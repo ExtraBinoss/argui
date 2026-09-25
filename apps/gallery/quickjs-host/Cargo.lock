@@ -241,8 +241,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-automation"
+version = "0.3.3"
+dependencies = [
+ "argui-animation",
+ "argui-core",
+ "argui-host",
+ "argui-inspect",
+ "argui-layout",
+ "argui-render",
+ "argui-runtime",
+ "argui-text",
+ "argui-ui",
+ "serde",
+ "web-time",
+]
+
+[[package]]
 name = "argui-core"
 version = "0.3.3"
+dependencies = [
+ "web-time",
+]
 
 [[package]]
 name = "argui-effects"
@@ -267,6 +287,7 @@ name = "argui-gallery-quickjs"
 version = "0.3.3"
 dependencies = [
  "argui-android",
+ "argui-automation",
  "argui-core",
  "argui-effects",
  "argui-gallery-assets",
@@ -278,9 +299,11 @@ dependencies = [
  "argui-runtime",
  "argui-text",
  "argui-ui",
+ "image",
  "pollster 0.4.0",
  "rquickjs",
  "rquickjs-sys",
+ "serde",
  "serde_json",
 ]
 
@@ -322,6 +345,7 @@ dependencies = [
  "argui-text",
  "argui-ui",
  "taffy",
+ "web-time",
 ]
 
 [[package]]

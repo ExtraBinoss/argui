@@ -11,7 +11,7 @@ Application rendering and callbacks continue through the existing
 `NativeBridge` and `argui-host` transaction/event contract. Do not introduce a
 second JSON protocol for describing or mounting the UI.
 
-## Current starting point
+## Starting point before implementation
 
 - `argui check` can validate a native TSX app without opening a window through
   the QuickJS host's `ARGUI_VALIDATE_ONLY` path. It does not render frames or
@@ -74,13 +74,12 @@ await ui.expectPerformance({ p95FrameTimeMsBelow: 16.67 })
 
 `scroll` injects an Argui wheel/trackpad delta at the selected element's
 position; `click({ button: 'right' })` sends a secondary-button press and
-release through the same pointer path as a real mouse. These examples describe
-the intended API and are not implemented yet.
+release through the same pointer path as a real mouse.
 Performance assertions are opt-in; every run records diagnostics even when no
 threshold is set. A frame budget of 16.67 ms corresponds to 60 Hz, not a
 guarantee that every operating system or CI runner can sustain 60 fps.
 
-This syntax does not exist yet. The test and app must execute in one QuickJS
+The test and app execute in one QuickJS
 session so the real Solid/React callbacks and `NativeBridge` deliveries are
 exercised. Test methods are thin bindings to the Rust automation driver; they
 must not serialize an alternate component tree or duplicate the host schema.
@@ -97,7 +96,10 @@ keeps the API small while covering common interactions. The first acceptance
 tests should cover a counter click, list scroll, context click, field entry,
 and drag. Add touch, IME composition, complex shortcuts, and other gestures
 only when a concrete application test needs them. Define clear timeouts and
-cancellation for async application work; avoid arbitrary sleeps. A virtual
+cancellation for async application work. Offer an explicit, bounded
+`ui.wait(ms)` for captures that need a chosen delay; keep the app scheduler,
+animations, and callbacks advancing during that wait. Prefer semantic
+assertions when elapsed time is not part of the test. A virtual
 clock can be added when animation tests require deterministic frame timing.
 
 ## Implementation sequence
@@ -146,6 +148,13 @@ clock can be added when animation tests require deterministic frame timing.
    dependency would otherwise affect mobile/WASM; enable it in the desktop
    CLI by default. Prefer one maintained cross-platform crate after checking
    its Linux, macOS, and Windows support; avoid OS-specific shell commands.
+   Use an opt-in, nested metric trace for action, model, geometry, paint,
+   renderer CPU, and readback spans. Keep frame diagnostics and the raw trace
+   in the report so tools can correlate slow frames with actions and inspect
+   new phase names without changing the report schema. GPU pass times require
+   adapter timestamp queries and must remain nullable. Link the automation
+   driver only through a Cargo feature; the ordinary release host must not
+   enable that feature or collect these development metrics.
    Performance thresholds fail a test only when explicitly requested in TS.
 5. **Cross-platform CI.** Run the same counter TSX test on Linux, macOS, and
    Windows, verify assertion results and nonblank captures, and retain the

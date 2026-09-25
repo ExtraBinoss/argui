@@ -6,6 +6,7 @@
     "baseUrl": ".",
     "paths": {
       "@argui/host": ["packages/host/src/index.ts"],
+      "@argui/test": ["packages/test/src/index.ts"],
       "@argui/solid": ["packages/solid/src/index.ts"],
       "@argui/solid/jsx-runtime": ["packages/solid/src/jsx-runtime.ts"],
       "@argui/react": ["packages/react/src/index.ts"],

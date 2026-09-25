@@ -13,6 +13,8 @@ use std::collections::HashMap;
 use taffy::NodeId;
 
 mod compute;
+#[cfg(feature = "metrics")]
+pub use compute::LayoutProfile;
 mod output;
 
 mod storage;

@@ -46,6 +46,13 @@ fn effect_clip_keeps_exact_scroll_viewport_edges() {
         region.intersection(PixelRegion::from_rect(clip, viewport).unwrap()),
         Some(region)
     );
+    assert_eq!(
+        region.intersection(PixelRegion {
+            origin: [200, 200],
+            size: [10, 10],
+        }),
+        None
+    );
     assert!(
         PixelRegion::from_clip_rect(
             Rect::new(Point::new(300.0, 300.0), Size::new(10.0, 10.0)),

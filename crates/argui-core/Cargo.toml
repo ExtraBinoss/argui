@@ -9,6 +9,11 @@ homepage.workspace = true
 readme.workspace = true
 description = "Geometry, color, identifiers and shared primitives for Argui"
 
+[features]
+metrics = ["dep:web-time"]
+
+[dependencies]
+web-time = { workspace = true, optional = true }
+
 [lints]
 workspace = true
-

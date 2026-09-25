@@ -1,13 +1,21 @@
 //! Native renderer controls and real frame profiles for JavaScript examples.
 
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+use std::sync::atomic::AtomicU64;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, Ordering},
     mpsc::Sender,
 };
 
-use argui_render::{DamageMode, DamageTracking, RenderProfile};
-use argui_runtime::{NativeHostControl, RuntimeEvent};
-use serde_json::{Value, json};
+use argui_render::DamageTracking;
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+use argui_render::{DamageMode, RenderProfile};
+use argui_runtime::NativeHostControl;
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+use argui_runtime::RuntimeEvent;
+use serde_json::Value;
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+use serde_json::json;
 
 use crate::runner::RelayBatch;
 
@@ -65,6 +73,7 @@ pub fn parse_control(json: &str) -> Result<NativeHostControl, String> {
 ///
 /// Returns measured CPU and optional GPU milliseconds together with the
 /// damage decision and pixel counts. Missing GPU timestamps remain JSON null.
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
 pub fn profile_json(profile: &RenderProfile) -> String {
     json!({
         "cpuMs": profile.cpu_time.as_secs_f64() * 1000.0,
@@ -88,6 +97,7 @@ pub fn profile_json(profile: &RenderProfile) -> String {
 /// `event` is a runtime event; `sender` receives serialized real samples;
 /// `enabled` is the page subscription flag and `frames` counts eligible frames.
 /// No sample is synthesized when the renderer has not emitted a profile.
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
 pub fn forward_profile(
     event: &RuntimeEvent,
     sender: &Sender<String>,
@@ -117,6 +127,9 @@ pub(crate) fn control_request(
     if let Ok(value) = serde_json::from_str::<Value>(json)
         && value.get("kind").and_then(Value::as_str) == Some("profile")
     {
+        if !cfg!(any(debug_assertions, feature = "dev-metrics")) {
+            return "renderer profiling is disabled in this release build".into();
+        }
         let Some(requested) = value.get("enabled").and_then(Value::as_bool) else {
             return "profile.enabled must be a boolean".into();
         };

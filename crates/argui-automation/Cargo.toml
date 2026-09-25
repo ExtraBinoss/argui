@@ -1,0 +1,34 @@
+[package]
+name = "argui-automation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Windowless Argui interaction driver and desktop process metrics"
+
+[features]
+default = []
+desktop-metrics = ["dep:sysinfo"]
+
+[dependencies]
+argui-animation.workspace = true
+argui-core = { workspace = true, features = ["metrics"] }
+argui-host.workspace = true
+argui-inspect.workspace = true
+argui-layout = { workspace = true, features = ["metrics"] }
+argui-render.workspace = true
+argui-runtime.workspace = true
+argui-text.workspace = true
+argui-ui.workspace = true
+serde.workspace = true
+sysinfo = { workspace = true, optional = true, features = ["system"] }
+web-time.workspace = true
+
+[dev-dependencies]
+argui-schema = { path = "../argui-schema" }
+
+[lints]
+workspace = true

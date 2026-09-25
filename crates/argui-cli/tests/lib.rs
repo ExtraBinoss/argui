@@ -38,7 +38,7 @@ fn fixture(root: &Path) {
         &root.join("bin/bun"),
         r##"#!/bin/sh
 case "$1" in
-  --version) echo 1.4.0 ;;
+  --version) if [ "${FAKE_BUN_DELETE:-}" = 1 ]; then rm "$0"; fi; echo 1.4.0 ;;
   *tsc) if [ "${FAKE_TSC_FAIL:-}" = 1 ]; then echo 'src/main.tsx(2,3): error TS0001: sample error'; exit 2; fi ;;
   *vite.js) if [ "${FAKE_VITE_FAIL:-}" = 1 ]; then exit 2; fi; mkdir -p dist; if [ "${FAKE_BUNDLE_MISSING:-}" != 1 ]; then printf 'export function mountGallery() {}\n' > dist/app.mjs; fi; if [ -n "${ARGUI_TEST_VITE_LOG:-}" ]; then printf 'build\n' >> "$ARGUI_TEST_VITE_LOG"; fi ;;
   run) mkdir -p apps/gallery/dist; printf 'export function mountGallery() {}\n' > apps/gallery/dist/gallery-core.mjs ;;
@@ -117,6 +117,18 @@ fn check_reports_success_and_failure() {
             .unwrap()
             .contains("src/main.tsx")
     );
+    let unavailable = Command::new(env!("CARGO_BIN_EXE_argui"))
+        .arg("check")
+        .current_dir(temp.path().join("apps/demo"))
+        .env(
+            "PATH",
+            format!("{}:/usr/bin:/bin", temp.path().join("bin").display()),
+        )
+        .env("FAKE_BUN_DELETE", "1")
+        .output()
+        .unwrap();
+    assert!(!unavailable.status.success());
+    assert!(String::from_utf8_lossy(&unavailable.stderr).contains("bun unavailable"));
 }
 
 #[test]

@@ -65,6 +65,10 @@
         "solid-js": "1.9.15",
       },
     },
+    "packages/test": {
+      "name": "@argui/test",
+      "version": "0.3.3",
+    },
     "packages/widgets": {
       "name": "@argui/widgets",
       "version": "0.3.2",
@@ -87,6 +91,8 @@
     "@argui/react": ["@argui/react@workspace:packages/react"],
 
     "@argui/solid": ["@argui/solid@workspace:packages/solid"],
+
+    "@argui/test": ["@argui/test@workspace:packages/test"],
 
     "@argui/widgets": ["@argui/widgets@workspace:packages/widgets"],
 

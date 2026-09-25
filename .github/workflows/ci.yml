@@ -196,6 +196,66 @@ jobs:
       - name: Compile the complete workspace
         run: cargo check --workspace --all-targets --all-features --locked
 
+  automation:
+    name: Windowless TSX automation (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            runner: ubuntu-24.04
+          - name: macOS
+            runner: macos-15
+          - name: Windows
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install Linux native and private-display dependencies
+        if: runner.os == 'Linux'
+        run: ./scripts/install-linux-ci.sh
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: v0.16.0
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: automation-${{ matrix.name }}
+          cache-targets: false
+          cache-directories: ${{ env.SCCACHE_DIR }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build the generated counter and run the same TSX test
+        run: |
+          bun install --frozen-lockfile
+          cargo run --locked -p argui-cli -- init counter-native
+          bun install --no-save
+          if [ "$RUNNER_OS" = Windows ]; then exe=target/debug/argui.exe; else exe=target/debug/argui; fi
+          if [ "$RUNNER_OS" = Linux ]; then
+            ./scripts/linux-hidden-display.sh "$exe" test apps/counter-native tests/automation/counter.test.ts --out target/automation-counter
+          else
+            "$exe" test apps/counter-native tests/automation/counter.test.ts --out target/automation-counter
+          fi
+          bun scripts/check-automation-report.mjs target/automation-counter
+      - name: Save automation diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: automation-${{ matrix.name }}
+          path: target/automation-counter/
+          retention-days: 7
+          if-no-files-found: ignore
+
   gallery:
     name: Solid and React gallery
     runs-on: ubuntu-24.04
@@ -371,7 +431,7 @@ jobs:
 
   release:
     name: Publish crates and GitHub release
-    needs: [security, quality, semver, coverage, desktop, gallery, web, mobile, android-package, packages]
+    needs: [security, quality, semver, coverage, desktop, automation, gallery, web, mobile, android-package, packages]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       github.repository == 'ExtraBinoss/argui' && github.actor == 'ExtraBinoss' &&

@@ -1,6 +1,7 @@
 //! Project scaffolding and build commands for Argui's native TSX host.
 #![cfg(not(target_arch = "wasm32"))]
 
+mod automation;
 mod components;
 mod icons;
 mod native;
@@ -16,7 +17,7 @@ use std::{
 pub use components::{component_files, install};
 pub use project::{Framework, Project, Target};
 
-const HELP: &str = "Argui TSX CLI\n\nUsage:\n  argui init counter-web|counter-native\n  argui init <solid|react|web|native> [name]\n  argui init <solid|react> <name>-web\n  argui check [path] [--json]\n  argui build [path] [dev|release]\n  argui dev [path]\n  argui run [path] <dev|release>\n  argui add <solid|react> <component>...\n  argui icon <source.png>\n  argui doctor [web]\n\nAvailable components are listed in the checkout's components/registry.json.\nInside an Argui checkout, init creates apps/<name>. Elsewhere, it creates a matching versioned checkout in <name>/ with the app in <name>/apps/<name>.\nProject commands accept a path relative to the current directory; omit it when already inside the app. The project manifest selects the native or browser target.\n";
+const HELP: &str = "Argui TSX CLI\n\nUsage:\n  argui init counter-web|counter-native\n  argui init <solid|react|web|native> [name]\n  argui init <solid|react> <name>-web\n  argui check [path] [--json]\n  argui build [path] [dev|release]\n  argui dev [path]\n  argui run [path] <dev|release>\n  argui test [app-path] <file.test.ts|file.test.tsx> --out <directory>\n  argui screenshot [app-path] --out <file.png>\n  argui add <solid|react> <component>...\n  argui icon <source.png>\n  argui doctor [web]\n\nAvailable components are listed in the checkout's components/registry.json.\nInside an Argui checkout, init creates apps/<name>. Elsewhere, it creates a matching versioned checkout in <name>/ with the app in <name>/apps/<name>.\nProject commands accept a path relative to the current directory; omit it when already inside the app. The project manifest selects the native or browser target.\n";
 #[cfg(windows)]
 const C_COMPILER: (&str, &str) = ("cl", "https://rust-lang.org/tools/install/");
 #[cfg(target_os = "macos")]
@@ -102,6 +103,8 @@ pub fn run_in(cwd: &Path, args: &[String]) -> Result<(), String> {
         [command] if command == "doctor" => doctor(),
         [command, target] if command == "doctor" && target == "web" => doctor_web(),
         [command, source] if command == "icon" => icons::generate(cwd, Path::new(source)),
+        [command, options @ ..] if command == "test" => automation::test(cwd, options),
+        [command, options @ ..] if command == "screenshot" => automation::screenshot(cwd, options),
         [command, options @ ..] if command == "check" => check_project(cwd, options),
         [command, options @ ..] if command == "build" || command == "run" || command == "dev" => {
             project_command(cwd, command, options)

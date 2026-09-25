@@ -15,6 +15,7 @@ path = "src/main.rs"
 test = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+argui-automation = { workspace = true, features = ["desktop-metrics"] }
 serde.workspace = true
 serde_json.workspace = true
 image.workspace = true

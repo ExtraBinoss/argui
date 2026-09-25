@@ -294,6 +294,25 @@ pub fn check(cwd: &Path, json: bool) -> Result<(), String> {
 /// # Errors
 /// Returns an error for missing prerequisites, failed builds, or output copies.
 pub fn build(cwd: &Path, release: bool) -> Result<(), String> {
+    build_native(cwd, release, false)
+}
+
+/// Builds a debug host with the optional automation and metrics code enabled.
+/// `cwd` selects the native application directory.
+///
+/// # Errors
+/// Returns an error from the project, TSX, or native build.
+pub(crate) fn build_for_automation(cwd: &Path) -> Result<(), String> {
+    build_native(cwd, false, true)
+}
+
+/// Builds the selected application with optional native test features.
+/// `cwd` identifies the app; `release` selects optimized output; `automation`
+/// links the test driver and metric collector into a debug host.
+///
+/// # Errors
+/// Returns an error from dependency checks, Bun, Cargo, or packaging.
+fn build_native(cwd: &Path, release: bool, automation: bool) -> Result<(), String> {
     if load(cwd)?.target == Target::Web {
         return super::web::build(cwd, release);
     }
@@ -320,6 +339,9 @@ pub fn build(cwd: &Path, release: bool) -> Result<(), String> {
         .arg("--locked");
     if release {
         cargo.arg("--release");
+    }
+    if automation {
+        cargo.args(["--features", "automation"]);
     }
     status(cargo.current_dir(&root), "cargo build")?;
     if release {

@@ -1,5 +1,10 @@
 //! Embedded QuickJS execution for the runtime-neutral gallery module.
 
+#[cfg(all(
+    feature = "automation",
+    any(target_os = "linux", target_os = "windows", target_os = "macos")
+))]
+mod automation;
 mod delivery;
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 mod desktop_application;
@@ -10,15 +15,17 @@ mod hot_reload;
 mod i18n;
 mod native_metrics;
 mod runner;
-#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
-mod validate;
 mod services;
 mod telemetry;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+mod validate;
 mod wire;
 
 pub use delivery::{coalesce_virtual_windows, ui_event_payload};
 pub use effects::registry_from_json;
-pub use native_metrics::{parse_control, profile_json};
+pub use native_metrics::parse_control;
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+pub use native_metrics::profile_json;
 pub use services::{ServiceOutcome, ServiceRegistry, ServiceResponse};
 pub use wire::decode_wire_operations;
 
@@ -98,6 +105,62 @@ impl QuickJsGallery {
         request: impl Fn(String) -> String + 'static,
         cancel: impl Fn(String) -> String + 'static,
     ) -> Result<Self, String> {
+        Self::new_internal(
+            source,
+            contract_json,
+            entry,
+            commit,
+            control,
+            request,
+            cancel,
+            #[cfg(feature = "automation")]
+            |_, _, _| 0,
+        )
+    }
+
+    /// Mounts `source` as an app imported by a `@argui/test` module.
+    /// `contract_json` supplies the host ABI, `commit` applies host transactions,
+    /// and `automation` queues native test actions in the same bridge session.
+    ///
+    /// # Errors
+    /// Returns a JavaScript, bridge, or schema error during mount.
+    #[cfg(feature = "automation")]
+    pub fn new_automation(
+        source: &str,
+        contract_json: &str,
+        commit: impl Fn(String) -> String + 'static,
+        automation: impl Fn(String, String, String) -> i32 + 'static,
+    ) -> Result<Self, String> {
+        Self::new_internal(
+            source,
+            contract_json,
+            "__arguiTest",
+            commit,
+            |_| "native controls unavailable".into(),
+            |_| "application services unavailable".into(),
+            |_| String::new(),
+            automation,
+        )
+    }
+
+    /// Installs the shared native bridge before mounting `entry` from `source`.
+    /// `contract_json` supplies the host ABI; `commit` forwards UI transactions;
+    /// `control`, `request`, and `cancel` forward native service work. With the
+    /// automation feature, `automation` queues test actions in the same session.
+    ///
+    /// # Errors
+    /// Returns a QuickJS or schema error while evaluating or mounting the bundle.
+    #[allow(clippy::too_many_arguments)]
+    fn new_internal(
+        source: &str,
+        contract_json: &str,
+        entry: &str,
+        commit: impl Fn(String) -> String + 'static,
+        control: impl Fn(String) -> String + 'static,
+        request: impl Fn(String) -> String + 'static,
+        cancel: impl Fn(String) -> String + 'static,
+        #[cfg(feature = "automation")] automation: impl Fn(String, String, String) -> i32 + 'static,
+    ) -> Result<Self, String> {
         let runtime = Runtime::new().map_err(js_error)?;
         let context = Context::full(&runtime).map_err(js_error)?;
         let i18n = Rc::new(RefCell::new(i18n::NativeI18n::default()));
@@ -131,6 +194,13 @@ impl QuickJsGallery {
                 .set(
                     "__arguiCancelService",
                     Function::new(ctx.clone(), cancel).map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            #[cfg(feature = "automation")]
+            globals
+                .set(
+                    "__arguiRequest",
+                    Function::new(ctx.clone(), automation).map_err(js_error)?,
                 )
                 .map_err(js_error)?;
             let loader = Rc::clone(&i18n);
@@ -169,6 +239,14 @@ impl QuickJsGallery {
                 .map_err(|error| format!("QuickJS: {error}"))?;
             CaughtError::catch(&ctx, evaluated.finish::<()>())
                 .map_err(|error| format!("QuickJS module: {error}"))?;
+            #[cfg(feature = "automation")]
+            let mount: Function = if entry == "__arguiTest" {
+                let test: Object = globals.get("__arguiTest").map_err(js_error)?;
+                test.get("app").map_err(js_error)?
+            } else {
+                module.get(entry).map_err(js_error)?
+            };
+            #[cfg(not(feature = "automation"))]
             let mount: Function = module.get(entry).map_err(js_error)?;
             let bridge: Object = globals.get("__arguiBridge").map_err(js_error)?;
             let hash: String = ctx
@@ -181,6 +259,55 @@ impl QuickJsGallery {
         let gallery = Self { runtime, context };
         gallery.drain_jobs()?;
         Ok(gallery)
+    }
+
+    /// Returns the test module's viewport JSON, using the default when omitted.
+    ///
+    /// # Errors
+    /// Returns a QuickJS error when the module did not define a test.
+    #[cfg(feature = "automation")]
+    pub fn automation_viewport(&self) -> Result<String, String> {
+        self.context.with(|ctx| ctx.eval("JSON.stringify(globalThis.__arguiTest?.viewport ?? {width:800,height:600,scale:1})").map_err(js_error))
+    }
+
+    /// Starts the async test body after its real application has mounted.
+    ///
+    /// # Errors
+    /// Returns an error if the test could not start.
+    #[cfg(feature = "automation")]
+    pub fn start_automation(&self) -> Result<(), String> {
+        self.context.with(|ctx| {
+            ctx.eval::<(), _>("globalThis.__arguiStartTest()")
+                .map_err(js_error)
+        })?;
+        self.drain_jobs()
+    }
+
+    /// Reads test completion and failure state as JSON.
+    ///
+    /// # Errors
+    /// Returns a QuickJS error if state serialization fails.
+    #[cfg(feature = "automation")]
+    pub fn automation_state(&self) -> Result<String, String> {
+        self.context.with(|ctx| {
+            ctx.eval("JSON.stringify(globalThis.__arguiTestState)")
+                .map_err(js_error)
+        })
+    }
+
+    /// Resolves one awaited native test action, then drains app/test jobs.
+    /// `id` identifies the action, `error` rejects it when nonempty, and `result`
+    /// is a JSON value for successful actions.
+    ///
+    /// # Errors
+    /// Returns a QuickJS error if the callback or scheduled jobs fail.
+    #[cfg(feature = "automation")]
+    pub fn resolve_automation(&self, id: i32, error: &str, result: &str) -> Result<(), String> {
+        self.context.with(|ctx| {
+            let resolve: Function = ctx.globals().get("__arguiResolve").map_err(js_error)?;
+            resolve.call::<_, ()>((id, error, result)).map_err(js_error)
+        })?;
+        self.drain_jobs()
     }
 
     /// Delivers a native callback encoded as JSON to the mounted application.
@@ -202,6 +329,7 @@ impl QuickJsGallery {
     ///
     /// # Errors
     /// Returns an error if the profile callback fails.
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     pub fn deliver_profile(&self, profile_json: &str) -> Result<(), String> {
         self.context.with(|ctx| {
             let deliver: Function = ctx

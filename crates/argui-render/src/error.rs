@@ -16,6 +16,7 @@ pub enum RendererError {
     SurfaceCreation(String),
     AdapterRequest(String),
     DeviceRequest(String),
+    Readback(String),
     Initialization {
         attempts: Vec<RendererAttemptFailure>,
         fallback_enabled: bool,
@@ -67,6 +68,7 @@ impl fmt::Display for RendererError {
             }
             Self::AdapterRequest(message) => write!(formatter, "adapter request failed: {message}"),
             Self::DeviceRequest(message) => write!(formatter, "device request failed: {message}"),
+            Self::Readback(message) => write!(formatter, "offscreen readback failed: {message}"),
             Self::Initialization {
                 attempts,
                 fallback_enabled,

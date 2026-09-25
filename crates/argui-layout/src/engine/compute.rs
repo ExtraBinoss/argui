@@ -1,11 +1,17 @@
 use crate::layout_tree::LayoutTree;
+#[cfg(feature = "metrics")]
+use argui_core::MetricTrace;
 use argui_core::{Point, Rect, Size};
 use argui_text::TextEngine;
 use argui_ui::{ElementKind, TreeUpdate, UiTree};
+#[cfg(feature = "metrics")]
+use std::time::Duration;
 use taffy::{
     AvailableSpace, Dimension, LengthPercentageAuto, NodeId, compute_leaf_layout,
     geometry::Size as TaffySize, tree::LayoutOutput as TaffyLayoutOutput,
 };
+#[cfg(feature = "metrics")]
+use web_time::Instant;
 
 use crate::{
     LayoutError,
@@ -17,6 +23,18 @@ use crate::{
 use super::{LayoutEngine, LayoutOutput, Placement, collect_layout, flattened};
 
 const MAX_CONTAINER_QUERY_PASSES: usize = 4;
+
+/// CPU time spent preparing geometry and producing paint output for one scene.
+#[cfg(feature = "metrics")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LayoutProfile {
+    /// Time spent reconciling, measuring, and placing the layout tree.
+    pub layout: Duration,
+    /// Time spent producing paint output or updating its scroll presentation.
+    pub paint: Duration,
+    /// Number of layout passes required for container query convergence.
+    pub passes: usize,
+}
 
 impl LayoutEngine {
     /// Computes node geometry, text input regions, hit regions, and paint output.
@@ -35,19 +53,108 @@ impl LayoutEngine {
         text_engine: &mut TextEngine,
         viewport: Size,
     ) -> Result<LayoutOutput, LayoutError> {
+        #[cfg(feature = "metrics")]
+        {
+            self.compute_profiled(ui, text_engine, viewport)
+                .map(|(output, _)| output)
+        }
+        #[cfg(not(feature = "metrics"))]
+        {
+            let mut history = Vec::new();
+            loop {
+                let (mut output, query_update, sizes) =
+                    self.compute_pass(ui, text_engine, viewport)?;
+                if query_update != TreeUpdate::Layout {
+                    if query_update == TreeUpdate::Scroll {
+                        self.apply_scroll(ui, &mut output)?;
+                    } else {
+                        self.repaint(ui, &mut output);
+                    }
+                    let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
+                    self.scroll_anchors = crate::anchor::capture(root, &output, ui);
+                    ui.mark_layout_clean();
+                    return Ok(output);
+                }
+                if history.contains(&sizes) || history.len() + 1 >= MAX_CONTAINER_QUERY_PASSES {
+                    return Err(LayoutError::NonConvergentContainerQueries);
+                }
+                history.push(sizes);
+            }
+        }
+    }
+
+    /// Computes a scene and returns separate geometry and paint CPU timings.
+    /// `ui` is the retained tree, `text_engine` shapes text, and `viewport` is
+    /// the available logical size. The timings include all container query passes.
+    ///
+    /// # Errors
+    /// Returns the same layout and container query errors as [`Self::compute`].
+    #[cfg(feature = "metrics")]
+    pub fn compute_profiled(
+        &mut self,
+        ui: &mut UiTree,
+        text_engine: &mut TextEngine,
+        viewport: Size,
+    ) -> Result<(LayoutOutput, LayoutProfile), LayoutError> {
+        self.compute_inner(ui, text_engine, viewport, None)
+    }
+
+    /// Computes a scene while writing nested phase spans to `trace`.
+    /// `ui`, `text_engine`, and `viewport` have the same meaning as in
+    /// [`Self::compute`]. Returns the scene and top-level timing totals.
+    ///
+    /// # Errors
+    /// Returns the same layout and container query errors as [`Self::compute`].
+    #[cfg(feature = "metrics")]
+    pub fn compute_traced(
+        &mut self,
+        ui: &mut UiTree,
+        text_engine: &mut TextEngine,
+        viewport: Size,
+        trace: &MetricTrace,
+    ) -> Result<(LayoutOutput, LayoutProfile), LayoutError> {
+        self.compute_inner(ui, text_engine, viewport, Some(trace))
+    }
+
+    /// Calculates `ui` for `viewport`, using `text_engine`, and optionally
+    /// writes nested timing spans to `trace`. Returns scene data and CPU totals.
+    ///
+    /// # Errors
+    /// Returns layout or container query errors from the same path as `compute`.
+    #[cfg(feature = "metrics")]
+    fn compute_inner(
+        &mut self,
+        ui: &mut UiTree,
+        text_engine: &mut TextEngine,
+        viewport: Size,
+        trace: Option<&MetricTrace>,
+    ) -> Result<(LayoutOutput, LayoutProfile), LayoutError> {
+        let _scene = trace.map(|trace| trace.span("scene.compute"));
         let mut history = Vec::new();
+        let mut profile = LayoutProfile::default();
         loop {
-            let (mut output, query_update, sizes) = self.compute_pass(ui, text_engine, viewport)?;
+            let _layout = trace.map(|trace| trace.span("layout.compute"));
+            let layout_started = Instant::now();
+            let (mut output, query_update, sizes) =
+                self.compute_pass(ui, text_engine, viewport, trace)?;
+            profile.layout += layout_started.elapsed();
+            profile.passes += 1;
+            drop(_layout);
             if query_update != TreeUpdate::Layout {
+                let _paint = trace.map(|trace| trace.span("paint.generate"));
+                let paint_started = Instant::now();
                 if query_update == TreeUpdate::Scroll {
                     self.apply_scroll(ui, &mut output)?;
                 } else {
                     self.repaint(ui, &mut output);
                 }
+                profile.paint += paint_started.elapsed();
+                drop(_paint);
+                let _finalize = trace.map(|trace| trace.span("layout.finalize"));
                 let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
                 self.scroll_anchors = crate::anchor::capture(root, &output, ui);
                 ui.mark_layout_clean();
-                return Ok(output);
+                return Ok((output, profile));
             }
             if history.contains(&sizes) || history.len() + 1 >= MAX_CONTAINER_QUERY_PASSES {
                 return Err(LayoutError::NonConvergentContainerQueries);
@@ -56,13 +163,22 @@ impl LayoutEngine {
         }
     }
 
+    /// Reconciles and measures one container query pass for `ui` in `viewport`.
+    /// `text_engine` supplies text measurements and optional `trace` records
+    /// subphases. Returns scene geometry, the query update, and node sizes.
+    ///
+    /// # Errors
+    /// Returns validation, layout, or node identity errors.
     fn compute_pass(
         &mut self,
         ui: &mut UiTree,
         text_engine: &mut TextEngine,
         viewport: Size,
+        #[cfg(feature = "metrics")] trace: Option<&MetricTrace>,
     ) -> Result<(LayoutOutput, TreeUpdate, Vec<Size>), LayoutError> {
         if self.revision != Some(ui.revision()) {
+            #[cfg(feature = "metrics")]
+            let _reconcile = trace.map(|trace| trace.span("layout.reconcile"));
             crate::custom::validate(ui.root())?;
             self.sync_or_rebuild(ui)?;
         }
@@ -96,13 +212,19 @@ impl LayoutEngine {
             ui,
             text_engine,
         };
+        #[cfg(feature = "metrics")]
+        let _measure = trace.map(|trace| trace.span("layout.measure"));
         measurement.compute(&mut self.tree, root.id, viewport, None)?;
+        #[cfg(feature = "metrics")]
+        drop(_measure);
         let viewport_rect = Rect::new(Point::default(), viewport);
         let mut desired_sizes = Vec::new();
         for &index in ui.layout_root_indices() {
             let element = elements[index];
             let node = self.nodes_by_index[index];
             if crate::overlay::detached(element) {
+                #[cfg(feature = "metrics")]
+                let _measure = trace.map(|trace| trace.span("layout.measure"));
                 measurement.compute(&mut self.tree, node, viewport, None)?;
                 let measured = self.tree.layout(node)?.size;
                 desired_sizes.push((
@@ -118,12 +240,16 @@ impl LayoutEngine {
                     node,
                 )? {
                     let (node, size) = apply_constraint(&mut self.tree, constraint)?;
+                    #[cfg(feature = "metrics")]
+                    let _measure = trace.map(|trace| trace.span("layout.measure"));
                     measurement.compute(&mut self.tree, node, size, None)?;
                 }
             }
             if element.layout_boundary {
                 let work = self.tree.prepare_boundary(node)?;
                 if work.dirty {
+                    #[cfg(feature = "metrics")]
+                    let _measure = trace.map(|trace| trace.span("layout.measure"));
                     measurement.compute(&mut self.tree, work.root, work.size, Some(work.input))?;
                 } else if work.moved {
                     self.tree.round_root(work.root);
@@ -136,6 +262,8 @@ impl LayoutEngine {
             viewport: viewport_rect,
             ..LayoutOutput::default()
         };
+        #[cfg(feature = "metrics")]
+        let _placement = trace.map(|trace| trace.span("layout.place"));
         collect_layout(
             &self.tree,
             root,

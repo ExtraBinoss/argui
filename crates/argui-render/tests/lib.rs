@@ -1,5 +1,9 @@
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "surface/offscreen_api.rs"]
+mod offscreen_api;
+
 const PRIMITIVES: [(&str, &str); 4] = [
     ("quad", include_str!("../src/shaders/primitives/quad.wgsl")),
     ("text", include_str!("../src/shaders/primitives/text.wgsl")),

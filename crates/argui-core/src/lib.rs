@@ -7,6 +7,8 @@ mod geometry;
 mod input;
 mod insets;
 mod keyboard;
+#[cfg(feature = "metrics")]
+mod metrics;
 mod name;
 mod text;
 
@@ -20,5 +22,7 @@ pub use input::{
 };
 pub use insets::Insets;
 pub use keyboard::{ImeInput, Key, KeyInput, KeyState, Modifiers};
+#[cfg(feature = "metrics")]
+pub use metrics::{MetricEvent, MetricKind, MetricSpan, MetricTrace};
 pub use name::Name;
 pub use text::{CaretAffinity, TextPosition};

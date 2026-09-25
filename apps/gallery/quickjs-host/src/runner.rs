@@ -1,15 +1,15 @@
 //! Native window and embedded QuickJS process for the shared gallery module.
 
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+use std::sync::Mutex;
 use std::{
-    cell::RefCell,
     path::PathBuf,
     rc::Rc,
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+        atomic::{AtomicBool, AtomicU64},
         mpsc::{self, Receiver, Sender},
     },
-    time::{Duration, Instant},
 };
 
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
@@ -18,14 +18,16 @@ use crate::desktop_application::{
 };
 use crate::{
     QuickJsGallery,
-    delivery::{coalesce_virtual_windows, event_json},
     effects::registry_from_json,
-    hot_reload::{BundleWatcher, Dispatch, ReloadContext, dev_bundle_path, reload_gallery},
-    native_metrics::{control_request, forward_profile},
+    hot_reload::{BundleWatcher, Dispatch, dev_bundle_path},
+    native_metrics::control_request,
     services::{ServiceChannels, ServiceRegistry, ServiceResponse},
-    telemetry::{
-        JsCounts, ProfileSummary, mark_commit_for_presentation, observe_profile, report_remaining,
-    },
+    telemetry::JsCounts,
+};
+#[cfg(any(debug_assertions, feature = "dev-metrics"))]
+use crate::{
+    native_metrics::forward_profile,
+    telemetry::{ProfileSummary, mark_commit_for_presentation, observe_profile, report_remaining},
 };
 use argui_host::Host;
 #[cfg(target_os = "android")]
@@ -38,8 +40,10 @@ use argui_runtime::{
     NativeHostAssets, NativeHostBatch, NativeHostControl, NativeHostDelivery, RuntimeError,
     WireOperation,
 };
-use argui_ui::UiEventKind;
 use serde_json::Value;
+
+mod js_loop;
+use js_loop::{JsLoopInbox, ReloadControl, run_js_loop};
 
 #[cfg(target_os = "android")]
 const NOTO_SANS: &[u8] = include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf");
@@ -64,6 +68,10 @@ pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
 pub fn run_desktop_with_services(
     services: Arc<ServiceRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "automation")]
+    if std::env::var_os("ARGUI_AUTOMATION_TEST").is_some() {
+        return crate::automation::run();
+    }
     if std::env::var_os("ARGUI_VALIDATE_ONLY").is_some() {
         return crate::validate::validate_app_bundle();
     }
@@ -74,9 +82,13 @@ pub fn run_desktop_with_services(
     let (application_sender, application_requests) = mpsc::channel();
     let appearance =
         register_application_services(&services, application_sender, config.tray.clone());
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     let observed = Arc::clone(&profiles);
-    let bundle_path = std::env::var_os("ARGUI_APP_BUNDLE").map(PathBuf::from).or_else(dev_bundle_path);
+    let bundle_path = std::env::var_os("ARGUI_APP_BUNDLE")
+        .map(PathBuf::from)
+        .or_else(dev_bundle_path);
     let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
@@ -89,11 +101,12 @@ pub fn run_desktop_with_services(
          profile_sender,
          profile_enabled,
          service_sender| {
+            #[cfg(any(debug_assertions, feature = "dev-metrics"))]
             let frames = AtomicU64::new(0);
             run_native_host_application(
                 config,
                 RendererConfig::default()
-                    .profiling(true)
+                    .profiling(cfg!(debug_assertions) || cfg!(feature = "dev-metrics"))
                     .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 host,
@@ -105,8 +118,13 @@ pub fn run_desktop_with_services(
                 },
                 GalleryApp::with_appearance(service_sender.clone(), appearance),
                 move |event| {
-                    forward_profile(&event, &profile_sender, &profile_enabled, &frames);
-                    observe_profile(&observed, &event, "quickjs");
+                    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
+                    {
+                        forward_profile(&event, &profile_sender, &profile_enabled, &frames);
+                        observe_profile(&observed, &event, "quickjs");
+                    }
+                    #[cfg(not(any(debug_assertions, feature = "dev-metrics")))]
+                    let _ = (&profile_sender, &profile_enabled);
                     if let Some(response) = runtime_service_event(&event) {
                         let _ = service_sender.send(response);
                     }
@@ -114,6 +132,7 @@ pub fn run_desktop_with_services(
             )
         },
     );
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     report_remaining(&profiles, "quickjs");
     result
 }
@@ -129,7 +148,9 @@ pub fn run_desktop_with_services(
 pub fn run_android(
     android_app: argui_android::AndroidApp,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     let observed = Arc::clone(&profiles);
     let bundle_path = cfg!(debug_assertions)
         .then(|| {
@@ -150,6 +171,7 @@ pub fn run_android(
          profile_sender,
          profile_enabled,
          _service_sender| {
+            #[cfg(any(debug_assertions, feature = "dev-metrics"))]
             let frames = AtomicU64::new(0);
             let text_engine = argui_text::TextEngine::from_embedded_fonts(
                 [NOTO_SANS],
@@ -164,7 +186,7 @@ pub fn run_android(
                     ..WindowConfig::default()
                 },
                 RendererConfig::default()
-                    .profiling(true)
+                    .profiling(cfg!(debug_assertions) || cfg!(feature = "dev-metrics"))
                     .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 text_engine,
@@ -173,12 +195,18 @@ pub fn run_android(
                 batches,
                 deliveries,
                 move |event| {
-                    forward_profile(&event, &profile_sender, &profile_enabled, &frames);
-                    observe_profile(&observed, &event, "quickjs");
+                    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
+                    {
+                        forward_profile(&event, &profile_sender, &profile_enabled, &frames);
+                        observe_profile(&observed, &event, "quickjs");
+                    }
+                    #[cfg(not(any(debug_assertions, feature = "dev-metrics")))]
+                    let _ = (&profile_sender, &profile_enabled, event);
                 },
             )
         },
     );
+    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     report_remaining(&profiles, "quickjs");
     result
 }
@@ -226,7 +254,7 @@ fn run_gallery(
     let (service_sender, service_responses) = mpsc::channel();
     let runtime_service_sender = service_sender.clone();
     let actor_services = Arc::clone(&services);
-    let (profile_sender, profile_events) = mpsc::channel();
+    let (profile_sender, _profile_events) = mpsc::channel();
     let profile_enabled = Arc::new(AtomicBool::new(false));
     let actor_profile_enabled = Arc::clone(&profile_enabled);
     let (stop_sender, stop) = mpsc::channel();
@@ -299,10 +327,13 @@ fn run_gallery(
             sender: &wire_sender,
         };
         let counts = JsCounts::new(batch_count, operation_count);
-        let (startup_batches, startup_operations) = counts.startup();
-        eprintln!(
-            "argui-gallery-profile mode=quickjs startup_batches={startup_batches} startup_operations={startup_operations}"
-        );
+        #[cfg(any(debug_assertions, feature = "dev-metrics"))]
+        {
+            let (startup_batches, startup_operations) = counts.startup();
+            eprintln!(
+                "argui-gallery-profile mode=quickjs startup_batches={startup_batches} startup_operations={startup_operations}"
+            );
+        }
         let effects = gallery
             .effect_definitions_json()
             .and_then(|json| registry_from_json(&json));
@@ -320,7 +351,8 @@ fn run_gallery(
             &mut reload,
             JsLoopInbox {
                 events,
-                profiles: profile_events,
+                #[cfg(any(debug_assertions, feature = "dev-metrics"))]
+                profiles: _profile_events,
                 errors,
                 stop,
                 services: service_responses,
@@ -392,6 +424,7 @@ fn relay_batches(
                     let _ = ack.send(Ok(()));
                 }
                 if batch_sequence > 1 && operation_count >= 50 {
+                    #[cfg(any(debug_assertions, feature = "dev-metrics"))]
                     mark_commit_for_presentation();
                 }
             }
@@ -406,163 +439,4 @@ fn relay_batches(
             Err(_) => break,
         }
     }
-}
-
-/// Development bundle state owned by the QuickJS actor.
-struct ReloadControl<'a> {
-    watcher: Option<BundleWatcher>,
-    contract_json: &'a str,
-    sender: &'a Sender<RelayBatch>,
-}
-
-/// Native channels consumed by the QuickJS event pump.
-struct JsLoopInbox {
-    events: Receiver<NativeHostDelivery>,
-    profiles: Receiver<String>,
-    errors: Receiver<String>,
-    stop: Receiver<()>,
-    services: Receiver<ServiceResponse>,
-}
-
-/// Pumps native events, timer callbacks, and QuickJS microtasks until shutdown.
-/// `gallery` is the active script; `dispatch` routes commits; `reload` watches
-/// candidate bundles; `inbox` carries native events and shutdown; `profile_enabled`
-/// gates profiling samples, and `counts` records JavaScript work. Returns after
-/// shutdown or on the first unrecoverable JavaScript/native commit error.
-///
-/// # Errors
-/// Returns an error when JavaScript fails or the native host rejects a batch.
-fn run_js_loop(
-    gallery: &mut QuickJsGallery,
-    dispatch: &mut Rc<RefCell<Dispatch>>,
-    reload: &mut ReloadControl<'_>,
-    inbox: JsLoopInbox,
-    profile_enabled: &Arc<AtomicBool>,
-    counts: &JsCounts,
-    services: ServiceChannels<'_>,
-) -> Result<(), String> {
-    let started = Instant::now();
-    let mut work = Duration::ZERO;
-    let mut ticks = 0_u64;
-    let mut deliveries = 0_u64;
-    let mut window_deliveries = 0_u64;
-    loop {
-        if inbox.stop.try_recv().is_ok() {
-            break;
-        }
-        if let Ok(error) = inbox.errors.try_recv() {
-            return Err(format!("native commit rejected: {error}"));
-        }
-        if let Some(watcher) = reload.watcher.as_mut() {
-            match watcher.changed() {
-                Ok(Some(source)) => {
-                    if let Err(error) = reload_gallery(
-                        gallery,
-                        dispatch,
-                        &source,
-                        reload.contract_json,
-                        ReloadContext {
-                            sender: reload.sender,
-                            counts,
-                            profile_enabled,
-                            services: ServiceChannels {
-                                registry: services.registry,
-                                sender: services.sender,
-                            },
-                        },
-                    ) {
-                        eprintln!("argui-hot-reload: {error}; keeping previous scene");
-                    } else {
-                        eprintln!("argui-hot-reload: bundle applied");
-                    }
-                }
-                Ok(None) => {}
-                Err(error) => eprintln!("argui-hot-reload: {error}"),
-            }
-        }
-        deliver_services(gallery, &inbox.services, dispatch.borrow().generation)?;
-        let entered = Instant::now();
-        let maximum_delay = if profile_enabled.load(Ordering::Relaxed)
-            || services.registry.has_pending(dispatch.borrow().generation)
-        {
-            50
-        } else if reload.watcher.is_some() {
-            100
-        } else {
-            1000
-        };
-        let delay = gallery
-            .next_wake(started.elapsed().as_secs_f64() * 1000.0)?
-            .min(Duration::from_millis(maximum_delay));
-        work += entered.elapsed();
-        let burst = inbox
-            .events
-            .recv_timeout(delay)
-            .ok()
-            .into_iter()
-            .chain(inbox.events.try_iter())
-            .collect();
-        for delivery in coalesce_virtual_windows(burst) {
-            if delivery.callback.node.generation() != dispatch.borrow().generation {
-                continue;
-            }
-            let entered = Instant::now();
-            gallery.deliver(&event_json(&delivery).to_string())?;
-            if profile_enabled.load(Ordering::Relaxed)
-                && matches!(delivery.kind, UiEventKind::Click(_))
-            {
-                eprintln!(
-                    "argui-gallery-profile click_js_callback_ms={:.3}",
-                    entered.elapsed().as_secs_f64() * 1000.0
-                );
-            }
-            work += entered.elapsed();
-            deliveries += 1;
-            window_deliveries += u64::from(matches!(
-                delivery.kind,
-                UiEventKind::VirtualWindowChanged { .. }
-            ));
-        }
-        deliver_services(gallery, &inbox.services, dispatch.borrow().generation)?;
-        let mut latest_profile = None;
-        while let Ok(profile) = inbox.profiles.try_recv() {
-            latest_profile = Some(profile);
-        }
-        if profile_enabled.load(Ordering::Relaxed)
-            && let Some(profile) = latest_profile
-        {
-            gallery.deliver_profile(&profile)?;
-        }
-        let entered = Instant::now();
-        gallery.tick(started.elapsed().as_secs_f64() * 1000.0)?;
-        work += entered.elapsed();
-        ticks += 1;
-        if profile_enabled.load(Ordering::Relaxed) && ticks.is_multiple_of(5) {
-            counts.report(deliveries, ticks, work, started.elapsed());
-            eprintln!("argui-gallery-profile virtual_window_deliveries={window_deliveries}");
-        }
-    }
-    if profile_enabled.load(Ordering::Relaxed) {
-        counts.report(deliveries, ticks, work, started.elapsed());
-    }
-    Ok(())
-}
-
-/// Delivers completed requests only to their still-live JavaScript generation.
-/// `gallery` receives JSON, `responses` is the native worker channel, and
-/// `session` identifies the current mounted application.
-///
-/// # Errors
-/// Returns an error if a response callback fails in QuickJS.
-fn deliver_services(
-    gallery: &QuickJsGallery,
-    responses: &Receiver<ServiceResponse>,
-    session: u32,
-) -> Result<(), String> {
-    for response in responses.try_iter() {
-        if response.session == session || response.session == u32::MAX {
-            gallery.deliver_service(&response.json().to_string())?;
-        }
-    }
-    Ok(())
 }

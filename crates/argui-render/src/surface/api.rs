@@ -337,7 +337,11 @@ impl SurfaceRenderer {
         }
         self.surface_config.width = width;
         self.surface_config.height = height;
-        self.surface.configure(&self.device, &self.surface_config);
+        if let Some(surface) = &self.surface {
+            surface.configure(&self.device, &self.surface_config);
+        } else {
+            self.offscreen_target = Some(offscreen_texture(&self.device, width, height));
+        }
         self.layer_cache.clear();
         self.damage.invalidate();
         self.scene_snapshot = None;
@@ -348,17 +352,25 @@ impl SurfaceRenderer {
     /// Replaces the native surface target while retaining the existing GPU device.
     ///
     /// # Errors
-    /// Returns an error if creating the replacement surface fails.
+    /// Returns an error for a windowless renderer or if surface creation fails.
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn recreate_surface(
         &mut self,
         target: impl Into<SurfaceTarget<'static>>,
     ) -> Result<(), RendererError> {
-        self.surface = self
-            .instance
-            .create_surface(target)
-            .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?;
-        self.surface.configure(&self.device, &self.surface_config);
+        self.surface
+            .as_ref()
+            .ok_or(RendererError::UnsupportedSurface)?;
+        self.surface = Some(
+            self.instance
+                .create_surface(target)
+                .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?,
+        );
+        self.offscreen_target = None;
+        self.surface
+            .as_ref()
+            .expect("replacement surface exists")
+            .configure(&self.device, &self.surface_config);
         self.layer_cache.clear();
         self.damage.invalidate();
         self.effect_root = None;

@@ -1,4 +1,4 @@
-use argui_core::{Point, PointerEvent, PointerId, PointerKind, PointerPhase};
+use argui_core::{Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase};
 
 use crate::{
     GestureDelivery, GestureEvent, GestureKind, GesturePhase, HitRegion, InteractionUpdate, NodeId,
@@ -86,11 +86,25 @@ impl UiTree {
         let hit = region
             .filter(|region| region.enabled)
             .map(|region| (region.node, region.gestures));
-        let gestures = self.gestures.update(event, hit);
+        let secondary = event.button == Some(PointerButton::Secondary);
+        let gestures = if secondary {
+            Vec::new()
+        } else {
+            self.gestures.update(event, hit)
+        };
         let mut update = if event.kind == PointerKind::Touch && !event.primary {
             InteractionUpdate::default()
         } else {
             match event.phase {
+                PointerPhase::Pressed | PointerPhase::Released if secondary => {
+                    let mut moved = self.position_for_transition(event, regions);
+                    if let Some((node, _)) = hit {
+                        moved
+                            .events
+                            .extend(self.event_deliveries(node, UiEventKind::Pointer(event)));
+                    }
+                    moved
+                }
                 PointerPhase::Entered | PointerPhase::Moved => {
                     let update = self.interaction.pointer_moved(event, regions);
                     self.decorate_pointer(update)

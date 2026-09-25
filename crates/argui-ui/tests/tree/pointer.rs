@@ -95,3 +95,53 @@ fn capture_default_works_without_pointer_down_listeners() {
     assert!(capture.events.is_empty());
     assert!(tree.pointer_captured(PointerId::MOUSE));
 }
+
+#[test]
+fn secondary_button_delivers_pointer_phases_without_primary_click() {
+    let mut tree = UiTree::new(listeners(
+        Element::container([]).interaction(Interaction::default()),
+    ));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node)];
+    for phase in [PointerPhase::Pressed, PointerPhase::Released] {
+        let event = PointerEvent {
+            button: Some(PointerButton::Secondary),
+            buttons: u16::from(phase == PointerPhase::Pressed) * 2,
+            ..PointerEvent::mouse(phase, Point::new(30.0, 20.0))
+        };
+        let update = tree.pointer_event(event, &regions);
+        assert!(update.events.iter().any(|delivery| {
+            matches!(&delivery.kind, UiEventKind::Pointer(sample)
+                if sample.phase == phase && sample.button == Some(PointerButton::Secondary))
+        }));
+        assert!(
+            !update
+                .events
+                .iter()
+                .any(|delivery| matches!(delivery.kind, UiEventKind::Click(_)))
+        );
+    }
+    assert!(!tree.pointer_captured(PointerId::MOUSE));
+    let mut disabled = [region(node)];
+    disabled[0].enabled = false;
+    let down = PointerEvent {
+        button: Some(PointerButton::Secondary),
+        buttons: 2,
+        ..PointerEvent::mouse(PointerPhase::Pressed, Point::new(30.0, 20.0))
+    };
+    assert!(
+        !tree
+            .pointer_event(down, &disabled)
+            .events
+            .iter()
+            .any(|delivery| {
+                matches!(
+                    delivery.kind,
+                    UiEventKind::Pointer(PointerEvent {
+                        phase: PointerPhase::Pressed,
+                        ..
+                    })
+                )
+            })
+    );
+}

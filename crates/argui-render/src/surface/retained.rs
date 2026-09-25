@@ -231,3 +231,13 @@ impl SurfaceRenderer {
         }
     }
 }
+
+/// Returns damage statistics for a direct full-viewport render.
+pub(super) fn full_damage_profile(viewport: [f32; 2]) -> DamageProfile {
+    DamageProfile {
+        mode: DamageMode::Full,
+        regions: 1,
+        damaged_pixels: viewport[0] as u64 * viewport[1] as u64,
+        retained_bytes: 0,
+    }
+}

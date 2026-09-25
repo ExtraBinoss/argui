@@ -21,6 +21,8 @@ mod text;
 mod virtual_list;
 
 pub use custom::CustomElementStats;
+#[cfg(feature = "metrics")]
+pub use engine::LayoutProfile;
 pub use engine::{LayoutEngine, LayoutNode, LayoutOutput, LayoutStorage, PaintStats, PortalLayout};
 pub use error::LayoutError;
 pub use input::TextInputRegion;

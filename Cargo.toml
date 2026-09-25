@@ -3,6 +3,7 @@ members = [
     "crates/argui-accessibility",
     "crates/argui-android",
     "crates/argui-animation",
+    "crates/argui-automation",
     "crates/argui-core",
     "crates/argui-cli",
     "crates/argui-effects",
@@ -40,6 +41,7 @@ readme = "README.md"
 argui-android = { path = "crates/argui-android", version = "0.3.3" }
 argui-accessibility = { path = "crates/argui-accessibility", version = "0.3.3" }
 argui-animation = { path = "crates/argui-animation", version = "0.3.3" }
+argui-automation = { path = "crates/argui-automation", version = "0.3.3" }
 argui-core = { path = "crates/argui-core", version = "0.3.3" }
 argui-effects = { path = "crates/argui-effects", version = "0.3.3" }
 argui-host = { path = "crates/argui-host", version = "0.3.3" }

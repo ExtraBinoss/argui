@@ -95,6 +95,19 @@ fn replacement_is_revisioned_transactional_and_removable() {
     .with_revision(3);
     assert!(updated.clone().with_replacement(invalid).is_err());
     assert_eq!(updated.get(&id), Some(&replacement));
+    assert!(matches!(
+        original
+            .clone()
+            .with_replacement(definition(EffectId::new("test.missing"))),
+        Err(RendererError::MissingEffect(_))
+    ));
+    assert_eq!(
+        original
+            .clone()
+            .without_definition(&EffectId::new("test.missing"))
+            .definitions(),
+        original.definitions()
+    );
     assert!(updated.without_definition(&id).is_empty());
 }
 
@@ -122,6 +135,14 @@ fn instances_are_checked_by_parameter_name_and_type() {
             .validate_instance(&EffectInstance::new(
                 definition.id.clone(),
                 [("amount", EffectValue::U32(1))],
+            ))
+            .is_err()
+    );
+    assert!(
+        definition
+            .validate_instance(&EffectInstance::new(
+                definition.id.clone(),
+                Vec::<(&str, EffectValue)>::new(),
             ))
             .is_err()
     );

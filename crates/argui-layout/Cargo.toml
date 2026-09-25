@@ -9,16 +9,19 @@ homepage.workspace = true
 readme.workspace = true
 description = "Flexbox and grid layout integration for Argui"
 
+[features]
+metrics = ["argui-core/metrics", "dep:web-time"]
+
 [dependencies]
 argui-core.workspace = true
 argui-paint.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
 taffy.workspace = true
+web-time = { workspace = true, optional = true }
 
 [dev-dependencies]
 argui-animation = { path = "../argui-animation" }
-web-time.workspace = true
 
 [lints]
 workspace = true

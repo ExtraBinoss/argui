@@ -246,9 +246,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-automation"
+version = "0.3.3"
+dependencies = [
+ "argui-animation",
+ "argui-core",
+ "argui-host",
+ "argui-inspect",
+ "argui-layout",
+ "argui-render",
+ "argui-runtime",
+ "argui-schema",
+ "argui-text",
+ "argui-ui",
+ "serde",
+ "sysinfo",
+ "web-time",
+]
+
+[[package]]
 name = "argui-cli"
 version = "0.3.3"
 dependencies = [
+ "argui-automation",
  "image",
  "serde",
  "serde_json",
@@ -258,6 +278,9 @@ dependencies = [
 [[package]]
 name = "argui-core"
 version = "0.3.3"
+dependencies = [
+ "web-time",
+]
 
 [[package]]
 name = "argui-effects"
@@ -3055,6 +3078,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntapi"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3b335231dfd352ffb0f8017f3b6027a4917f7df785ea2143d8af2adc66980ae"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3323,6 +3355,16 @@ dependencies = [
  "bitflags 2.13.1",
  "block2 0.6.2",
  "objc2 0.6.4",
+ "objc2-core-foundation",
+]
+
+[[package]]
+name = "objc2-io-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33fafba39597d6dc1fb709123dfa8289d39406734be322956a69f0931c73bb15"
+dependencies = [
+ "libc",
  "objc2-core-foundation",
 ]
 
@@ -4923,6 +4965,20 @@ dependencies = [
  "libc",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.37.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16607d5caffd1c07ce073528f9ed972d88db15dd44023fa57142963be3feb11f"
+dependencies = [
+ "libc",
+ "memchr",
+ "ntapi",
+ "objc2-core-foundation",
+ "objc2-io-kit",
+ "windows 0.61.3",
 ]
 
 [[package]]
