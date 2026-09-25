@@ -25,7 +25,6 @@ mod gtk;
 mod inspect;
 mod layout;
 mod model_updates;
-#[cfg(not(target_arch = "wasm32"))]
 mod native_host;
 mod visibility;
 pub use inspect::{Inspection, InspectionCache};
@@ -113,10 +112,11 @@ pub(crate) struct Application {
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
-    #[cfg(not(target_arch = "wasm32"))]
     pub(super) native_host: Option<crate::NativeHost>,
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) native_host_events: Option<std::sync::mpsc::Sender<crate::NativeHostDelivery>>,
+    #[cfg(target_arch = "wasm32")]
+    pub(super) web_host_events: Option<Box<dyn Fn(crate::NativeHostDelivery)>>,
     pub(super) interaction_snapshot: crate::model::InteractionSnapshot,
     pub(super) source_index: RefCell<crate::SourceIdentityIndex>,
     pub(super) animations: RuntimeAnimations,
@@ -258,10 +258,11 @@ impl Application {
             text_engine,
             text_scene,
             ui_tree,
-            #[cfg(not(target_arch = "wasm32"))]
             native_host: None,
             #[cfg(not(target_arch = "wasm32"))]
             native_host_events: None,
+            #[cfg(target_arch = "wasm32")]
+            web_host_events: None,
             interaction_snapshot: crate::model::InteractionSnapshot::default(),
             source_index: RefCell::default(),
             animations: RuntimeAnimations::new(model.as_ref()),
@@ -445,15 +446,7 @@ impl Application {
                 pointer_capture.extend(effects.pointer_capture);
                 ui_commands.extend(effects.ui_commands);
             }
-            #[cfg(not(target_arch = "wasm32"))]
-            if let (Some(host), Some(sender)) = (&self.native_host, &self.native_host_events)
-                && let Some(callback) = host.callback_for(event)
-            {
-                let _ = sender.send(crate::NativeHostDelivery {
-                    callback,
-                    kind: event.kind.clone(),
-                });
-            }
+            self.deliver_native_host_event(event);
             let published = self
                 .ui_tree
                 .as_ref()

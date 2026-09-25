@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "components": {
+    "button": {
+      "solid": [
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "input-field": {
+      "solid": [
+        "shared/input-text.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/input-field.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/input-field.tsx",
+        "shared/input-text.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "popover": {
+      "solid": [
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/popover.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/popover.tsx",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "select": {
+      "solid": [
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/select.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/select.tsx",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "dialog": {
+      "solid": [
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/dialog.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/dialog.tsx",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    }
+  }
+}

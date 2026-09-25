@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "argui-accessibility"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "argui-android"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-platform",
  "argui-render",
@@ -240,18 +240,28 @@ dependencies = [
 
 [[package]]
 name = "argui-animation"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
+name = "argui-cli"
+version = "0.3.3"
+dependencies = [
+ "image",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "argui-core"
-version = "0.3.2"
+version = "0.3.3"
 
 [[package]]
 name = "argui-effects"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-paint",
  "argui-render",
@@ -262,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "argui-host"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -274,7 +284,7 @@ dependencies = [
 
 [[package]]
 name = "argui-i18n"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-ui",
  "fluent-bundle",
@@ -286,7 +296,7 @@ dependencies = [
 
 [[package]]
 name = "argui-inspect"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
  "serde",
@@ -295,14 +305,14 @@ dependencies = [
 
 [[package]]
 name = "argui-ios"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-runtime",
 ]
 
 [[package]]
 name = "argui-layout"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -315,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "argui-media"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -326,14 +336,14 @@ dependencies = [
 
 [[package]]
 name = "argui-paint"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-platform"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "android-activity",
  "arboard",
@@ -375,11 +385,11 @@ dependencies = [
 
 [[package]]
 name = "argui-reactive"
-version = "0.3.2"
+version = "0.3.3"
 
 [[package]]
 name = "argui-render"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -396,7 +406,7 @@ dependencies = [
 
 [[package]]
 name = "argui-runtime"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -430,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "argui-schema"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -447,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "argui-shader"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
  "naga",
@@ -456,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "argui-text"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
  "cosmic-text",
@@ -466,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "argui-theme"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -475,7 +485,7 @@ dependencies = [
 
 [[package]]
 name = "argui-ui"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argui-accessibility",
  "argui-animation",
@@ -489,7 +499,7 @@ dependencies = [
 
 [[package]]
 name = "argui-updater"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "flate2",
  "minisign-verify",
@@ -505,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "argui-webview"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "ammonia",
  "argui-core",

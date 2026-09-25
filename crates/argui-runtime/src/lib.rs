@@ -14,7 +14,6 @@ mod input;
 mod launch;
 mod model;
 mod multi;
-#[cfg(not(target_arch = "wasm32"))]
 mod native_host;
 #[cfg(feature = "tasks")]
 pub mod tasks;
@@ -32,6 +31,8 @@ pub use effect::{VisualEffectTarget, apply_visual_effect, apply_visual_effect_sc
 pub use environment::{ThemeRequest, WindowEnvironment};
 pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};
+#[cfg(target_arch = "wasm32")]
+pub use launch::WebHostHandle;
 #[cfg(not(target_arch = "wasm32"))]
 pub use launch::run_native_host;
 #[cfg(not(target_arch = "wasm32"))]
@@ -53,7 +54,6 @@ pub use model::{
     ScrollRequest, ServiceAlreadyRegistered, ServiceRegistration, SourceIdentityIndex,
     Subscription, ViewUpdate, WeakEntity, WeakMount,
 };
-#[cfg(not(target_arch = "wasm32"))]
 pub use native_host::{
     NativeHostApplicationRequest, NativeHostAssets, NativeHostBatch, NativeHostCommit,
     NativeHostControl, NativeHostDelivery, NativeWindowInfo, WireHostId, WireOperation, WireValue,

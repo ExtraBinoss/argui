@@ -4,7 +4,7 @@ use argui_core::Insets;
 #[cfg(target_os = "android")]
 use argui_paint::Fill;
 use argui_paint::VectorAsset;
-use argui_ui::{Element, TreeUpdate, UiTree, percent};
+use argui_ui::{Element, TreeUpdate, UiEvent, UiTree, percent};
 
 use super::Application;
 use crate::{
@@ -34,6 +34,30 @@ pub(super) fn native_host_root_with_safe_area(mut root: Element, insets: Insets)
 }
 
 impl Application {
+    /// Delivers `event` to the current presentation callback, if one is installed.
+    /// Native hosts use a channel and browser hosts call their subscriber directly.
+    pub(super) fn deliver_native_host_event(&self, event: &UiEvent) {
+        let Some(callback) = self
+            .native_host
+            .as_ref()
+            .and_then(|host| host.callback_for(event))
+        else {
+            return;
+        };
+        let delivery = crate::NativeHostDelivery {
+            callback,
+            kind: event.kind.clone(),
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(sender) = &self.native_host_events {
+            let _ = sender.send(delivery);
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Some(subscriber) = &self.web_host_events {
+            subscriber(delivery);
+        }
+    }
+
     /// Installs decoded media before the native window and GPU renderer start.
     ///
     /// * `assets` — image and SVG resources addressed by the JavaScript asset manifest.

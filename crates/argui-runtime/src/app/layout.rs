@@ -123,15 +123,7 @@ impl Application {
             if !event.should_dispatch() {
                 continue;
             }
-            #[cfg(not(target_arch = "wasm32"))]
-            if let (Some(host), Some(sender)) = (&self.native_host, &self.native_host_events)
-                && let Some(callback) = host.callback_for(&event)
-            {
-                let _ = sender.send(crate::NativeHostDelivery {
-                    callback,
-                    kind: event.kind.clone(),
-                });
-            }
+            self.deliver_native_host_event(&event);
             let published = self
                 .ui_tree
                 .as_ref()

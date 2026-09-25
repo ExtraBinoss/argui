@@ -10,6 +10,8 @@ mod hot_reload;
 mod i18n;
 mod native_metrics;
 mod runner;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+mod validate;
 mod services;
 mod telemetry;
 mod wire;

@@ -49,6 +49,8 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         let _ = event_loop;
         match event {
             UserEvent::ModelsReady => self.models_ready(event_loop),
+            #[cfg(target_arch = "wasm32")]
+            UserEvent::WebHostCommit(_) => {}
             #[cfg(not(target_arch = "wasm32"))]
             UserEvent::HostCommit(batch) => {
                 if let Some(entry) = self.windows.get_mut(&batch.window) {

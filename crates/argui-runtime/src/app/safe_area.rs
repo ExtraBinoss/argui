@@ -34,7 +34,6 @@ impl Application {
             return;
         }
         self.environment.safe_area_insets = insets;
-        #[cfg(not(target_arch = "wasm32"))]
         if let Some(root) = self
             .native_host
             .as_ref()

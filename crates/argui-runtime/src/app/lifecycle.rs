@@ -95,6 +95,17 @@ impl ApplicationHandler<UserEvent> for Application {
         match event_loop.create_window(attributes) {
             Ok(window) => {
                 let window = Arc::new(window);
+                #[cfg(target_arch = "wasm32")]
+                if let Err(error) = argui_platform::attach_web_canvas(
+                    &window,
+                    &self.window_key,
+                    self.window_config.web_parent_id.as_deref(),
+                ) {
+                    (self.on_event)(RuntimeEvent::CommandFailed(error.clone()));
+                    self.fatal_error = Some(crate::RuntimeError::Configuration(error));
+                    event_loop.exit();
+                    return;
+                }
                 #[cfg(all(feature = "webview", target_arch = "wasm32"))]
                 self.initialize_browser_webviews(&window);
                 #[cfg(all(feature = "webview", any(target_os = "windows", target_os = "macos")))]
@@ -232,10 +243,17 @@ impl ApplicationHandler<UserEvent> for Application {
         }
         #[cfg(target_arch = "wasm32")]
         {
+            if let UserEvent::WebHostCommit(operations) = event {
+                if let Err(error) = self.commit_native_host(operations, Vec::new()) {
+                    (self.on_event)(RuntimeEvent::CommandFailed(error));
+                }
+                return;
+            }
             let Some(window) = self.window.clone() else {
                 return;
             };
             match event {
+                UserEvent::WebHostCommit(_) => {}
                 UserEvent::ModelsReady => self.models_ready(event_loop),
                 UserEvent::GpuCanvasReady(id) => self.gpu_canvas_ready(id),
                 #[cfg(feature = "tasks")]

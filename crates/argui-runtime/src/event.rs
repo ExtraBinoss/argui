@@ -108,6 +108,8 @@ pub(crate) enum UserEvent {
     HostCommit(crate::NativeHostBatch),
     #[cfg(not(target_arch = "wasm32"))]
     NativeHostApplication(crate::NativeHostApplicationRequest),
+    #[cfg(target_arch = "wasm32")]
+    WebHostCommit(Vec<crate::WireOperation>),
     /// A native producer updated a mounted application-owned GPU canvas.
     GpuCanvasReady(argui_paint::GpuCanvasId),
     #[cfg(feature = "tasks")]

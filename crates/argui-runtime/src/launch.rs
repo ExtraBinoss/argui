@@ -14,12 +14,16 @@ use crate::{
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native_host;
+#[cfg(target_arch = "wasm32")]
+mod web_host;
 #[cfg(target_os = "android")]
 pub use native_host::run_android_native_host_with_text_engine;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_host::{
     NativeHostApplicationChannels, run_native_host, run_native_host_application,
 };
+#[cfg(target_arch = "wasm32")]
+pub use web_host::WebHostHandle;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Runs a multi-window application with the default text engine.

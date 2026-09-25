@@ -55,6 +55,8 @@ pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Runs the desktop gallery with application-registered native services.
 /// `services` contains the operations available to its TSX components.
+/// When `ARGUI_VALIDATE_ONLY` is set, validates `ARGUI_APP_BUNDLE` without
+/// creating a window and does not use `services`.
 ///
 /// # Errors
 /// Returns an error if the gallery, native window, or JavaScript engine fails.
@@ -62,13 +64,19 @@ pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
 pub fn run_desktop_with_services(
     services: Arc<ServiceRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let config = gallery_config()?;
+    if std::env::var_os("ARGUI_VALIDATE_ONLY").is_some() {
+        return crate::validate::validate_app_bundle();
+    }
+    let mut config = gallery_config()?;
+    if let Ok(title) = std::env::var("ARGUI_APP_TITLE") {
+        config.windows[0].window.title = title;
+    }
     let (application_sender, application_requests) = mpsc::channel();
     let appearance =
         register_application_services(&services, application_sender, config.tray.clone());
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
     let observed = Arc::clone(&profiles);
-    let bundle_path = dev_bundle_path();
+    let bundle_path = std::env::var_os("ARGUI_APP_BUNDLE").map(PathBuf::from).or_else(dev_bundle_path);
     let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
@@ -203,7 +211,11 @@ fn run_gallery(
     if contract["abiHash"].as_str() != Some(&host.abi_hash().to_string()) {
         return Err("generated JavaScript contract is stale; run bun run generate:jsx".into());
     }
-    let source = include_str!("../../dist/gallery-core.mjs");
+    let source = match std::env::var_os("ARGUI_APP_BUNDLE") {
+        Some(path) => std::fs::read_to_string(&path)
+            .map_err(|error| format!("{}: {error}", PathBuf::from(path).display()))?,
+        None => include_str!("../../dist/gallery-core.mjs").to_owned(),
+    };
 
     let (wire_sender, wire_receiver) = mpsc::channel();
     let (batch_sender, batches) = mpsc::channel();
@@ -230,7 +242,7 @@ fn run_gallery(
         let cancel_services = Arc::clone(&actor_services);
         let request_sender = service_sender.clone();
         let gallery = QuickJsGallery::new_with_services(
-            source,
+            &source,
             contract_json,
             "mountGallery",
             move |json| route.borrow_mut().accept(&json),
