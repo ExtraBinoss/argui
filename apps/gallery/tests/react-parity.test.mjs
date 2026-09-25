@@ -350,7 +350,9 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       const navigation = nodes.find((node) => node.type === 'VirtualWindow'
         && node.properties.key?.value === 'gallery-navigation')
       assert.ok(navigation, 'gallery navigation must use the native virtual list')
-      assert.ok(navigation.children.length <= 12, 'only a bounded navigation range mounts')
+      assert.equal(navigation.children.length, 16, 'all small-list gallery destinations remain mounted')
+      assert.ok(nodes.some((node) => node.properties.key?.value === 'page-animation-lab'))
+      assert.ok(nodes.some((node) => node.properties.key?.value === 'page-damage-control'))
       assert.ok(nodes.some((node) => node.type === 'Text' && node.properties.text?.value === 'EXAMPLES'))
       const overlayPane = nodes.find((node) => node.properties.key?.value === 'scroll-Overlay')
       assert.ok(overlayPane)

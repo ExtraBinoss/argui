@@ -17,7 +17,9 @@ export function VirtualList(props: VirtualListProps): JSX.Element {
   })
   const axis = () => props.axis ?? 'vertical'
   const shadow = () => props.shadow
-  const current = () => boundedWindow(window(), props.count)
+  const current = () => props.count <= 32
+    ? { ...boundedWindow(window(), props.count), start: 0, end: props.count }
+    : boundedWindow(window(), props.count)
   const rows = () => {
     const range = current()
     return Array.from({ length: range.end - range.start }, (_, position) => {
