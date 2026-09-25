@@ -44,9 +44,14 @@ impl Application {
         else {
             return;
         };
+        let pointer = self
+            .ui_layout
+            .as_ref()
+            .and_then(|layout| crate::NativePointerPosition::from_event(event, layout));
         let delivery = crate::NativeHostDelivery {
             callback,
             kind: event.kind.clone(),
+            pointer,
         };
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(sender) = &self.native_host_events {

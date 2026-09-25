@@ -60,8 +60,14 @@ pub struct Project {
     #[serde(default)]
     pub components: Vec<String>,
     /// Repository files installed as component dependencies.
-    #[serde(default)]
+    #[serde(default, alias = "componentFiles")]
     pub component_files: Vec<String>,
+    /// SHA-256 of each installed component dependency at the recorded version.
+    #[serde(default, alias = "componentChecksums")]
+    pub component_checksums: std::collections::BTreeMap<String, String>,
+    /// Release version of each installed framework/component pair.
+    #[serde(default, alias = "componentVersions")]
+    pub component_versions: std::collections::BTreeMap<String, String>,
 }
 
 /// Finds the Argui checkout containing `cwd`, returning its root path.
@@ -147,6 +153,8 @@ pub fn init_target(
         target: runtime,
         components: Vec::new(),
         component_files: Vec::new(),
+        component_checksums: std::collections::BTreeMap::new(),
+        component_versions: std::collections::BTreeMap::new(),
     };
     write(
         &target.join("argui.json"),
@@ -485,47 +493,48 @@ fn vite_config(framework: Framework) -> String {
     )
 }
 
-const SOLID_APP: &str = r##"import { NativeHost, type NativeBridge, type NativeNode } from '@argui/host'
-import { createSignal, render, useNativeHost } from '@argui/solid'
-import { Button, palette } from '@argui/widgets/solid'
+pub(crate) const SOLID_APP: &str = r##"import { NativeHost, createThemeRuntime, type NativeBridge, type NativeNode, type ThemeRuntime } from '@argui/host'
+import { createSignal, render, useNativeHost, useTheme } from '@argui/solid'
+import { Button } from '@argui/widgets/solid'
+import { widgetThemeDefinition, type Palette } from '@argui/widgets/theme'
 
-const theme = palette('dark', 'blue')
-
-function App() {
+function App(props: { runtime: ThemeRuntime<Palette> }) {
   const [count, setCount] = createSignal(0)
-  return <column width="fill" height="fill" padding={32} gap={20} background={theme.background}>
-    <text text="Argui counter" color={theme.foreground} font_size={32} />
+  const theme = useTheme(props.runtime)
+  return <column width="fill" height="fill" padding={32} gap={20} background={theme().background}>
+    <text text="Argui counter" color={theme().foreground} font_size={32} />
     <rectangle width="fill" height={140} radius={18} background="#334155dd" backdrop_filter="blur(12px)">
       <text text="Argui backdrop blur with a translucent fallback" color="#ffffff" font_size={18} />
     </rectangle>
-    <text text={`Count: ${count()}`} color={theme.foreground} font_size={20} />
-    <Button id="increment" label="Increment" theme={theme} kind="primary" onClick={() => setCount(count() + 1)} />
+    <text text={`Count: ${count()}`} color={theme().foreground} font_size={20} />
+    <Button id="increment" label="Increment" theme={theme()} kind="primary" onClick={() => setCount(count() + 1)} />
   </column>
 }
 
-/** Mounts the Solid application in the native QuickJS host. */
+/** Mounts the Solid application with one host-owned theme session. */
 export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {
   const host = new NativeHost(bridge, expectedAbiHash)
+  const theme = createThemeRuntime(bridge, widgetThemeDefinition)
   useNativeHost(host)
   const root = host.createElement('Column')
   host.setProperty(root, 'width', 'fill')
   host.setProperty(root, 'height', 'fill')
-  const dispose = render(() => <App /> as NativeNode, root)
+  const dispose = render(() => <App runtime={theme} /> as NativeNode, root)
   host.setRoot(root)
-  return () => { dispose(); host.dispose() }
+  return () => { dispose(); host.dispose(); theme.dispose() }
 }
 "##;
 
-const REACT_APP: &str = r##"/** @jsxImportSource @argui/react */
-import { NativeHost, type NativeBridge } from '@argui/host'
-import { createRoot } from '@argui/react'
+pub(crate) const REACT_APP: &str = r##"/** @jsxImportSource @argui/react */
+import { NativeHost, createThemeRuntime, type NativeBridge, type ThemeRuntime } from '@argui/host'
+import { createRoot, useTheme } from '@argui/react'
 import { useState } from 'react'
-import { Button, palette } from '@argui/widgets/react'
+import { Button } from '@argui/widgets/react'
+import { widgetThemeDefinition, type Palette } from '@argui/widgets/theme'
 
-const theme = palette('dark', 'blue')
-
-function App() {
+function App(props: { runtime: ThemeRuntime<Palette> }) {
   const [count, setCount] = useState(0)
+  const theme = useTheme(props.runtime)
   return <column width="fill" height="fill" padding={32} gap={20} background={theme.background}>
     <text text="Argui counter" color={theme.foreground} font_size={32} />
     <rectangle width="fill" height={140} radius={18} background="#334155dd" backdrop_filter="blur(12px)">
@@ -536,11 +545,12 @@ function App() {
   </column>
 }
 
-/** Mounts the React application in the native QuickJS host. */
+/** Mounts the React application with one host-owned theme session. */
 export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {
   const host = new NativeHost(bridge, expectedAbiHash)
+  const theme = createThemeRuntime(bridge, widgetThemeDefinition)
   const root = createRoot(host, 'Column', { width: 'fill', height: 'fill' })
-  root.render(<App />)
-  return () => root.unmount()
+  root.render(<App runtime={theme} />)
+  return () => { root.unmount(); theme.dispose() }
 }
 "##;

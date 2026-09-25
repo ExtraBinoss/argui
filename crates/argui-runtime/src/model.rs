@@ -1,5 +1,6 @@
 use crate::AppCommand;
 use argui_animation::Frame;
+#[cfg(feature = "inspect")]
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_render::EffectDefinition;
@@ -138,6 +139,7 @@ pub struct AnyEntity {
     image_assets: Rc<dyn Fn() -> Vec<ImageAsset>>,
     vector_assets: Rc<dyn Fn() -> Vec<VectorAsset>>,
     effect_definitions: Rc<dyn Fn() -> Vec<EffectDefinition>>,
+    #[cfg(feature = "inspect")]
     inspector: Rc<dyn Fn() -> Option<InspectorHandle>>,
     take_effects: Rc<dyn Fn() -> ContextEffects>,
 }
@@ -154,12 +156,31 @@ fn inherit_environment_use(parent: &Cell<bool>, child: &Cell<bool>) {
     }
 }
 
+/// Adds the child presentation's token dependencies to its parent `reads` set.
+/// `child` contains the IDs read during the child's latest render.
+fn inherit_theme_reads(
+    reads: &RefCell<HashSet<argui_theme::ThemeTokenId>>,
+    child: &RefCell<HashSet<argui_theme::ThemeTokenId>>,
+) {
+    reads.borrow_mut().extend(child.borrow().iter().copied());
+}
+
+/// Stores `next` and reports whether the previous values used by this view changed.
+/// `used` marks full-environment reads; `theme_reads` lists isolated token reads.
 fn update_environment(
     current: &RefCell<WindowEnvironment>,
     used: &Cell<bool>,
+    theme_reads: &RefCell<HashSet<argui_theme::ThemeTokenId>>,
     next: &WindowEnvironment,
 ) -> bool {
-    current.replace(next.clone()) != *next && used.get()
+    let previous = current.replace(next.clone());
+    if used.get() {
+        return previous != *next;
+    }
+    theme_reads
+        .borrow()
+        .iter()
+        .any(|id| previous.theme_value(*id) != next.theme_value(*id))
 }
 
 impl<T: Render> Entity<T> {
@@ -186,6 +207,7 @@ impl<T: Render> Entity<T> {
         let image_assets = self.clone();
         let vector_assets = self.clone();
         let effect_definitions = self.clone();
+        #[cfg(feature = "inspect")]
         let inspector = self.clone();
         let take_effects = self.clone();
         let model_runtimes = self.clone();
@@ -227,6 +249,7 @@ impl<T: Render> Entity<T> {
             effect_definitions: Rc::new(move || {
                 effect_definitions.read(Render::effect_definitions)
             }),
+            #[cfg(feature = "inspect")]
             inspector: Rc::new(move || inspector.read(Render::inspector)),
             take_effects: Rc::new(move || take_effects.take_effects()),
         }
@@ -268,6 +291,7 @@ impl<T: Render> Entity<T> {
         let environment_changed = update_environment(
             &self.0.presentation.environment,
             &self.0.presentation.environment_used,
+            &self.0.presentation.theme_reads,
             &environment,
         );
         if let Some(element) = self.0.presentation.cache.reusable(environment_changed) {
@@ -310,6 +334,8 @@ impl<T: Render> Entity<T> {
             .presentation
             .environment_used
             .set(cx.environment_read.get());
+        *self.0.presentation.theme_reads.borrow_mut() =
+            std::mem::take(&mut *cx.theme_reads.borrow_mut());
         *self.0.presentation.observed_identities.borrow_mut() =
             std::mem::take(&mut *cx.observed_identities.borrow_mut());
         self.0.presentation.cache.store(&element);

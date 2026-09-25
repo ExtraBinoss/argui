@@ -1,12 +1,15 @@
+import { widgetGroups, widgetPages } from './widget-pages'
+
 /** Ordered gallery destinations shared by the Solid and React shells. */
 export const pages = [
-  'Button', 'Input', 'Select', 'Popover', 'Dialog', 'Media', 'Services', 'Theming', 'Internationalization', 'Accessibility', 'Overlay', 'Animation Lab', 'Damage Control', 'WGSL Lab',
+  'Button', 'Input', 'Select', 'Popover', 'Dialog', ...widgetPages,
+  'Media', 'Services', 'Theming', 'Typography', 'Date Picker', 'Data Table', 'Internationalization', 'Accessibility', 'Overlay', 'Animation Lab', 'Damage Control', 'WGSL Lab',
 ] as const
 
 export type Page = typeof pages[number]
 
 /** A destination or noninteractive section label within the virtual navigation. */
-export type NavigationItem = { kind: 'page'; page: Page } | { kind: 'heading'; label: 'COMPONENTS' | 'EXAMPLES' }
+export type NavigationItem = { kind: 'page'; page: Page } | { kind: 'heading'; label: string }
 
 /** Ordered navigation rows, including a distinct Examples section. */
 export const navigationItems: readonly NavigationItem[] = [
@@ -16,10 +19,17 @@ export const navigationItems: readonly NavigationItem[] = [
   { kind: 'page', page: 'Select' },
   { kind: 'page', page: 'Popover' },
   { kind: 'page', page: 'Dialog' },
+  ...widgetGroups.flatMap((group): NavigationItem[] => [
+    { kind: 'heading', label: group.label },
+    ...group.pages.map((page): NavigationItem => ({ kind: 'page', page })),
+  ]),
   { kind: 'heading', label: 'EXAMPLES' },
   { kind: 'page', page: 'Media' },
   { kind: 'page', page: 'Services' },
   { kind: 'page', page: 'Theming' },
+  { kind: 'page', page: 'Typography' },
+  { kind: 'page', page: 'Date Picker' },
+  { kind: 'page', page: 'Data Table' },
   { kind: 'page', page: 'Internationalization' },
   { kind: 'page', page: 'Accessibility' },
   { kind: 'page', page: 'Overlay' },

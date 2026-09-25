@@ -1,0 +1,15 @@
+[package]
+name = "argui-gallery-assets"
+version = "0.3.3"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+description = "Application owned decoded image and SVG assets"
+
+[dependencies]
+argui-media = { version = "=0.3.3", features = ["media"] }
+argui-paint = "=0.3.3"
+argui-runtime = "=0.3.3"
+
+[workspace]
+resolver = "3"

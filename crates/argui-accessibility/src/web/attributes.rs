@@ -266,6 +266,7 @@ const fn aria_role(role: Role) -> &'static str {
         Role::Button => "button",
         Role::CheckBox => "checkbox",
         Role::RadioButton => "radio",
+        Role::RadioGroup => "radiogroup",
         Role::Switch => "switch",
         Role::TextInput => "textbox",
         Role::TextArea => "textbox",

@@ -5,6 +5,7 @@ import { mountGallery } from '../dist/gallery-core.mjs'
 import { mountReactGallery } from '../dist/gallery-react-core.mjs'
 import assets from '../assets.generated.json' with { type: 'json' }
 import contract from '../../../packages/host/src/contract.generated.json' with { type: 'json' }
+import { createThemeBridge } from './fixtures/theme-bridge.mjs'
 
 function capture(mount) {
   const batches = []
@@ -14,6 +15,7 @@ function capture(mount) {
     contract: () => contract,
     commit: (operations) => batches.push([...operations]),
     subscribe: (callback) => { deliver = callback; return () => { deliver = () => {} } },
+    theme: createThemeBridge(),
   }, contract.abiHash)
   return { batches, inputValues, dispose, deliver: (event) => deliver(event) }
 }
@@ -228,7 +230,7 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     for (const presentation of [solid, react]) {
       const current = tree(presentation)
       const navigation = allNodes(current).find((node) => node.properties.key?.value === 'gallery-navigation')
-      assert.equal(navigation?.properties.__item_count?.value, 2)
+      assert.equal(navigation?.properties.__item_count?.value, 5)
       assert.ok(allNodes(current).some((node) => node.properties.key?.value === 'page-input'))
       assert.ok(!allNodes(current).some((node) => node.properties.key?.value === 'page-button'))
     }
@@ -342,8 +344,9 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     await click('motion-step')
     await click('motion-play')
     await click('motion-play')
-    await type('gallery-search', 'input', '')
+    await type('gallery-search', 'input', 'Media')
     await click('page-media')
+    await type('gallery-search', 'input', '')
     const orbit = assets.assets.find((asset) => asset.key === 'illustration/orbit.png')
     const saturn = assets.assets.find((asset) => asset.key === 'photo/saturn.jpg')
     assert.ok(orbit && saturn)
@@ -357,10 +360,10 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       const navigation = nodes.find((node) => node.type === 'VirtualWindow'
         && node.properties.key?.value === 'gallery-navigation')
       assert.ok(navigation, 'gallery navigation must use the native virtual list')
-      assert.equal(navigation.children.length, 16, 'all small-list gallery destinations remain mounted')
-      assert.ok(nodes.some((node) => node.properties.key?.value === 'page-animation-lab'))
-      assert.ok(nodes.some((node) => node.properties.key?.value === 'page-damage-control'))
-      assert.ok(nodes.some((node) => node.type === 'Text' && node.properties.text?.value === 'EXAMPLES'))
+      assert.ok(navigation.children.length > 0 && navigation.children.length < 30,
+        'the larger gallery keeps only a bounded navigation window mounted')
+      assert.ok(nodes.some((node) => node.properties.key?.value === 'scroll-Animation Lab'))
+      assert.ok(nodes.some((node) => node.properties.key?.value === 'scroll-Damage Control'))
       const overlayPane = nodes.find((node) => node.properties.key?.value === 'scroll-Overlay')
       assert.ok(overlayPane)
       assert.equal(allNodes(overlayPane).filter((node) => node.properties.backdrop_filter?.value).length, 0)
@@ -375,9 +378,9 @@ test('Solid and React keep native structure, stable properties, and blocked butt
         && node.properties.backdrop_filter?.value === 'blur(10px)'
         && node.properties.background?.value === '#fffdf899'))
     }
-    const customTheme = { canvas: '#eee9df', panel: '#fffdf899', ink: '#282e35', muted: '#69737d',
-      accent: '#123456', radius: 12, padding: 10, blur: 7, fontSize: 21,
-      shadowBlur: 5, shadowColor: '#282e3544', appSpecificVariable: 31 }
+    const customTheme = { sampleCanvas: '#eee9df', samplePanel: '#fffdf899', sampleInk: '#282e35', sampleMuted: '#69737d',
+      sampleAccent: '#123456', sampleRadius: 12, samplePadding: 10, sampleBlur: 7, sampleFontSize: 21,
+      sampleShadowBlur: 5, sampleShadowColor: '#282e3544' }
     await type('theme-json', 'input', JSON.stringify(customTheme))
     await click('theme-load-json')
     for (const presentation of [solid, react]) {
@@ -400,7 +403,7 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     }
     await click('menu')
     await click('menu')
-    await type('gallery-search', 'input', '')
+    await type('gallery-search', 'input', 'Input')
     await click('page-input')
     for (const [index, presentation] of [solid, react].entries()) {
       assert.equal(nativeIdentity(presentation, 'input-name'), inputIdentities[index])

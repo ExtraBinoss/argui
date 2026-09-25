@@ -301,7 +301,9 @@ impl Application {
                 prepared.reposition_block(index, block.bounds.origin, block.clip);
             }
         }
+        #[cfg(feature = "inspect")]
         self.publish_inspection();
+        #[cfg(feature = "inspect")]
         self.paint_inspection_highlight();
         true
     }

@@ -435,6 +435,9 @@ impl Driver {
                     .callback_for(&event)
                     .map(|callback| NativeHostDelivery {
                         callback,
+                        pointer: self.layout.as_ref().and_then(|layout| {
+                            argui_runtime::NativePointerPosition::from_event(&event, layout)
+                        }),
                         kind: event.kind,
                     })
             }));

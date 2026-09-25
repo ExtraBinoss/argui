@@ -87,8 +87,23 @@ normal horizontally scrolling editor behavior.
 ## Themes
 
 `argui-theme` contains no global singleton. `Theme<T>` owns typed light and dark
-values and resolves them with `ThemeMode::Light`, `Dark`, or `System`. Any
-application data can be themed; TSX components can provide their own tokens.
+values and resolves them with `ThemeMode::Light`, `Dark`, or `System`. For
+application themes, `ThemeSchema` declares typed tokens and their invalidation
+impact. Each `ThemeRuntime` resolves schema defaults, then its active light,
+dark, or custom variant, then application or window overrides. In system mode,
+the active variant follows the window color scheme. Cloning a runtime shares
+state; `fork()` creates an independent copy for another window.
+
+`ThemeRuntime::update` groups variant, preference, and override edits in one
+atomic commit. `ThemeSnapshot` gives views and TSX adapters a coherent set of
+values and revisions. `ThemeChange` identifies changed token IDs and their
+strongest update phase, so unchanged values do not trigger layout or paint
+work. `watch` returns a subscription removed on drop; `subscribe_tokens`
+delivers only changes to selected token IDs.
+
+Applications observe theme values through `argui_theme::ThemeRuntime`,
+`ThemeSnapshot`, and `ThemeSubscription`. Application models continue to own
+non-theme state.
 
 Theme colors are authored in sRGB and stored internally as linear sRGB. See
 [Color](../rendering/primitives.md#color) for the renderer-wide contract.

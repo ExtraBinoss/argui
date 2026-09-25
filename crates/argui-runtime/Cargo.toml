@@ -11,8 +11,11 @@ description = "Retained UI runtime, application lifecycle and events for Argui"
 
 [features]
 default = []
+android = []
 desktop-backdrop = ["argui-platform/desktop-backdrop"]
 global-shortcuts = ["argui-platform/global-shortcuts"]
+inspect = ["dep:argui-inspect"]
+ios = []
 native-popups = ["argui-platform/native-popups"]
 tasks = ["dep:tokio", "dep:futures-util", "dep:futures-channel", "dep:gloo-timers"]
 tray = ["argui-platform/tray"]
@@ -20,7 +23,7 @@ webview = ["dep:argui-webview", "argui-platform/gtk-host", "dep:tao", "dep:gtk"]
 
 [dependencies]
 argui-accessibility.workspace = true
-argui-inspect.workspace = true
+argui-inspect = { workspace = true, optional = true }
 argui-animation.workspace = true
 argui-core.workspace = true
 argui-host.workspace = true
@@ -43,6 +46,9 @@ argui-webview = { workspace = true, optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 tao = { version = "=0.37.0", features = ["rwh_06"], optional = true }
 gtk = { version = "=0.18.2", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { workspace = true, features = ["android-native-activity"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 accesskit.workspace = true

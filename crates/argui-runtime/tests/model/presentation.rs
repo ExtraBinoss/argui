@@ -99,3 +99,83 @@ fn handler_identity_is_presentation_owned_stable_and_not_reused() {
     replacement.dispatch_event(delivery);
     assert_eq!(replacement.read(|view| view.0), 0);
 }
+
+mod theme {
+    use std::{cell::Cell, rc::Rc, sync::Arc};
+
+    use argui_core::Color;
+    use argui_runtime::{
+        Context, Entity, Render, ThemeRuntime, ThemeSchema, ThemeTokenDefinition, ThemeTokenId,
+        ThemeValue, WindowEnvironment,
+    };
+    use argui_ui::Element;
+
+    struct ThemeLeaf {
+        token: ThemeTokenId,
+        renders: Rc<Cell<usize>>,
+    }
+
+    impl Render for ThemeLeaf {
+        /// Renders one token and increments `renders` for cache-invalidation assertions.
+        fn render(&mut self, context: &mut Context<Self>) -> Element {
+            self.renders.set(self.renders.get() + 1);
+            Element::text(format!("{:?}", context.theme_value(self.token)))
+        }
+    }
+
+    struct ThemeParent {
+        child: Entity<ThemeLeaf>,
+        renders: Rc<Cell<usize>>,
+    }
+
+    impl Render for ThemeParent {
+        /// Renders `child` while recording whether the parent cache was rebuilt.
+        fn render(&mut self, context: &mut Context<Self>) -> Element {
+            self.renders.set(self.renders.get() + 1);
+            context.entity(&self.child)
+        }
+    }
+
+    /// Changes to unread tokens preserve both child and ancestor retained caches.
+    #[test]
+    fn token_reads_invalidate_only_the_presentations_using_changed_values() {
+        let schema = Arc::new(
+            ThemeSchema::new([
+                ThemeTokenDefinition::new("foreground", ThemeValue::Color(Color::WHITE)),
+                ThemeTokenDefinition::new("padding", ThemeValue::Length(8.0)),
+            ])
+            .unwrap(),
+        );
+        let foreground = schema.token("foreground").unwrap();
+        let padding = schema.token("padding").unwrap();
+        let theme = ThemeRuntime::new(schema);
+        let child_renders = Rc::new(Cell::new(0));
+        let parent_renders = Rc::new(Cell::new(0));
+        let child = Entity::new(ThemeLeaf {
+            token: foreground,
+            renders: Rc::clone(&child_renders),
+        });
+        let parent = Entity::new(ThemeParent {
+            child,
+            renders: Rc::clone(&parent_renders),
+        });
+        let environment = || WindowEnvironment {
+            theme: Some(theme.snapshot()),
+            ..WindowEnvironment::default()
+        };
+        let _ = parent.render_in(environment());
+        assert_eq!((parent_renders.get(), child_renders.get()), (1, 1));
+
+        theme
+            .set_override(padding, ThemeValue::Length(12.0))
+            .unwrap();
+        let _ = parent.render_in(environment());
+        assert_eq!((parent_renders.get(), child_renders.get()), (1, 1));
+
+        theme
+            .set_override(foreground, ThemeValue::Color(Color::BLACK))
+            .unwrap();
+        let _ = parent.render_in(environment());
+        assert_eq!((parent_renders.get(), child_renders.get()), (2, 2));
+    }
+}

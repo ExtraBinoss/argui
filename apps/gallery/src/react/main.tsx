@@ -1,5 +1,5 @@
 /** @jsxImportSource @argui/react */
-import { ApplicationServices, NativeHost, type NativeBridge } from '@argui/host'
+import { ApplicationServices, NativeHost, createThemeRuntime, type NativeBridge } from '@argui/host'
 import { createRoot } from '@argui/react'
 import { WidgetAssetProvider } from '@argui/widgets/react'
 import { isI18nBridgeAvailable, loadI18n, subscribeI18n, tr } from '@argui/i18n'
@@ -7,6 +7,7 @@ import enUS from '../i18n/en-US.json'
 import fr from '../i18n/fr.json'
 import { mediaAssets } from '../assets.generated'
 import { ReactGallery } from './gallery'
+import { galleryThemeDefinition, type GalleryTokens } from '../theme'
 
 /** Mounts the React gallery through the same Argui native host and schema. */
 export function mountReactGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {
@@ -14,6 +15,7 @@ export function mountReactGallery(bridge: NativeBridge, expectedAbiHash: string)
     loadI18n({ fallback: 'en-US', catalogs: { 'en-US': enUS, fr }, locale: 'en-US' })
   }
   const host = new NativeHost(bridge, expectedAbiHash)
+  const runtime = createThemeRuntime<GalleryTokens>(bridge, galleryThemeDefinition)
   const services = new ApplicationServices(bridge)
   const updateTrayMenu = () => {
     void services.supports('menus', 'set').then((supported) => {
@@ -29,10 +31,10 @@ export function mountReactGallery(bridge: NativeBridge, expectedAbiHash: string)
       chevronDown: mediaAssets['tabler/chevron-down.svg'],
       loader: mediaAssets['tabler/loader-2.svg'],
     }}>
-      <ReactGallery services={services} />
+      <ReactGallery services={services} runtime={runtime} />
     </WidgetAssetProvider>,
   )
-  return () => { unsubscribeLocale(); services.dispose(); root.unmount() }
+  return () => { unsubscribeLocale(); services.dispose(); root.unmount(); runtime.dispose() }
 }
 
 export { mountReactGallery as mountGallery }

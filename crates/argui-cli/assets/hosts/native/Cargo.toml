@@ -1,0 +1,52 @@
+[package]
+name = "argui-app-native"
+version = "0.3.3"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+description = "Native QuickJS host owned by this Argui application"
+
+[features]
+default = []
+dev-tabler-icons = []
+dev-metrics = []
+automation = ["dep:argui-automation", "argui-runtime/inspect", "dev-metrics"]
+tasks = ["argui-runtime/tasks"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+argui-gallery-assets = { path = "../assets" }
+argui-core = "=0.3.3"
+argui-automation = { version = "=0.3.3", optional = true }
+argui-effects = { version = "=0.3.3", features = ["scroll"] }
+argui-host = { version = "=0.3.3", features = ["media"] }
+argui-i18n = "=0.3.3"
+argui-paint = "=0.3.3"
+argui-platform = { version = "=0.3.3", features = ["file-picker"] }
+argui-render = "=0.3.3"
+argui-runtime = "=0.3.3"
+argui-ui = "=0.3.3"
+rquickjs = "=0.14.0"
+rquickjs-sys = { version = "=0.14.0", features = ["bindgen"] }
+serde_json = "=1.0.151"
+serde = { version = "=1.0.229", features = ["derive"] }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+pollster = "=0.4.0"
+web-time = "=1.1.0"
+
+[target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
+argui-runtime = { version = "=0.3.3", features = ["tray", "global-shortcuts", "desktop-backdrop"] }
+
+[workspace]
+resolver = "3"
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+incremental = false
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false

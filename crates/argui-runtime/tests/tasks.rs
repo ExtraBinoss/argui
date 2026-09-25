@@ -16,6 +16,20 @@ fn cancellation_is_shared_and_empty_slot_is_idle() {
     slot.cancel();
 }
 
+/// The public scheduling helpers resume on a live executor without external wakeups.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn sleep_and_yield_resume_within_a_current_thread_runtime() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        argui_runtime::tasks::yield_now().await;
+        argui_runtime::tasks::sleep(std::time::Duration::from_millis(1)).await;
+    });
+}
+
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
 fn dispatcher_clock_rejects_wall_time_control_and_shutdown() {

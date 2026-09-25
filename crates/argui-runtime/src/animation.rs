@@ -100,7 +100,7 @@ impl Application {
         let Some(frame) = self.animations.frame() else {
             return;
         };
-        let model_started = Instant::now();
+        let model_started = self.profile_clock();
         let effects = if self.animations.model_active {
             self.model.as_ref().map(|model| {
                 model.animation_frame(frame);
@@ -115,13 +115,13 @@ impl Application {
         if let Some(effects) = effects {
             self.apply_model_effects(effects, event_loop);
         }
-        let model_time = model_started.elapsed();
-        let paint_started = Instant::now();
+        let model_time = model_started.map_or(std::time::Duration::ZERO, |start| start.elapsed());
+        let paint_started = self.profile_clock();
         let tree_animation = self
             .ui_tree
             .as_mut()
             .map_or(TreeUpdate::None, |tree| tree.advance_animations(frame.now));
-        let paint_time = paint_started.elapsed();
+        let paint_time = paint_started.map_or(std::time::Duration::ZERO, |start| start.elapsed());
         self.frame_record.model += model_time;
         self.frame_record.paint += paint_time;
         self.pending_ui_frame.merge(

@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use argui_animation::Frame;
+#[cfg(feature = "inspect")]
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_render::EffectDefinition;
@@ -80,6 +81,7 @@ impl AnyEntity {
         (self.effect_definitions)()
     }
 
+    #[cfg(feature = "inspect")]
     pub(crate) fn inspector(&self) -> Option<InspectorHandle> {
         (self.inspector)()
     }

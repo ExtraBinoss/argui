@@ -5,7 +5,7 @@ use argui_text::{
     EllipsisPosition, FontStyle, LetterSpacing, TextAlign, TextOverflow, TextStyle, TextWrap,
     UnderlineStyle,
 };
-use argui_ui::{AlignItems, Element, EventType, FlexWrap, JustifyContent};
+use argui_ui::{AlignItems, Element, EventType, FlexWrap, JustifyContent, WritingDirection};
 
 use crate::{
     EventId, NativeElementInput, NativeSchema, NativeTypeId, PropertyId, PropertySchema,
@@ -160,6 +160,7 @@ pub const BACKDROP_FILTER: PropertyId = PropertyId::from_raw(104);
 pub const DESKTOP_BACKDROP_TINT: PropertyId = PropertyId::from_raw(236);
 pub const DESKTOP_BACKDROP_FALLBACK: PropertyId = PropertyId::from_raw(237);
 pub const TEXT_PRIVACY: PropertyId = PropertyId::from_raw(238);
+pub const DIRECTION_SCOPE: PropertyId = PropertyId::from_raw(239);
 pub const TEXT_LINE_HEIGHT: PropertyId = PropertyId::from_raw(105);
 pub const TEXT_FONT_STYLE: PropertyId = PropertyId::from_raw(106);
 pub const TEXT_LETTER_SPACING: PropertyId = PropertyId::from_raw(107);

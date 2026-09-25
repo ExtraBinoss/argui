@@ -2,10 +2,14 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 mod automation;
+mod component_install;
 mod components;
 mod icons;
 mod native;
 mod project;
+mod sdk;
+mod source_cache;
+mod standalone;
 mod web;
 
 use std::{
@@ -14,10 +18,11 @@ use std::{
     process::Command,
 };
 
-pub use components::{component_files, install};
+pub use component_install::install;
+pub use components::{catalog, component_files};
 pub use project::{Framework, Project, Target};
 
-const HELP: &str = "Argui TSX CLI\n\nUsage:\n  argui init counter-web|counter-native\n  argui init <solid|react|web|native> [name]\n  argui init <solid|react> <name>-web\n  argui check [path] [--json]\n  argui build [path] [dev|release]\n  argui dev [path]\n  argui run [path] <dev|release>\n  argui test [app-path] <file.test.ts|file.test.tsx> --out <directory>\n  argui screenshot [app-path] --out <file.png>\n  argui add <solid|react> <component>...\n  argui icon <source.png>\n  argui doctor [web]\n\nAvailable components are listed in the checkout's components/registry.json.\nInside an Argui checkout, init creates apps/<name>. Elsewhere, it creates a matching versioned checkout in <name>/ with the app in <name>/apps/<name>.\nProject commands accept a path relative to the current directory; omit it when already inside the app. The project manifest selects the native or browser target.\n";
+const HELP: &str = "Argui CLI\n\nUsage:\n  argui init [rust|solid|react] [--dir PATH] [--name NAME] [--targets native,web] [--feature tasks] [--feature automation] [--yes]\n  argui check [path] [--json]\n  argui build [dev|release] [--target native|web]\n  argui dev [--target native|web]\n  argui run [dev|release] [--target native|web]\n  argui test [app-path] <file.test.ts|file.test.tsx> --out <directory>\n  argui screenshot [app-path] --out <file.png>\n  argui add [--solid|--react] <component>... [--project PATH]\n  argui list components [--solid|--react] [--project PATH] [--json]\n  argui icon <source.png>\n  argui doctor [web]\n\nInit writes directly into --dir (default current directory). Solid and React select native and web by default; Rust currently supports native. Mobile requires both Android and iOS, so remains unavailable until the iOS shell and packaging exist. Run bun install in a generated TSX project before check or build.\n";
 #[cfg(windows)]
 const C_COMPILER: (&str, &str) = ("cl", "https://rust-lang.org/tools/install/");
 #[cfg(target_os = "macos")]
@@ -56,6 +61,14 @@ pub fn run_in(cwd: &Path, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         [] => overview(cwd),
+        [command, options @ ..]
+            if command == "init"
+                && (options.is_empty()
+                    || options.first().is_some_and(|value| value == "rust")
+                    || options.iter().any(|value| value.starts_with("--"))) =>
+        {
+            standalone::init(cwd, options)
+        }
         [command, preset]
             if command == "init" && (preset == "counter-web" || preset == "counter-native") =>
         {
@@ -105,15 +118,117 @@ pub fn run_in(cwd: &Path, args: &[String]) -> Result<(), String> {
         [command, source] if command == "icon" => icons::generate(cwd, Path::new(source)),
         [command, options @ ..] if command == "test" => automation::test(cwd, options),
         [command, options @ ..] if command == "screenshot" => automation::screenshot(cwd, options),
-        [command, options @ ..] if command == "check" => check_project(cwd, options),
-        [command, options @ ..] if command == "build" || command == "run" || command == "dev" => {
-            project_command(cwd, command, options)
+        [command, options @ ..] if command == "check" => {
+            if standalone::is_project(&standalone::selected_path(cwd, options)) {
+                standalone::command(cwd, command, options)
+            } else {
+                check_project(cwd, options)
+            }
         }
-        [command, framework, names @ ..] if command == "add" && !names.is_empty() => {
-            components::add(cwd, Framework::parse(framework)?, names)
+        [command, options @ ..] if command == "build" || command == "run" || command == "dev" => {
+            if standalone::is_project(&standalone::selected_path(cwd, options)) {
+                standalone::command(cwd, command, options)
+            } else {
+                project_command(cwd, command, options)
+            }
+        }
+        [command, options @ ..] if command == "add" => add_components(cwd, options),
+        [command, subject, options @ ..] if command == "list" && subject == "components" => {
+            list_components(cwd, options)
         }
         _ => Err(format!("invalid command; run `argui --help`\n{HELP}")),
     }
+}
+
+/// Parses a mixed-framework component request and resolves the project root.
+/// Framework selectors apply to subsequent names; `--project` selects the app.
+///
+/// # Errors
+/// Returns an error for invalid flags, absent names, or missing project state.
+fn add_components(cwd: &Path, options: &[String]) -> Result<(), String> {
+    let mut selected = None;
+    let mut selectors = 0usize;
+    let mut selector_without_name = false;
+    let mut project_path = None;
+    let mut requests = Vec::new();
+    let mut arguments = options.iter();
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--solid" | "--react" => {
+                if selector_without_name {
+                    return Err("choose a component name between framework selectors".into());
+                }
+                selected = Some(Framework::parse(argument.trim_start_matches("--"))?);
+                selectors += 1;
+                selector_without_name = true;
+            }
+            "solid" | "react" if requests.is_empty() && selected.is_none() => {
+                selected = Some(Framework::parse(argument)?);
+                selectors += 1;
+                selector_without_name = true;
+            }
+            "--project" => {
+                let path = arguments.next().ok_or("--project needs a directory")?;
+                project_path = Some(cwd.join(path));
+            }
+            name if name.starts_with('-') => return Err(format!("unknown add option `{name}`")),
+            name => {
+                requests.push((selected, name.to_owned()));
+                selector_without_name = false;
+            }
+        }
+    }
+    if requests.is_empty() {
+        return Err("usage: argui add [--solid|--react] <component>... [--project PATH]".into());
+    }
+    if selectors == 1 && selector_without_name {
+        for (framework, _) in &mut requests {
+            *framework = selected;
+        }
+    }
+    let start = project_path.as_deref().unwrap_or(cwd);
+    let app = start
+        .ancestors()
+        .find(|ancestor| ancestor.join("argui.json").is_file())
+        .ok_or("cannot locate argui.json; use --project PATH")?;
+    if standalone::is_project(app) && standalone::load(app)?.framework == "rust" {
+        return Err("argui add installs TSX components; this project uses pure Rust".into());
+    }
+    let default = project::load(app)?.framework;
+    let requests = requests
+        .into_iter()
+        .map(|(framework, name)| (framework.unwrap_or(default), name))
+        .collect::<Vec<_>>();
+    component_install::add_batch(app, &requests)
+}
+
+/// Parses component catalog filters and an optional selected project.
+///
+/// # Errors
+/// Returns an error for contradictory flags, missing paths, or invalid registries.
+fn list_components(cwd: &Path, options: &[String]) -> Result<(), String> {
+    let mut framework = None;
+    let mut project = None;
+    let mut json = false;
+    let mut arguments = options.iter();
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--solid" | "--react" => {
+                let choice = Framework::parse(argument.trim_start_matches("--"))?;
+                if framework.is_some_and(|selected| selected != choice) {
+                    return Err("choose only one of --solid and --react".into());
+                }
+                framework = Some(choice);
+            }
+            "--project" => {
+                let path = arguments.next().ok_or("--project needs a directory")?;
+                project = Some(cwd.join(path));
+            }
+            "--json" => json = true,
+            _ => return Err(format!("unknown list components option `{argument}`")),
+        }
+    }
+    components::list(cwd, project.as_deref(), framework, json)
 }
 
 /// Resolves an optional app path against `cwd`, leaving an in-app command local.

@@ -16,10 +16,12 @@ use std::{
 use crate::desktop_application::{
     GalleryApp, gallery_config, register_application_services, runtime_service_event,
 };
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+use crate::hot_reload::dev_bundle_path;
 use crate::{
     QuickJsGallery,
     effects::registry_from_json,
-    hot_reload::{BundleWatcher, Dispatch, dev_bundle_path},
+    hot_reload::{BundleWatcher, Dispatch},
     native_metrics::control_request,
     services::{ServiceChannels, ServiceRegistry, ServiceResponse},
     telemetry::JsCounts,
@@ -159,7 +161,7 @@ pub fn run_desktop_with_services(
 /// Returns an error if the schema, gallery bundle, QuickJS engine, or native window cannot start.
 #[cfg(target_os = "android")]
 pub fn run_android(
-    android_app: argui_android::AndroidApp,
+    android_app: argui_runtime::mobile::android::AndroidApp,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));

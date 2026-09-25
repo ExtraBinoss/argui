@@ -243,15 +243,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-inspect"
-version = "0.3.3"
-dependencies = [
- "argui-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "argui-layout"
 version = "0.3.3"
 dependencies = [
@@ -304,19 +295,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-reactive"
-version = "0.3.3"
-
-[[package]]
 name = "argui-render"
 version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
- "argui-shader",
  "argui-text",
  "bytemuck",
+ "naga",
  "resvg",
+ "thiserror 2.0.20",
  "web-time",
  "wgpu",
 ]
@@ -331,7 +319,6 @@ dependencies = [
  "argui-animation",
  "argui-core",
  "argui-host",
- "argui-inspect",
  "argui-layout",
  "argui-paint",
  "argui-platform",
@@ -363,15 +350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-shader"
-version = "0.3.3"
-dependencies = [
- "argui-core",
- "naga",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-text"
 version = "0.3.3"
 dependencies = [
@@ -387,7 +365,6 @@ version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
- "argui-reactive",
 ]
 
 [[package]]

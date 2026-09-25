@@ -89,6 +89,70 @@ fn cli(root: &Path, args: &[&str]) -> std::process::Output {
 }
 
 #[test]
+/// Option errors keep framework selectors, paths, and catalog filters unambiguous.
+fn command_option_edges_report_clear_errors() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let run = |args: &[&str]| {
+        run_in(
+            root,
+            &args
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect::<Vec<_>>(),
+        )
+    };
+    for (args, expected) in [
+        (vec!["add", "--unknown", "button"], "unknown add option"),
+        (vec!["add", "--project"], "needs a directory"),
+        (vec!["add", "button", "solid"], "cannot locate argui.json"),
+        (vec!["add", "--solid", "solid"], "cannot locate argui.json"),
+        (
+            vec!["list", "components", "--solid", "--react"],
+            "choose only one",
+        ),
+        (vec!["list", "components", "--project"], "needs a directory"),
+        (
+            vec!["list", "components", "--unknown"],
+            "unknown list components option",
+        ),
+        (vec!["run", "missing", "release"], "argui.json"),
+        (vec!["run", "release", "missing"], "argui.json"),
+    ] {
+        let error = run(&args).unwrap_err();
+        assert!(error.contains(expected), "{args:?}: {error}");
+    }
+    run_in(
+        root,
+        &[
+            "init".into(),
+            "rust".into(),
+            "--dir".into(),
+            "rust-app".into(),
+            "--yes".into(),
+        ],
+    )
+    .unwrap();
+    let error = run_in(&root.join("rust-app"), &["add".into(), "button".into()]).unwrap_err();
+    assert!(error.contains("pure Rust"));
+}
+
+#[test]
+/// The overview reports unavailable tools when its PATH contains no build executables.
+fn overview_reports_missing_tools() {
+    let temp = tempfile::tempdir().unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_argui"))
+        .current_dir(temp.path())
+        .env("PATH", "")
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    let output = String::from_utf8(result.stdout).unwrap();
+    assert!(output.contains("Bun missing"));
+    assert!(output.contains("Rust missing"));
+}
+
+#[test]
 /// The CLI emits both readable and JSON TypeScript diagnostics.
 fn check_reports_success_and_failure() {
     let temp = tempfile::tempdir().unwrap();
@@ -404,22 +468,21 @@ fn release_packaging_reports_conflicts() {
 }
 
 #[test]
-/// Global initialization obtains its matching checkout before creating an app.
-fn init_outside_checkout_uses_versioned_git_clone() {
+/// Global initialization creates an application without cloning a checkout.
+fn init_outside_checkout_creates_standalone_app() {
     let temp = tempfile::tempdir().unwrap();
     fs::create_dir_all(temp.path().join("bin")).unwrap();
-    script(
-        &temp.path().join("bin/git"),
-        r##"#!/bin/sh
-for last do :; done
-mkdir -p "$last/packages/host" "$last/apps/gallery/quickjs-host/src"
-printf '{}\n' > "$last/packages/host/package.json"
-printf '[package]\n' > "$last/apps/gallery/quickjs-host/Cargo.toml"
-printf 'ARGUI_APP_BUNDLE\n' > "$last/apps/gallery/quickjs-host/src/runner.rs"
-"##,
-    );
+    script(&temp.path().join("bin/git"), "#!/bin/sh\nexit 97\n");
     let result = Command::new(env!("CARGO_BIN_EXE_argui"))
-        .args(["init", "react", "outside-app"])
+        .args([
+            "init",
+            "react",
+            "--dir",
+            "outside-app",
+            "--name",
+            "outside-app",
+            "--yes",
+        ])
         .current_dir(temp.path())
         .env(
             "PATH",
@@ -436,11 +499,8 @@ printf 'ARGUI_APP_BUNDLE\n' > "$last/apps/gallery/quickjs-host/src/runner.rs"
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    assert!(
-        temp.path()
-            .join("outside-app/apps/outside-app/src/main.tsx")
-            .is_file()
-    );
+    assert!(temp.path().join("outside-app/src/main.tsx").is_file());
+    assert!(temp.path().join("outside-app/argui.json").is_file());
 }
 
 #[test]

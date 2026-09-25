@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { mountGallery } from '../dist/gallery-core.mjs'
+import { createThemeBridge } from './fixtures/theme-bridge.mjs'
 
 const contract = JSON.parse(readFileSync('packages/host/src/contract.generated.json', 'utf8'))
 
@@ -11,6 +12,7 @@ test('runtime-neutral gallery mounts the same native tree without a Bun bootstra
     contract: () => contract,
     commit: (operations) => batches.push(operations),
     subscribe: () => () => {},
+    theme: createThemeBridge(),
   }
   const dispose = mountGallery(bridge, contract.abiHash)
   assert(batches[0].some((operation) => operation.kind === 'setRoot'))
@@ -25,6 +27,7 @@ test('busy loader needs no recurring JavaScript native commits', async () => {
     contract: () => contract,
     commit: (operations) => batches.push(operations),
     subscribe: () => () => {},
+    theme: createThemeBridge(),
   }, contract.abiHash)
   try {
     const initial = batches.length

@@ -1,5 +1,7 @@
 import type { AssetRef, SemanticCurrent } from '@argui/host'
 import type { Palette } from './theme'
+import type { ButtonSize } from './button-size'
+import type { SelectOption } from './select-options'
 
 /** Icons injected by an application instead of loaded from its asset catalogue. */
 export interface WidgetIcons {
@@ -17,9 +19,10 @@ export interface ButtonProps {
   disabled?: boolean
   busy?: boolean
   selected?: boolean
+  size?: ButtonSize
   role?: 'button' | 'switch'
   current?: SemanticCurrent
-  kind?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'quiet'
+  kind?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'quiet' | 'link'
   icon?: AssetRef
   activeIcon?: AssetRef
   iconOnly?: boolean
@@ -27,14 +30,18 @@ export interface ButtonProps {
   controls?: string
 }
 
-/** Props shared by the controlled native selector implementations. */
+/** Props shared by the native selection popup implementations. */
 export interface SelectProps {
   id: string
   label: string
-  options: readonly string[]
-  value: string
+  options: readonly SelectOption[]
+  value?: string
+  defaultValue?: string
   theme: Palette
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
+  placeholder?: string
+  disabled?: boolean
+  width?: number
 }
 
 /** Props shared by the themed native text input implementations. */
@@ -42,8 +49,9 @@ export interface InputFieldProps {
   id: string
   label: string
   theme: Palette
-  value: string
-  onChange: (value: string) => void
+  value?: string
+  defaultValue?: string
+  onChange?: (value: string) => void
   placeholder?: string
   disabled?: boolean
   readOnly?: boolean
@@ -64,6 +72,9 @@ export interface PopoverProps<TChildren> {
   opaque?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  placement?: 'top_start' | 'top' | 'top_end' | 'bottom_start' | 'bottom' | 'bottom_end' | 'left_start' | 'left' | 'left_end' | 'right_start' | 'right' | 'right_end'
+  width?: number
+  closeLabel?: string | false
   children: TChildren
 }
 
@@ -71,6 +82,7 @@ export interface PopoverProps<TChildren> {
 export interface DialogProps<TChildren> {
   id: string
   title: string
+  description?: string
   open: boolean
   onOpenChange: (open: boolean) => void
   theme: Palette
@@ -81,5 +93,5 @@ export interface DialogProps<TChildren> {
   blur?: number
   scrimColor?: string
   surfaceColor?: string
-  closeLabel?: string
+  closeLabel?: string | false
 }

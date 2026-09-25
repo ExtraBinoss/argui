@@ -3,17 +3,17 @@
 Argui's Rust engine can be embedded in native applications. The repository's
 maintained mobile sample is the Solid TSX gallery on Android: its Gradle shell
 starts a Rust QuickJS host, which runs the gallery bundle through the shared
-host contract. The `argui-android` and `argui-ios` crates remain available for
-applications that build their own native integrations. This repository does
+host contract. Optional `argui-runtime` entry modules support applications
+that build their own native integrations. This repository does
 not include an iOS app shell or Xcode project.
 
 ## Support status
 
 CI currently proves that:
 
-- `argui-android` and the gallery QuickJS host cross-compile for Android;
+- the `argui-runtime/android` entry and gallery QuickJS host cross-compile for Android;
 - Gradle creates a debug APK and unsigned release AAB for the Android gallery;
-- the `argui-ios` entry crate cross-compiles for iOS.
+- the `argui-runtime/ios` entry cross-compiles for iOS.
 
 CI does not package an iOS application. Physical-device startup, input,
 lifecycle, TalkBack/VoiceOver, document services, and owner signing still need
@@ -38,18 +38,22 @@ pub fn build() -> (
 ```
 
 A native Rust launcher calls `argui_runtime::run_application_with_text_engine`;
-mobile launchers call the equivalent function through their entry crates.
+mobile launchers call the equivalent function through runtime's mobile modules.
 Embed resources needed at startup with `include_bytes!`.
 
-Mobile entry crates are explicit dependencies. A Rust application selects the
-engine and platform crates it uses:
+Mobile entry features are explicit and target-gated. A Rust application selects
+the engine and platform features it uses:
 
 ```toml
 [dependencies]
-argui-core = "0.3.2"
-argui-runtime = "0.3.2"
-argui-android = "0.3.2" # Android application only
-# argui-ios = "0.3.2"  # iOS application only
+argui-core = "0.3.3"
+argui-runtime = "0.3.3"
+
+[target.'cfg(target_os = "android")'.dependencies]
+argui-runtime = { version = "0.3.3", features = ["android"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+argui-runtime = { version = "0.3.3", features = ["ios"] }
 ```
 
 The TSX application path is separate: `apps/gallery` shares the Rust host and
@@ -58,7 +62,7 @@ renderer while its Solid or React bundle defines the application UI. See the
 
 ## Android
 
-`argui-android` connects Android's `NativeActivity` to the Winit lifecycle.
+`argui-runtime::mobile::android` connects Android's `NativeActivity` to the Winit lifecycle.
 A Rust application crate builds a `cdylib` named `main` and exports the activity
 entry symbol:
 
@@ -69,11 +73,11 @@ crate-type = ["cdylib"]
 ```
 
 ```rust,ignore
-use argui_android::AndroidApp;
+use argui_runtime::mobile::android::AndroidApp;
 
 fn launch(android_app: AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
     let (app, renderer, text, model) = shared_app::build();
-    argui_android::run_application_with_text_engine(
+    argui_runtime::mobile::android::run_application_with_text_engine(
         android_app,
         app,
         renderer,
@@ -84,7 +88,7 @@ fn launch(android_app: AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-argui_android::android_main!(launch);
+argui_runtime::android_main!(launch);
 ```
 
 The repository shell is in `mobile/android`. Its small Java `NativeActivity`
@@ -121,12 +125,12 @@ from a visible user action. Android 15 and later limit background `dataSync`
 foreground-service use to a cumulative six hours per 24-hour period; the
 notification does not make arbitrary or indefinite background work permitted.
 Other Android shells do not need the repository helper to run Argui, but must
-package `crates/argui-android/android/src/main/java` and declare the service,
+package `crates/argui-runtime/src/mobile/android/java` and declare the service,
 permissions, and notification icon before calling `MobileActivity::begin`.
 
 ## iOS
 
-`argui-ios` exports a C-callable Rust entry point. A consuming application
+`argui-runtime::mobile::ios` exports a C-callable Rust entry point. A consuming application
 builds a static library:
 
 ```toml
@@ -137,7 +141,7 @@ crate-type = ["staticlib"]
 ```rust,ignore
 fn launch() -> Result<(), Box<dyn std::error::Error>> {
     let (app, renderer, text, model) = shared_app::build();
-    argui_ios::run_application_with_text_engine(
+    argui_runtime::mobile::ios::run_application_with_text_engine(
         app,
         renderer,
         text,
@@ -147,7 +151,7 @@ fn launch() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-argui_ios::ios_main!(start_argui_app, launch);
+argui_runtime::ios_main!(start_argui_app, launch);
 ```
 
 The consuming Xcode project calls `start_argui_app()`; Winit starts
@@ -236,7 +240,7 @@ ships a gallery page demonstrating background activity.
 The Rust engine, layout, text, image/vector resources, effects, tasks, WGPU,
 touch, keyboard, and IME are shared across supported native targets. The TSX
 gallery currently packages desktop and Android hosts; CI only cross-checks the
-iOS entry crate. Desktop backdrops, native popovers, tray, desktop WebView, and
+iOS entry module. Desktop backdrops, native popovers, tray, desktop WebView, and
 updater are platform integrations. File-picker requests have no mobile
 document-provider adapter, and clipboard requests report unavailable. One
 full-screen Argui window is the supported mobile application model.
@@ -246,11 +250,11 @@ full-screen Argui window is the supported mobile application model.
 ```sh
 rustup target add aarch64-linux-android aarch64-apple-ios
 
-cargo check --locked --target aarch64-linux-android -p argui-android
-cargo check --locked --manifest-path apps/gallery/quickjs-host/Cargo.toml \
-  --target aarch64-linux-android --lib
+cargo check --locked --target aarch64-linux-android -p argui-runtime --features android
+cargo ndk -t arm64-v8a -P 26 check --locked \
+  --manifest-path apps/gallery/quickjs-host/Cargo.toml --lib
 
-cargo check --locked --target aarch64-apple-ios -p argui-ios
+cargo check --locked --target aarch64-apple-ios -p argui-runtime --features ios
 ```
 
 CI packages Android artifacts only. Device validation must cover startup,

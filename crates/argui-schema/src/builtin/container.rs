@@ -57,6 +57,12 @@ pub(super) fn register(
         .property(loop_motion::properties()[11].clone())
         .property(common_property(CommonProperty::Padding))
         .property(PropertySchema::new(
+            DIRECTION_SCOPE,
+            "direction_scope",
+            ValueType::String,
+            "Writing direction inherited by visual descendants and portal content: ltr or rtl.",
+        ))
+        .property(PropertySchema::new(
             SCROLL_Y,
             "scroll_y",
             ValueType::Bool,
@@ -128,6 +134,17 @@ pub(super) fn register(
     registry.register(schema, move |input: &NativeElementInput| {
         let children = input.children(CHILDREN).to_vec();
         let mut element = apply_container(apply_common(constructor(children), input)?, input);
+        if let Some(SchemaValue::String(value)) = input.get(DIRECTION_SCOPE) {
+            element = element.direction_scope(match value.as_str() {
+                "ltr" => WritingDirection::Ltr,
+                "rtl" => WritingDirection::Rtl,
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "{name} does not support direction_scope `{value}`"
+                    )));
+                }
+            });
+        }
         if optional_bool(input, WRAP) == Some(true) {
             element = element.flex_wrap(FlexWrap::Wrap);
         }

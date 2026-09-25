@@ -63,7 +63,9 @@ impl Application {
                 self.prepared_text = None;
                 self.apply_scroll_request(request, event_loop);
             }
+            #[cfg(feature = "inspect")]
             self.publish_inspection();
+            #[cfg(feature = "inspect")]
             self.paint_inspection_highlight();
         }
         let scene = self

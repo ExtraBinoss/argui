@@ -12,6 +12,7 @@ pub enum Role {
     Button,
     CheckBox,
     RadioButton,
+    RadioGroup,
     Switch,
     TextInput,
     TextArea,

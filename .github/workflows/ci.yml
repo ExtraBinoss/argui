@@ -338,10 +338,12 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check Android engine
         run: |
-          cargo check --locked --target aarch64-linux-android -p argui-android
+          cargo check --locked --target aarch64-linux-android -p argui-runtime --features android
+          cargo check --locked --target aarch64-linux-android -p argui-runtime --features android --test mobile
       - name: Check iOS engine
         run: |
-          cargo check --locked --target aarch64-apple-ios -p argui-ios
+          cargo check --locked --target aarch64-apple-ios -p argui-runtime --features ios
+          cargo check --locked --target aarch64-apple-ios -p argui-runtime --features ios --test mobile
 
   android-package:
     name: Android APK and AAB

@@ -4,13 +4,15 @@ import json
 import re
 from pathlib import Path
 import sys
+import tomllib
 
 METRICS = ("branches", "functions", "lines", "regions")
 
 
 def workspace_crates():
-    return sorted(str(path.parent.relative_to("crates"))
-                  for path in Path("crates").glob("**/Cargo.toml"))
+    workspace = tomllib.loads(Path("Cargo.toml").read_text())["workspace"]
+    return sorted(str(Path(member).relative_to("crates"))
+                  for member in workspace["members"] if member.startswith("crates/"))
 
 
 def only_reexports(crate):

@@ -15,38 +15,49 @@ bun run gallery:react
 
 The first run builds the native host. Framework pages live in `src/solid/`
 and `src/react/`; generated assets, catalogs, and other shared data remain in
-`src/`.
+`src/`. Each of the 63 registered components has its own page file in both
+framework directories. The gallery search filters the component navigation;
+**Examples → Data Table**, **Date Picker**, and **Typography** are compositions.
 
 ## Shared TSX widgets
 
 The gallery's reusable controls live in the workspace package
 [`@argui/widgets`](../../packages/widgets/package.json). Import them from
 `@argui/widgets/solid` or `@argui/widgets/react`; both entries expose
-`Button`, `InputField`, `Select`, `Popover`, `Dialog`, `palette`, and `inputText`.
+the 63 registered widgets, including `Button`, `InputField`, `Select`,
+`Popover`, and `Dialog`, plus shared helpers such as `inputText`.
 Each widget has its own Solid and React source file under
 `packages/widgets/src/solid/` and `packages/widgets/src/react/`. Shared types,
-colors, input text extraction, and asset providers stay separate so component
+theme token definitions, input text extraction, and asset providers stay separate so component
 installers can copy one widget and its declared dependencies.
 Applications provide their own native asset references through
 `WidgetAssetProvider`, so the package does not depend on the gallery's generated
 asset manifest:
 
 ```tsx
-import { Button, palette, WidgetAssetProvider } from '@argui/widgets/solid'
+import { createThemeRuntime, type NativeBridge } from '@argui/host'
+import { useTheme } from '@argui/solid'
+import { Button, WidgetAssetProvider } from '@argui/widgets/solid'
+import { widgetThemeDefinition } from '@argui/widgets/theme'
 import { mediaAssets } from '../assets.generated'
 
-const theme = palette('dark', 'blue')
-
-function App() {
-  return (
-    <WidgetAssetProvider icons={{ search: mediaAssets['tabler/search.svg'] }}>
-      <Button id="save" label="Save" theme={theme} kind="primary" onClick={() => {}} />
-    </WidgetAssetProvider>
-  )
+function makeApp(bridge: NativeBridge) {
+  const runtime = createThemeRuntime(bridge, widgetThemeDefinition)
+  function App() {
+    const theme = useTheme(runtime)
+    return (
+      <WidgetAssetProvider icons={{ search: mediaAssets['tabler/search.svg'] }}>
+        <Button id="save" label="Save" theme={theme()} kind="primary" onClick={() => {}} />
+      </WidgetAssetProvider>
+    )
+  }
+  return { App, dispose: () => runtime.dispose() }
 }
 ```
 
-For React, import the same names from `@argui/widgets/react`.
+The host passes its bridge to `makeApp`; call `dispose` when unmounting the app.
+For React, import `useTheme` from `@argui/react` and the widgets from
+`@argui/widgets/react`. `useTheme` returns the resolved values directly.
 `InputField` accepts `password` and adds a Show/Hide button. The native editor
 masks the text until revealed and keeps both states protected from clipboard,
 undo history, and accessibility value export. `selectionColor` overrides its

@@ -3,10 +3,13 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
 
+#[cfg(feature = "inspect")]
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
+#[cfg(feature = "inspect")]
+use argui_render::{AdapterProfile, DamageMode, GpuFrameProfile};
 use argui_render::{
-    AdapterProfile, DamageMode, EffectDefinition, EffectRegistry, GpuCanvasDiagnosticKind,
-    GpuFrameProfile, RenderStatus, SurfaceAlphaMode, SurfaceRenderer,
+    EffectDefinition, EffectRegistry, GpuCanvasDiagnosticKind, RenderStatus, SurfaceAlphaMode,
+    SurfaceRenderer,
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -352,15 +355,37 @@ impl Application {
         // WebAssembly initializes the renderer asynchronously, so a command can
         // update the requested policy while the surface is still loading.
         renderer.set_damage_tracking(self.renderer_config.damage_tracking);
-        let profiling_active = self.renderer_profiling_requested
+        let profiling_active = self.renderer_profiling_requested;
+        #[cfg(feature = "inspect")]
+        let profiling_active = profiling_active
             || self
                 .inspector
                 .as_ref()
                 .is_some_and(argui_inspect::InspectorHandle::gpu_profiling);
         renderer.set_profiling_active(profiling_active);
 
+        #[cfg(feature = "inspect")]
         if let Some(inspector) = &self.inspector {
-            inspector.record_ui(self.frame_record.clone());
+            inspector.record_ui(FrameRecord {
+                interval: self.frame_record.interval,
+                model: self.frame_record.model,
+                tree: self.frame_record.tree,
+                layout: self.frame_record.layout,
+                paint: self.frame_record.paint,
+                surface: self.frame_record.surface,
+                resize_events: self.frame_record.resize_events,
+                update: match self.frame_record.update {
+                    argui_ui::TreeUpdate::None | argui_ui::TreeUpdate::Semantics => {
+                        Invalidation::None
+                    }
+                    argui_ui::TreeUpdate::Composite => Invalidation::Composite,
+                    argui_ui::TreeUpdate::Paint | argui_ui::TreeUpdate::Scroll => {
+                        Invalidation::Paint
+                    }
+                    argui_ui::TreeUpdate::Layout => Invalidation::Layout,
+                },
+                ..FrameRecord::default()
+            });
         }
         if self.renderer_profiling_requested {
             (self.on_event)(RuntimeEvent::AnimationProfile(crate::AnimationProfile {
@@ -368,12 +393,7 @@ impl Application {
                 model_time: self.frame_record.model,
                 tree_time: self.frame_record.tree + self.frame_record.layout,
                 paint_time: self.frame_record.paint + self.frame_record.surface,
-                tree_update: match self.frame_record.update {
-                    Invalidation::None => argui_ui::TreeUpdate::None,
-                    Invalidation::Composite => argui_ui::TreeUpdate::Composite,
-                    Invalidation::Paint => argui_ui::TreeUpdate::Paint,
-                    Invalidation::Layout => argui_ui::TreeUpdate::Layout,
-                },
+                tree_update: self.frame_record.update,
             }));
         }
 
@@ -406,6 +426,7 @@ impl Application {
         }
         let result = match rendered {
             Ok(RenderStatus::Presented | RenderStatus::Skipped) => {
+                #[cfg(feature = "inspect")]
                 if let Some(inspector) = &self.inspector {
                     let profile = renderer.last_profile();
                     inspector.record_render(FrameRecord {
@@ -478,6 +499,7 @@ impl Application {
     }
 }
 
+#[cfg(feature = "inspect")]
 fn adapter_record(profile: &AdapterProfile) -> AdapterRecord {
     AdapterRecord {
         name: profile.name.clone(),
@@ -496,6 +518,7 @@ fn adapter_record(profile: &AdapterProfile) -> AdapterRecord {
     }
 }
 
+#[cfg(feature = "inspect")]
 fn gpu_record(profile: &GpuFrameProfile) -> GpuFrameRecord {
     GpuFrameRecord {
         sequence: profile.frame,

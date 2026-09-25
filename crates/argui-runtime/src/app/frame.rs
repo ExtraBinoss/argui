@@ -1,9 +1,22 @@
+use std::time::Duration;
 use web_time::Instant;
 
-use argui_inspect::Invalidation;
 use argui_ui::{FocusRequest, InteractionUpdate, TextSelectionRequest, TreeUpdate};
 
 use crate::{RuntimeEvent, ScrollRequest, app::Application};
+
+/// Timing collected for a frame only while profiling is requested.
+#[derive(Default)]
+pub(crate) struct FrameTiming {
+    pub(crate) interval: std::time::Duration,
+    pub(crate) model: std::time::Duration,
+    pub(crate) tree: std::time::Duration,
+    pub(crate) layout: std::time::Duration,
+    pub(crate) paint: std::time::Duration,
+    pub(crate) surface: std::time::Duration,
+    pub(crate) resize_events: u32,
+    pub(crate) update: TreeUpdate,
+}
 
 impl Application {
     /// Queues an immediately applied native size for the next frame.
@@ -174,17 +187,31 @@ impl PendingUiFrame {
 }
 
 impl Application {
+    /// Samples the clock when renderer profiling or inspection is active.
+    ///
+    /// Returns no timestamp for ordinary frames without metric collection.
+    pub(crate) fn profile_clock(&self) -> Option<Instant> {
+        let active = self.renderer_profiling_requested;
+        #[cfg(feature = "inspect")]
+        let active = active || self.inspector.is_some();
+        active.then(Instant::now)
+    }
+
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn begin_frame_profile(&mut self) {
         self.composite_frame = false;
-        let now = Instant::now();
-        self.frame_record = argui_inspect::FrameRecord {
+        let Some(now) = self.profile_clock() else {
+            self.frame_record = FrameTiming::default();
+            self.last_redraw = None;
+            return;
+        };
+        self.frame_record = FrameTiming {
             interval: self
                 .last_redraw
                 .map_or(std::time::Duration::ZERO, |previous| {
                     now.duration_since(previous)
                 }),
-            ..argui_inspect::FrameRecord::default()
+            ..FrameTiming::default()
         };
         self.last_redraw = Some(now);
     }
@@ -201,7 +228,7 @@ impl Application {
         let Some((width, height)) = pending.size() else {
             return;
         };
-        let started = Instant::now();
+        let started = self.profile_clock();
         if let super::RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
             renderer.resize(width, height);
         }
@@ -210,7 +237,7 @@ impl Application {
         if scale_changed || self.viewport != previous_viewport {
             self.pending_ui_frame.request_layout();
         }
-        self.frame_record.surface += started.elapsed();
+        self.frame_record.surface += started.map_or(Duration::ZERO, |start| start.elapsed());
         self.frame_record.resize_events = pending.events();
     }
 
@@ -220,7 +247,7 @@ impl Application {
         event_loop: &dyn crate::host::LoopControl,
     ) -> TreeUpdate {
         let pending = std::mem::take(&mut self.pending_ui_frame);
-        let tree_started = Instant::now();
+        let tree_started = self.profile_clock();
         let assets_changed = if pending.rebuild {
             match self.refresh_media_assets() {
                 Ok(changed) => changed,
@@ -243,7 +270,7 @@ impl Application {
         } else {
             TreeUpdate::None
         };
-        self.frame_record.tree += tree_started.elapsed();
+        self.frame_record.tree += tree_started.map_or(Duration::ZERO, |start| start.elapsed());
         self.composite_frame = super::frame_route::retain_compositor_frame(
             self.composite_frame,
             tree_update,
@@ -252,69 +279,67 @@ impl Application {
         );
         match tree_update {
             TreeUpdate::Layout => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.prepare_or_exit(event_loop);
-                self.frame_record.layout += started.elapsed();
+                self.frame_record.layout += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             _ if pending.layout || assets_changed => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.prepare_or_exit(event_loop);
-                self.frame_record.layout += started.elapsed();
+                self.frame_record.layout += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             _ if pending.text_input => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.refresh_text_inputs();
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             _ if pending.scroll => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.scroll_or_exit(event_loop);
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             TreeUpdate::Paint => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.repaint();
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             TreeUpdate::Scroll => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.scroll_or_exit(event_loop);
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             _ if pending.paint => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.repaint();
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             TreeUpdate::Composite => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.composite();
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             _ if pending.composite => {
-                let started = Instant::now();
+                let started = self.profile_clock();
                 self.composite();
-                self.frame_record.paint += started.elapsed();
+                self.frame_record.paint += started.map_or(Duration::ZERO, |start| start.elapsed());
             }
             TreeUpdate::Semantics => {}
             TreeUpdate::None => {}
         }
         self.frame_record.update = match tree_update {
-            TreeUpdate::Layout => Invalidation::Layout,
-            TreeUpdate::Composite if self.composite_frame => Invalidation::Composite,
-            TreeUpdate::Composite => Invalidation::Paint,
-            TreeUpdate::Paint => Invalidation::Paint,
-            TreeUpdate::Scroll => Invalidation::Paint,
-            TreeUpdate::Semantics => Invalidation::None,
-            TreeUpdate::None if pending.layout => Invalidation::Layout,
+            TreeUpdate::Layout => TreeUpdate::Layout,
+            TreeUpdate::Composite if self.composite_frame => TreeUpdate::Composite,
+            TreeUpdate::Composite => TreeUpdate::Paint,
+            TreeUpdate::Paint => TreeUpdate::Paint,
+            TreeUpdate::Scroll => TreeUpdate::Paint,
+            TreeUpdate::Semantics => TreeUpdate::None,
+            TreeUpdate::None if pending.layout => TreeUpdate::Layout,
             TreeUpdate::None if pending.text_input || pending.scroll || pending.paint => {
-                Invalidation::Paint
+                TreeUpdate::Paint
             }
-            TreeUpdate::None if pending.composite && self.composite_frame => {
-                Invalidation::Composite
-            }
-            TreeUpdate::None if pending.composite => Invalidation::Paint,
-            TreeUpdate::None => Invalidation::None,
+            TreeUpdate::None if pending.composite && self.composite_frame => TreeUpdate::Composite,
+            TreeUpdate::None if pending.composite => TreeUpdate::Paint,
+            TreeUpdate::None => TreeUpdate::None,
         };
         if let Some(request) = pending.scroll_request {
             self.apply_scroll_request(request, event_loop);

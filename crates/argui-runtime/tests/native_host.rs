@@ -116,3 +116,40 @@ fn registered_image_and_vector_handles_are_required_before_commit() {
     assert!(validate_native_host_assets(&[image, vector], &[], &[]).is_err());
     assert!(validate_native_host_assets(&[HostOperation::SetRoot { id: None }], &[], &[]).is_ok());
 }
+
+mod pointer {
+    use argui_core::{Point, PointerEvent, PointerPhase, Rect, Size};
+    use argui_layout::{LayoutNode, LayoutOutput};
+    use argui_runtime::NativePointerPosition;
+    use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
+
+    /// Pointer coordinates delivered to a keyed callback are relative to its bounds.
+    #[test]
+    fn pointer_coordinates_are_relative_to_the_callback_node_bounds() {
+        let tree = UiTree::new(Element::container(
+            [Element::text("slider").keyed("slider")],
+        ));
+        let node = tree.node_ids()[1];
+        let mut layout = LayoutOutput::default();
+        layout.nodes.push(LayoutNode {
+            index: 1,
+            node,
+            bounds: Rect::new(Point::new(45.0, 30.0), Size::new(180.0, 24.0)),
+            layout_bounds: Rect::default(),
+            clip: None,
+            text_index: None,
+        });
+        let event = UiEvent::new(
+            node,
+            Some("slider".into()),
+            UiEventKind::Pointer(PointerEvent::mouse(
+                PointerPhase::Moved,
+                Point::new(90.0, 42.0),
+            )),
+        );
+        let position = NativePointerPosition::from_event(&event, &layout).unwrap();
+        assert_eq!((position.local_x, position.local_y), (45.0, 12.0));
+        assert_eq!((position.width, position.height), (180.0, 24.0));
+        assert_eq!((position.x, position.y), (90.0, 42.0));
+    }
+}

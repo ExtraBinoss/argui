@@ -30,7 +30,7 @@ android {
 
     sourceSets {
         main {
-            java.srcDir(new File(repositoryRoot, 'crates/argui-android/android/src/main/java'))
+            java.srcDir(new File(repositoryRoot, 'crates/argui-runtime/src/mobile/android/java'))
         }
     }
 
@@ -70,7 +70,7 @@ def registerRustBuild = { String variant, boolean optimized ->
         inputs.file(cargoManifest)
         inputs.file(new File(cargoManifest.parentFile, 'Cargo.lock'))
         inputs.dir(new File(repositoryRoot, 'crates'))
-        inputs.dir(new File(repositoryRoot, 'crates/argui-android/android'))
+        inputs.dir(new File(repositoryRoot, 'crates/argui-runtime/src/mobile/android/java'))
         inputs.dir(new File(repositoryRoot, '.cargo'))
         dependsOn prepareJsGallery
         inputs.dir(new File(repositoryRoot, 'apps/gallery/quickjs-host/src'))

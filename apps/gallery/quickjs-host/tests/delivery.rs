@@ -1,9 +1,24 @@
 use argui_core::Point;
-use argui_gallery_quickjs::{coalesce_virtual_windows, ui_event_payload};
-use argui_runtime::{CallbackDelivery, CallbackId, HostId, NativeHostDelivery};
+use argui_gallery_quickjs::{coalesce_virtual_windows, event_json, ui_event_payload};
+use argui_runtime::{CallbackDelivery, CallbackId, HostId, NativeHostDelivery, NativePointerPosition};
 use argui_ui::{SemanticAction, SemanticValue};
 use argui_ui::{UiEventKind, VirtualMeasurement};
 use serde_json::json;
+
+#[test]
+fn pointer_delivery_exposes_window_and_local_coordinates() {
+    let delivery = NativeHostDelivery {
+        callback: CallbackDelivery { node: HostId::new(4, 1), callback: CallbackId(9) },
+        kind: UiEventKind::Focused,
+        pointer: Some(NativePointerPosition {
+            x: 90.0, y: 42.0, local_x: 45.0, local_y: 12.0, width: 180.0, height: 24.0,
+        }),
+    };
+    let payload = event_json(&delivery)["payload"].clone();
+    assert_eq!(payload["localX"], 45.0);
+    assert_eq!(payload["width"], 180.0);
+    assert_eq!(payload["x"], 90.0);
+}
 
 #[test]
 fn scroll_delivery_keeps_native_absolute_offsets() {
@@ -72,6 +87,7 @@ fn obsolete_window_ranges_coalesce_without_dropping_other_events() {
     };
     let window = |start| NativeHostDelivery {
         callback,
+        pointer: None,
         kind: UiEventKind::VirtualWindowChanged {
             start,
             end: start + 8,
@@ -84,6 +100,7 @@ fn obsolete_window_ranges_coalesce_without_dropping_other_events() {
         window(4),
         NativeHostDelivery {
             callback,
+            pointer: None,
             kind: UiEventKind::Focused,
         },
         window(8),

@@ -3,9 +3,9 @@ use std::{
     sync::Arc,
 };
 
+use crate::shader::{ShaderParameterMetadata, validate_effect_source};
 use argui_core::Name;
 use argui_paint::{EffectId, EffectInstance, EffectValue};
-use argui_shader::{ShaderParameterMetadata, validate_effect_source};
 
 use crate::RendererError;
 

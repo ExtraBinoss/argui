@@ -223,17 +223,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-android"
-version = "0.3.3"
-dependencies = [
- "argui-platform",
- "argui-render",
- "argui-runtime",
- "argui-text",
- "winit",
-]
-
-[[package]]
 name = "argui-animation"
 version = "0.3.3"
 dependencies = [
@@ -286,7 +275,6 @@ dependencies = [
 name = "argui-gallery-quickjs"
 version = "0.3.3"
 dependencies = [
- "argui-android",
  "argui-automation",
  "argui-core",
  "argui-effects",
@@ -407,19 +395,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-reactive"
-version = "0.3.3"
-
-[[package]]
 name = "argui-render"
 version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
- "argui-shader",
  "argui-text",
  "bytemuck",
+ "naga",
  "resvg",
+ "thiserror 2.0.20",
  "web-time",
  "wgpu",
 ]
@@ -466,15 +451,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-shader"
-version = "0.3.3"
-dependencies = [
- "argui-core",
- "naga",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-text"
 version = "0.3.3"
 dependencies = [
@@ -490,7 +466,6 @@ version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
- "argui-reactive",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@
   "version": "0.3.2",
   "type": "module",
   "exports": {
+    "./theme": "./src/shared/theme.ts",
     "./react": "./src/react/index.ts",
     "./solid": "./src/solid/index.ts"
   },

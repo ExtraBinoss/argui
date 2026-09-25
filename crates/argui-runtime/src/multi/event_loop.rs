@@ -79,6 +79,11 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
                     entry.runtime.user_event(event_loop, event);
                 }
             }
+            UserEvent::ThemeChanged { ref window, .. } => {
+                if let Some(entry) = self.windows.get_mut(window) {
+                    entry.runtime.user_event(event_loop, event);
+                }
+            }
             #[cfg(target_arch = "wasm32")]
             UserEvent::ClipboardText { ref window, .. } => {
                 if let Some(entry) = self.windows.get_mut(window) {

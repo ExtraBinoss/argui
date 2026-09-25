@@ -33,6 +33,7 @@ pub(super) struct Presentation<T> {
     pub(super) event_routes: RefCell<Vec<AnyEntity>>,
     pub(super) environment: RefCell<WindowEnvironment>,
     pub(super) environment_used: Cell<bool>,
+    pub(super) theme_reads: RefCell<HashSet<argui_theme::ThemeTokenId>>,
     pub(super) observed_identities: RefCell<HashSet<RetainedIdentity>>,
     pub(super) interaction_snapshot: Rc<RefCell<super::InteractionSnapshot>>,
     pub(super) handlers: RefCell<HandlerRegistry<T>>,
@@ -60,6 +61,7 @@ impl<T> Presentation<T> {
             event_routes: RefCell::default(),
             environment: RefCell::default(),
             environment_used: Cell::new(false),
+            theme_reads: RefCell::default(),
             observed_identities: RefCell::default(),
             interaction_snapshot: Rc::default(),
             handlers: RefCell::new(HandlerRegistry::default()),
@@ -70,6 +72,7 @@ impl<T> Presentation<T> {
         self.lifecycle.end();
         self.cache.clear();
         self.observed_identities.borrow_mut().clear();
+        self.theme_reads.borrow_mut().clear();
         let handlers = self.handlers.replace(HandlerRegistry::default());
         let children = self.children.take();
         let routes = self.event_routes.take();

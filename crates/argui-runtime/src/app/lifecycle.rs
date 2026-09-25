@@ -187,6 +187,12 @@ impl ApplicationHandler<UserEvent> for Application {
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
+        if let UserEvent::ThemeChanged { window, change } = &event {
+            if *window == self.window_key {
+                self.apply_theme_change(change);
+            }
+            return;
+        }
         if let UserEvent::Preferences {
             window,
             preferences,
@@ -219,6 +225,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     self.tasks_ready(event_loop);
                 }
                 UserEvent::Preferences { .. } => {}
+                UserEvent::ThemeChanged { .. } => {}
                 #[cfg(all(feature = "webview", target_os = "linux"))]
                 UserEvent::NativeInput { .. } => {}
                 UserEvent::AccessKit(event) => {
@@ -264,6 +271,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     self.tasks_ready(event_loop);
                 }
                 UserEvent::Preferences { .. } => {}
+                UserEvent::ThemeChanged { .. } => {}
                 UserEvent::ClipboardText {
                     window: window_key,
                     target,

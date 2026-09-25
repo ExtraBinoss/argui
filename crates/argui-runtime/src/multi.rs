@@ -246,6 +246,7 @@ impl MultiApplication {
             callback,
         )
         .identified(self.config.identity.clone(), key.clone())
+        .with_theme(self.model.borrow().theme(&key))
         .initially_visible(spec.visible)
         .ui_zoom(self.config.ui_zoom.enabled, self.ui_zoom_factor)
         .preference_overrides(self.config.preferences)
@@ -514,6 +515,7 @@ impl Render for WindowModel {
         self.model.borrow().effect_definitions()
     }
 
+    #[cfg(feature = "inspect")]
     fn inspector(&self) -> Option<argui_inspect::InspectorHandle> {
         self.model.borrow().inspector(&self.key)
     }

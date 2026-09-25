@@ -97,6 +97,7 @@ pub(super) fn parse_role(name: &str) -> Result<Role, SchemaError> {
         "button" => Role::Button,
         "check_box" => Role::CheckBox,
         "radio_button" => Role::RadioButton,
+        "radio_group" => Role::RadioGroup,
         "switch" => Role::Switch,
         "text_input" => Role::TextInput,
         "text_area" => Role::TextArea,

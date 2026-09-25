@@ -116,8 +116,8 @@ by native windows, native popups, and WebAssembly.
 
 Rust applications implement `Render` or `AppModel` once. Native and WebAssembly
 launchers differ at the executable entry point. Android has a checked-in
-`NativeActivity` shell for the TSX gallery; `argui-android` and `argui-ios` also
-provide entry crates for native integrations. The repository no longer includes
+`NativeActivity` shell for the TSX gallery; `argui-runtime` provides optional
+Android and iOS entry modules for native integrations. The repository does not include
 an iOS app shell or Xcode project.
 
 Target-specific code belongs at the platform edge. Do not put Winit handles in

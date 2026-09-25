@@ -1,8 +1,40 @@
 use argui_core::Size;
 use argui_schema::{NativeElementInput, SchemaValue, builtin};
 use argui_ui::{
-    GridPlacement, GridTemplateComponent, LengthPercentageAuto, Line, TreeUpdate, UiTree, length,
+    GridPlacement, GridTemplateComponent, LengthPercentageAuto, Line, TreeUpdate, UiTree,
+    WritingDirection, length,
 };
+
+#[test]
+fn direction_scope_is_exposed_to_all_native_layout_containers() {
+    let registry = builtin::registry().unwrap();
+    for native_type in [
+        builtin::CONTAINER,
+        builtin::ROW,
+        builtin::COLUMN,
+        builtin::GRID,
+    ] {
+        let element = registry
+            .construct(
+                native_type,
+                &NativeElementInput::new()
+                    .property(builtin::DIRECTION_SCOPE, SchemaValue::String("rtl".into())),
+            )
+            .unwrap();
+        assert_eq!(element.direction_scope, Some(WritingDirection::Rtl));
+    }
+    assert!(
+        registry
+            .construct(
+                builtin::ROW,
+                &NativeElementInput::new().property(
+                    builtin::DIRECTION_SCOPE,
+                    SchemaValue::String("sideways".into()),
+                ),
+            )
+            .is_err()
+    );
+}
 
 #[test]
 fn grid_tracks_placement_and_common_layout_reach_the_element() {

@@ -10,7 +10,7 @@ builds the Rust shared library into the APK or AAB.
 Android represents long-running, user-visible work with a foreground service
 and an ongoing notification. The shared Rust API owns the activity title,
 status, progress, lifetime, and worker-facing update handle. The Java adapter
-under `crates/argui-android/android/src/main/java/dev/argui/android` maps that
+under `crates/argui-runtime/src/mobile/android/java/dev/argui/android` maps that
 state to Android's notification template and service lifecycle.
 
 The gallery renders edge to edge. Its status and navigation bars are

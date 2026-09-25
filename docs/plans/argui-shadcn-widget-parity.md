@@ -1,6 +1,6 @@
 # Plan : parité des widgets Argui avec shadcn/ui
 
-Statut : plan pour une **autre tâche d'implémentation**. Ce document ne demande aucun changement de code dans la tâche qui le rédige. Il complète le [plan global Argui](argui-crate-theme-decisions.md), en particulier le thème commun, les composants copiables par `argui add` et les cibles native + Web des mêmes sources TSX.
+Statut : mise en œuvre en cours. Ce document complète le [plan global Argui](argui-crate-theme-decisions.md), en particulier le thème commun, les composants copiables par `argui add` et les cibles native + Web des mêmes sources TSX.
 
 ## Objectif et frontière
 
@@ -31,9 +31,9 @@ Statut : plan pour une **autre tâche d'implémentation**. Ce document ne demand
 
 ## Point de départ Argui
 
-- [`components/registry.json`](../../components/registry.json) déclare cinq composants Solid et React : `button`, `input-field`, `select`, `popover`, `dialog`. `input-field` est l'équivalent le plus proche d'`input`, mais son API et ses états doivent être comparés à la référence. **Présent ne veut pas dire parité terminée.**
-- Les sources vivent dans [`packages/widgets/src/solid`](../../packages/widgets/src/solid/) et [`packages/widgets/src/react`](../../packages/widgets/src/react/), avec types/helpers partagés. Le registre ne porte aujourd'hui ni version ni source versionnée par widget ; sa migration suit le plan CLI global.
-- La [navigation de galerie](../../apps/gallery/src/gallery-pages.ts) expose cinq pages Components et des pages Examples (Media, Services, Theming, Internationalization, Accessibility, Overlay, Animation Lab, Damage Control et WGSL Lab). Les nouvelles entrées doivent couvrir les états et interactions significatifs dans **les deux** pages framework, sans gonfler systématiquement la page d'accueil.
+- [`components/registry.json`](../../components/registry.json) déclare actuellement les 63 composants Solid et React de l'inventaire, dont les cinq widgets de départ : `button`, `input-field`, `select`, `popover`, `dialog`. `input-field` est l'équivalent le plus proche d'`input`, mais son API et ses états doivent être comparés à la référence. **Présent ne veut pas dire parité terminée.**
+- Les sources vivent dans [`packages/widgets/src/solid`](../../packages/widgets/src/solid/) et [`packages/widgets/src/react`](../../packages/widgets/src/react/), avec types/helpers partagés. Le registre généré porte une version, une URL source et un checksum par fichier ; l'installation autonome hors du dépôt suit le plan CLI global.
+- La [navigation de galerie](../../apps/gallery/src/gallery-pages.ts) expose une page par composant et par framework, avec recherche et catégories, ainsi que des pages Examples. Les entrées couvrent leurs états et interactions dans les deux frameworks.
 - Garder les widgets faciles à copier. Mutualiser seulement les types, les algorithmes neutres du framework, les tokens et les primitives dont plusieurs composants ont un vrai besoin. Éviter une seconde grosse bibliothèque de comportement ou de CSS à installer chez l'utilisateur.
 
 ## Checklist de parité
@@ -50,78 +50,80 @@ Statut : plan pour une **autre tâche d'implémentation**. Ce document ne demand
 
 ### Fondations visuelles et formulaires
 
-- [ ] `alert`
-- [ ] `aspect-ratio`
-- [ ] `avatar`
-- [ ] `badge`
-- [ ] `breadcrumb`
-- [ ] `button-group`
-- [ ] `card`
-- [ ] `checkbox`
-- [ ] `empty`
-- [ ] `field`
-- [ ] `form` — entrée du registre amont, absente de `add --all` ; définir l'API Solid/React de validation sans imposer React Hook Form aux deux.
-- [ ] `input-group`
-- [ ] `input-otp`
-- [ ] `item`
-- [ ] `kbd`
-- [ ] `label`
-- [ ] `native-select`
-- [ ] `progress`
-- [ ] `radio-group`
-- [ ] `separator`
-- [ ] `skeleton`
-- [ ] `slider`
-- [ ] `spinner`
-- [ ] `switch`
-- [ ] `textarea`
-- [ ] `toggle`
-- [ ] `toggle-group`
+- [~] `alert`
+- [~] `aspect-ratio`
+- [~] `avatar`
+- [~] `badge`
+- [~] `breadcrumb`
+- [~] `button-group`
+- [~] `card`
+- [~] `checkbox`
+- [~] `empty`
+- [~] `field`
+- [~] `form` — entrée du registre amont, absente de `add --all` ; valider l'API Solid/React sans imposer React Hook Form aux deux.
+- [~] `input-group`
+- [~] `input-otp`
+- [~] `item`
+- [~] `kbd`
+- [~] `label`
+- [~] `native-select`
+- [~] `progress`
+- [~] `radio-group`
+- [~] `separator`
+- [~] `skeleton`
+- [~] `slider`
+- [~] `spinner`
+- [~] `switch`
+- [~] `textarea`
+- [~] `toggle`
+- [~] `toggle-group`
 
 ### Surfaces, navigation et overlays
 
-- [ ] `accordion`
-- [ ] `alert-dialog`
-- [ ] `collapsible`
-- [ ] `combobox`
-- [ ] `command`
-- [ ] `context-menu`
-- [ ] `direction`
-- [ ] `drawer`
-- [ ] `dropdown-menu`
-- [ ] `hover-card`
-- [ ] `menubar`
-- [ ] `navigation-menu`
-- [ ] `pagination`
-- [ ] `resizable`
-- [ ] `scroll-area`
-- [ ] `sheet`
-- [ ] `sidebar`
-- [ ] `tabs`
-- [ ] `tooltip`
+- [~] `accordion`
+- [~] `alert-dialog`
+- [~] `collapsible`
+- [~] `combobox`
+- [~] `command`
+- [~] `context-menu`
+- [~] `direction`
+- [~] `drawer`
+- [~] `dropdown-menu`
+- [~] `hover-card`
+- [~] `menubar`
+- [~] `navigation-menu`
+- [~] `pagination`
+- [~] `resizable`
+- [~] `scroll-area`
+- [~] `sheet`
+- [~] `sidebar`
+- [~] `tabs`
+- [~] `tooltip`
 
 ### Données, contenu et capacités avancées
 
-- [ ] `attachment`
-- [ ] `bubble`
-- [ ] `calendar`
-- [ ] `carousel`
-- [ ] `chart`
-- [ ] `marker`
-- [ ] `message`
-- [ ] `message-scroller`
-- [ ] `questionnaire` — présent dans `add --all` 4.21.0, absent du dossier amont figé ; consulter le TSX temporaire et sa provenance/version avant adaptation.
-- [ ] `sonner` — adapter en système de toast natif réutilisable ; éviter une dépendance DOM/`next-themes` dans le widget Argui.
-- [ ] `table`
-- [ ] `toast` — entrée amont sans fichier généré par `add --all` ; comparer à `sonner` et choisir une API publique unique ou documenter clairement deux comportements.
+- [~] `attachment`
+- [~] `bubble`
+- [~] `calendar`
+- [~] `carousel`
+- [~] `chart` — histogramme horizontal natif simple ; axes et séries multiples restent hors de son API.
+- [~] `marker`
+- [~] `message`
+- [~] `message-scroller`
+- [~] `questionnaire` — validation synchrone et locale, avec étapes, choix et texte.
+- [~] `sonner` — pile de notifications dans l'arbre natif, avec timers, actions et annonces accessibles ; aucune notification système OS.
+- [~] `table` — tri et sélection accessibles avec défilement borné ; pas de virtualisation interne.
+- [~] `toast` — rendu d'une notification distinct du gestionnaire de pile `sonner`.
 
 ### Compositions des pages officielles à démontrer
 
-- [ ] `data-table` : scénario tri, filtres, sélection, pagination, défilement et grands jeux de données ; composer `table` et la liste virtuelle Argui quand cela apporte une vraie valeur.
-- [ ] `date-picker` : composer `calendar` et `popover`, avec saisie, formatage localisé et clavier.
-- [ ] `typography` : hiérarchie et styles de texte pilotés par le thème, dans la gallery et dans les exemples de composition ; peut rester une recette plutôt qu'un widget du registre si aucun fichier copiable n'est nécessaire.
+- [~] `data-table` : scénario sur 1 200 lignes, avec filtrage et tri sur l'ensemble avant pagination, sélection conservée entre pages et défilement natif borné. La page montre 20 lignes à la fois ; la table ne virtualise pas ses lignes.
+- [~] `date-picker` : composer `calendar` et `popover`, avec saisie, formatage localisé et clavier.
+- [~] `typography` : hiérarchie et styles de texte pilotés par le thème, dans la gallery et dans les exemples de composition ; reste une recette plutôt qu'un widget du registre.
 
 Le contrat de parité se juge sur les **fonctionnalités** et les exemples, pas sur le nombre brut de fichiers. `toast`, `sonner`, `form` et les compositions peuvent être des recettes ou API regroupées si le coordinateur documente pourquoi la couverture utilisateur reste complète. Ne pas déclarer une case finie avec un widget statique qui n'a pas les interactions annoncées.
+
+Chaque composant dispose de son propre fichier de page galerie dans chacun des adaptateurs Solid et React ; les fichiers de démonstration regroupés par lot ne sont pas conservés. Les groupes ne servent qu'à la navigation et au suivi du travail.
 
 ## Exemples pour capacités optionnelles
 

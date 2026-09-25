@@ -74,6 +74,27 @@ fn clickable_combo_scope_prevents_text_selection_without_keyboard_activation() {
     assert_eq!(scope.user_select, UserSelect::None);
 }
 
+/// Confirms radio groups retain their dedicated role through schema construction.
+#[test]
+fn radio_group_scope_exposes_its_native_semantic_role() {
+    let scope = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(
+                    builtin::SEMANTIC_ROLE,
+                    SchemaValue::String("radio_group".into()),
+                )
+                .property(
+                    builtin::SEMANTIC_LABEL,
+                    SchemaValue::String("Display density".into()),
+                ),
+        )
+        .unwrap();
+    assert_eq!(scope.semantics.as_ref().unwrap().role, Role::RadioGroup);
+}
+
 #[test]
 fn modal_focus_scope_can_target_and_restore_focus() {
     let registry = builtin::registry().unwrap();

@@ -206,7 +206,7 @@ impl EffectGpu {
         source: &str,
     ) -> Result<(), RendererError> {
         let source =
-            argui_shader::validate_effect_source(format!("effect://{id}/{pass}"), source, &[])
+            crate::shader::validate_effect_source(format!("effect://{id}/{pass}"), source, &[])
                 .map_err(|error| RendererError::InvalidShader(error.to_string()))?
                 .source;
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {

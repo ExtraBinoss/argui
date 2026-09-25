@@ -1,20 +1,74 @@
-//! Bounded, conflict-aware component installation from the Argui repository.
+//! Versioned Argui widget registry and catalog.
 
+use crate::component_install::read_bounded;
 use crate::project::{self, Framework};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
-    io::Read,
     path::{Component, Path},
 };
 
-const MAX_FILE: u64 = 256 * 1024;
+#[derive(Deserialize)]
+pub(super) struct Registry {
+    pub(super) version: u32,
+    #[serde(rename = "arguiVersion")]
+    argui_version: Option<String>,
+    #[serde(default)]
+    pub(super) files: BTreeMap<String, String>,
+    pub(super) components: BTreeMap<String, ComponentEntry>,
+}
+
+impl Registry {
+    /// Returns the Argui release version recorded in this registry.
+    pub(super) fn argui_version(&self) -> Option<&str> {
+        self.argui_version.as_deref()
+    }
+}
 
 #[derive(Deserialize)]
-struct Registry {
-    version: u32,
-    components: BTreeMap<String, BTreeMap<String, Vec<String>>>,
+#[serde(untagged)]
+pub(super) enum ComponentEntry {
+    Unversioned(BTreeMap<String, Vec<String>>),
+    Versioned {
+        version: String,
+        source: BTreeMap<String, String>,
+        solid: Vec<String>,
+        react: Vec<String>,
+    },
+}
+
+impl ComponentEntry {
+    /// Returns paths for the selected adapter and validates versioned source metadata.
+    ///
+    /// # Errors
+    /// Returns an error if the versioned source URL is absent or malformed.
+    fn paths(&self, framework: Framework) -> Result<&[String], String> {
+        match self {
+            Self::Unversioned(files) => files
+                .get(framework.name())
+                .map(Vec::as_slice)
+                .ok_or_else(|| format!("component has no {} variant", framework.name())),
+            Self::Versioned {
+                version,
+                source,
+                solid,
+                react,
+            } => {
+                if version.is_empty()
+                    || !source.get(framework.name()).is_some_and(|url| {
+                        url.starts_with("https://github.com/") && url.contains("/blob/v")
+                    })
+                {
+                    return Err("component has no immutable source URL or version".into());
+                }
+                Ok(if framework == Framework::Solid {
+                    solid
+                } else {
+                    react
+                })
+            }
+        }
+    }
 }
 
 /// Resolves requested component names into fixed repository-relative source paths.
@@ -23,23 +77,27 @@ struct Registry {
 ///
 /// # Errors
 /// Returns an error for an unknown or malformed component name.
-fn files(
+pub(super) fn files(
     registry: &Registry,
     framework: Framework,
     names: &[String],
 ) -> Result<Vec<String>, String> {
-    if registry.version != 1 {
+    if registry.version != 1 && registry.version != 2 {
         return Err(format!(
             "unsupported component registry version {}",
             registry.version
         ));
+    }
+    if registry.version == 2 && registry.argui_version.as_deref().is_none_or(str::is_empty) {
+        return Err("versioned registry lacks arguiVersion".into());
     }
     let mut paths = BTreeSet::new();
     for name in names {
         if !project::valid_name(name) {
             return Err(format!("invalid component name `{name}`"));
         }
-        let component = registry.components.get(name).ok_or_else(|| {
+        let canonical = if name == "input" { "input-field" } else { name };
+        let component = registry.components.get(canonical).ok_or_else(|| {
             format!(
                 "unknown component `{name}`; available: {}",
                 registry
@@ -50,17 +108,198 @@ fn files(
                     .join(", ")
             )
         })?;
+        if let ComponentEntry::Versioned { source, .. } = component {
+            let release = registry
+                .argui_version
+                .as_deref()
+                .ok_or("versioned registry lacks arguiVersion")?;
+            let expected = format!(
+                "https://github.com/ExtraBinoss/argui/blob/v{release}/packages/widgets/src/"
+            );
+            if !source
+                .get(framework.name())
+                .is_some_and(|url| url.starts_with(&expected))
+            {
+                return Err(format!(
+                    "component `{name}` source does not match Argui v{release}"
+                ));
+            }
+        }
         let dependencies = component
-            .get(framework.name())
-            .ok_or_else(|| format!("component `{name}` has no {} variant", framework.name()))?;
+            .paths(framework)
+            .map_err(|error| format!("component `{name}`: {error}"))?;
+        if registry.version == 2 && matches!(component, ComponentEntry::Unversioned(_)) {
+            return Err(format!("component `{name}` lacks versioned metadata"));
+        }
         for path in dependencies {
             if !safe_path(path) {
                 return Err(format!("unsafe registry path `{path}`"));
+            }
+            if registry.version == 2
+                && !registry
+                    .files
+                    .get(path)
+                    .is_some_and(|hash| valid_hash(hash))
+            {
+                return Err(format!(
+                    "component `{name}` lacks a SHA-256 checksum for `{path}`"
+                ));
             }
             paths.insert(path.clone());
         }
     }
     Ok(paths.into_iter().collect())
+}
+
+/// Reports whether `hash` is exactly one lowercase SHA-256 digest.
+fn valid_hash(hash: &str) -> bool {
+    hash.len() == 64
+        && hash
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+#[derive(Serialize)]
+struct CatalogRow {
+    name: String,
+    source: String,
+    framework: String,
+    version: String,
+    installed: bool,
+    files: Vec<String>,
+}
+
+/// Formats installable component variants from a registry and optional project.
+/// `framework` filters variants; `json` selects structured or columnar output.
+///
+/// # Errors
+/// Returns an error for malformed registry data or unsupported registry versions.
+pub fn catalog(
+    registry_json: &str,
+    project: Option<&project::Project>,
+    framework: Option<Framework>,
+    json: bool,
+) -> Result<String, String> {
+    catalog_with_sources(registry_json, project, framework, json, true)
+}
+
+/// Formats the catalog while withholding unverified release links.
+///
+/// # Errors
+/// Returns an error for malformed registry data or component metadata.
+fn catalog_with_sources(
+    registry_json: &str,
+    project: Option<&project::Project>,
+    framework: Option<Framework>,
+    json: bool,
+    published: bool,
+) -> Result<String, String> {
+    let registry: Registry =
+        serde_json::from_str(registry_json).map_err(|error| error.to_string())?;
+    if !matches!(registry.version, 1 | 2) {
+        return Err(format!(
+            "unsupported component registry version {}",
+            registry.version
+        ));
+    }
+    let mut rows = Vec::new();
+    for (name, component) in &registry.components {
+        for adapter in [Framework::Solid, Framework::React] {
+            if framework.is_some_and(|selected| selected != adapter) {
+                continue;
+            }
+            let paths = files(&registry, adapter, std::slice::from_ref(name))?;
+            let (version, source) = match component {
+                ComponentEntry::Unversioned(_) => {
+                    ("unversioned".to_owned(), "local checkout".to_owned())
+                }
+                ComponentEntry::Versioned {
+                    version, source, ..
+                } => (
+                    version.clone(),
+                    source.get(adapter.name()).cloned().unwrap_or_default(),
+                ),
+            };
+            rows.push(CatalogRow {
+                name: name.clone(),
+                source: if published {
+                    source
+                } else {
+                    "unpublished development snapshot".into()
+                },
+                framework: adapter.name().to_owned(),
+                version,
+                installed: project.is_some_and(|app| {
+                    app.components
+                        .contains(&format!("{}/{name}", adapter.name()))
+                }),
+                files: paths,
+            });
+        }
+    }
+    if json {
+        serde_json::to_string_pretty(&rows).map_err(|error| error.to_string())
+    } else {
+        let mut lines = vec!["NAME  SOURCE  FRAMEWORK  VERSION  INSTALLED".to_owned()];
+        lines.extend(rows.into_iter().map(|row| {
+            format!(
+                "{}  {}  {}  {}  {}",
+                row.name,
+                row.source,
+                row.framework,
+                row.version,
+                if row.installed { "yes" } else { "no" }
+            )
+        }));
+        Ok(lines.join("\n"))
+    }
+}
+
+/// Lists components from the checkout's registry or the CLI's embedded catalog.
+/// `cwd` may be a project directory, while `project_path` explicitly selects one.
+///
+/// # Errors
+/// Returns an error for an invalid project or catalog.
+pub fn list(
+    cwd: &Path,
+    project_path: Option<&Path>,
+    framework: Option<Framework>,
+    json: bool,
+) -> Result<(), String> {
+    let app = project_path.or_else(|| {
+        cwd.ancestors()
+            .find(|ancestor| ancestor.join("argui.json").is_file())
+    });
+    let standalone = app
+        .filter(|path| crate::standalone::is_project(path))
+        .map(crate::standalone::load)
+        .transpose()?;
+    let project = app
+        .filter(|_| {
+            standalone
+                .as_ref()
+                .is_none_or(|app| app.framework != "rust")
+        })
+        .map(project::load)
+        .transpose()?;
+    let registry = if let Some(app) = &standalone
+        && app.distribution == "release"
+    {
+        crate::source_cache::registry(&app.argui_version)?
+    } else if let Ok(root) = project::find_root(cwd) {
+        read_bounded(&root.join("components/registry.json"))?
+    } else {
+        include_str!("../../../components/registry.json").to_owned()
+    };
+    let published = standalone
+        .as_ref()
+        .is_some_and(|app| app.distribution == "release")
+        || standalone.is_none() && crate::sdk::release_available();
+    println!(
+        "{}",
+        catalog_with_sources(&registry, project.as_ref(), framework, json, published)?
+    );
+    Ok(())
 }
 
 /// Resolves `names` against a registry JSON string for `framework`.
@@ -92,145 +331,4 @@ fn safe_path(path: &str) -> bool {
             .components()
             .all(|part| matches!(part, Component::Normal(_)))
         && (path.ends_with(".ts") || path.ends_with(".tsx"))
-}
-
-/// Installs Argui components into `cwd/src/argui-ui` and records them in argui.json.
-/// `framework` must match the project adapter; `names` must be known components.
-/// Sources come from the versioned Argui checkout containing `cwd`.
-///
-/// # Errors
-/// Returns an error for framework mismatch, missing or unsafe sources, conflicts, or writes.
-pub fn add(cwd: &Path, framework: Framework, names: &[String]) -> Result<(), String> {
-    let project = project::load(cwd)?;
-    if project.framework != framework {
-        return Err(format!(
-            "project uses {}; requested {}",
-            project.framework.name(),
-            framework.name()
-        ));
-    }
-    let root = project::find_root(cwd)?;
-    let registry_json = read_bounded(&root.join("components/registry.json"))?;
-    let source_root = root
-        .join("packages/widgets/src")
-        .canonicalize()
-        .map_err(|error| format!("widget source directory: {error}"))?;
-    install(cwd, framework, names, &registry_json, |path| {
-        let source = source_root.join(path);
-        let resolved = source
-            .canonicalize()
-            .map_err(|error| format!("{}: {error}", source.display()))?;
-        if !resolved.starts_with(&source_root) {
-            return Err(format!("component source escapes widget directory: {path}"));
-        }
-        read_bounded(&resolved)
-    })
-}
-
-/// Installs components from `registry_json` using `source` to obtain validated
-/// repository-relative files. This also supports offline or mirrored registries.
-/// `cwd` is the project directory, `framework` its adapter, and `names` are
-/// requested components. Returns after recording dependencies in argui.json.
-///
-/// # Errors
-/// Returns an error for invalid registry entries, conflicts, source failures,
-/// or filesystem writes.
-pub fn install(
-    cwd: &Path,
-    framework: Framework,
-    names: &[String],
-    registry_json: &str,
-    mut source: impl FnMut(&str) -> Result<String, String>,
-) -> Result<(), String> {
-    let mut project = project::load(cwd)?;
-    if project.framework != framework {
-        return Err(format!(
-            "project uses {}; requested {}",
-            project.framework.name(),
-            framework.name()
-        ));
-    }
-    let paths = component_files(registry_json, framework, names)?;
-    let destination = cwd.join("src/argui-ui");
-    for path in &paths {
-        let output = destination.join(path);
-        if output.is_symlink()
-            || output.parent().is_some_and(|parent| parent.is_symlink())
-            || destination.is_symlink()
-            || cwd.join("src").is_symlink()
-        {
-            return Err(format!("symlink conflict: {}", output.display()));
-        }
-        if output.exists() && !project.component_files.contains(path) {
-            return Err(format!(
-                "untracked component file conflicts with {}",
-                output.display()
-            ));
-        }
-    }
-    let missing: Vec<_> = paths
-        .iter()
-        .filter(|path| !destination.join(path).exists())
-        .cloned()
-        .collect();
-    let mut staged = Vec::new();
-    for path in &missing {
-        staged.push((path, source(path)?));
-    }
-    for (path, body) in staged {
-        let output = destination.join(path);
-        if output.exists() {
-            return Err(format!(
-                "{} appeared while reading sources; no files overwritten",
-                output.display()
-            ));
-        }
-        project::write(&output, &body)?;
-        println!("Added {}", output.display());
-    }
-    for name in names {
-        let entry = format!("{}/{name}", framework.name());
-        if !project.components.contains(&entry) {
-            project.components.push(entry);
-        }
-    }
-    for path in paths {
-        if !project.component_files.contains(&path) {
-            project.component_files.push(path);
-        }
-    }
-    project.components.sort();
-    project.component_files.sort();
-    let manifest = serde_json::to_string_pretty(&project).map_err(|error| error.to_string())?;
-    fs::write(cwd.join("argui.json"), manifest).map_err(|error| error.to_string())?;
-    if missing.is_empty() {
-        println!("Components already present; manifest updated.");
-    }
-    Ok(())
-}
-
-/// Reads a UTF-8 source file with a fixed byte limit.
-/// `path` is a registry or source file within the versioned checkout.
-/// Returns its contents after checking its size and encoding.
-///
-/// # Errors
-/// Returns an error for an unreadable, oversized, or non-UTF-8 file.
-fn read_bounded(path: &Path) -> Result<String, String> {
-    let file = fs::File::open(path).map_err(|error| format!("{}: {error}", path.display()))?;
-    if file
-        .metadata()
-        .map_err(|error| format!("{}: {error}", path.display()))?
-        .len()
-        > MAX_FILE
-    {
-        return Err(format!("{}: exceeds {MAX_FILE} bytes", path.display()));
-    }
-    let mut bytes = Vec::new();
-    file.take(MAX_FILE + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|error| format!("{}: {error}", path.display()))?;
-    if bytes.len() as u64 > MAX_FILE {
-        return Err(format!("{}: exceeds {MAX_FILE} bytes", path.display()));
-    }
-    String::from_utf8(bytes).map_err(|error| format!("{}: invalid UTF-8: {error}", path.display()))
 }

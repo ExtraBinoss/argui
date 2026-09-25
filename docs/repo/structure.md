@@ -57,7 +57,7 @@ when the purpose already names the integration.
 | `argui-media` | Stable media assets and optional image/SVG decoding | core, paint |
 | `argui-platform` | Winit windows, input, clipboard, tray, and OS adapters | core, paint |
 | `argui-text` | Shaping, bidi, fallback, cursor geometry, and glyphs | core |
-| `argui-render` | WGPU surfaces, resources, batching, and effects | core, paint, text |
+| `argui-render` | WGPU surfaces, resources, batching, effects, and WGSL validation | core, paint, text |
 | `argui-theme` | Theme tokens and appearance settings | core |
 | `argui-ui` | Retained elements, styles, events, focus, and semantics | core, accessibility, animation, paint, text |
 | `argui-layout` | Retained Taffy Flexbox and Grid adapter | core, paint, text, ui |
@@ -68,9 +68,6 @@ when the purpose already names the integration.
 | `argui-runtime` | Models, scheduling, windows, layout, and rendering | engine and platform crates |
 | `argui-host` | Native transaction host used by the TSX adapters | schema, ui, runtime |
 | `argui-schema` | Shared element and transaction contract | core |
-| `argui-reactive` | Reactive signals and subscriptions | core |
-| `argui-android` | Android `NativeActivity` entry point | platform, render, runtime, text |
-| `argui-ios` | iOS static-library entry point for custom app shells | runtime |
 
 Publishable Rust engine crates use the root workspace release policy. The
 gallery's application-only Rust crates have independent manifests and are not
@@ -82,11 +79,11 @@ part of the root Cargo workspace.
 | --- | --- |
 | Linux, Windows, macOS | Rust applications use `argui-runtime` and the needed engine crates |
 | WebAssembly | Rust `cdylib` with a `#[wasm_bindgen(start)]` launcher |
-| Android | `argui-android`; the repository gallery uses its QuickJS host and TSX bundles |
-| iOS | `argui-ios` static library; applications provide their own native shell |
+| Android | `argui-runtime/mobile/android` feature; the repository gallery uses its QuickJS host and TSX bundles |
+| iOS | `argui-runtime/mobile/ios` feature; applications provide their own native shell |
 
 Desktop and Web implementations are selected by Cargo target configuration.
-Android and iOS entry crates remain separate explicit dependencies. This
+Android and iOS entry features are separate and target-gated. This
 repository currently packages the Android gallery; it no longer contains an
 iOS sample application or Xcode project. Packaging details are in
 [native mobile](../native-mobile.md).

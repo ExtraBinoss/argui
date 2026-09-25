@@ -12,7 +12,7 @@ description = "Native Argui gallery window driven by embedded QuickJS"
 [features]
 dev-tabler-icons = []
 dev-metrics = []
-automation = ["dep:argui-automation", "dev-metrics"]
+automation = ["dep:argui-automation", "argui-runtime/inspect", "dev-metrics"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -37,7 +37,7 @@ image = { version = "=0.25.10", default-features = false, features = ["png"] }
 pollster = "=0.4.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-argui-android = { path = "../../../crates/argui-android", version = "0.3.3" }
+argui-runtime = { path = "../../../crates/argui-runtime", version = "0.3.3", features = ["android"] }
 argui-text = { path = "../../../crates/argui-text", version = "0.3.3" }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]

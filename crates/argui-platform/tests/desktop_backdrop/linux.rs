@@ -38,10 +38,14 @@ fn exercise() {
         return;
     }
     assert_eq!(std::env::var("ARGUI_HIDDEN_DISPLAY").as_deref(), Ok("1"));
+    let runtime = std::path::PathBuf::from(std::env::var("XDG_RUNTIME_DIR").unwrap());
+    assert_eq!(runtime.parent(), Some(std::env::temp_dir().as_path()));
     assert!(
-        std::env::var("XDG_RUNTIME_DIR")
+        runtime
+            .file_name()
             .unwrap()
-            .starts_with("/tmp/argui-display.")
+            .to_string_lossy()
+            .starts_with("argui-display.")
     );
     assert!(std::env::var_os("WAYLAND_DISPLAY").is_none());
     struct Check;

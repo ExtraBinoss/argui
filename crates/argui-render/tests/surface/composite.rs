@@ -26,9 +26,10 @@ fn custom_effect_registry_and_headless_pixels() {
         return;
     };
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
-    let source = argui_shader::validate_effect_source("effect://test/headless", SHADER, &[])
-        .unwrap()
-        .source;
+    let source =
+        argui_render::shader::validate_effect_source("effect://test/headless", SHADER, &[])
+            .unwrap()
+            .source;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("headless-custom-effect"),
         source: wgpu::ShaderSource::Wgsl(source.into()),

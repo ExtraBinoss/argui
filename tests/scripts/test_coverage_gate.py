@@ -29,10 +29,13 @@ def entry(branches, count):
 
 
 class SourceCoverage(unittest.TestCase):
-    def test_nested_packages_are_individually_gated(self):
+    def test_only_workspace_members_are_individually_gated(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            for crate in ("argui-core", "extensions/runtime"):
+            (root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = ["crates/argui-core", "crates/extensions/runtime"]\n'
+            )
+            for crate in ("argui-core", "extensions/runtime", "argui-core/assets/host"):
                 manifest = root / "crates" / crate / "Cargo.toml"
                 manifest.parent.mkdir(parents=True)
                 manifest.write_text("[package]\nname = \"example\"\n")

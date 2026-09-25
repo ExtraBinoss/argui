@@ -8,7 +8,7 @@ work that remains open; it is not a release schedule.
 - [ ] Complete Android support: validate the packaged Solid/React TSX gallery on
   emulator and device, finish platform services, then ship owner-signed APK/AAB
   artifacts.
-- [ ] Complete iOS support: provide a native sample shell for `argui-ios`, then
+- [ ] Complete iOS support: provide a native sample shell for `argui-runtime`'s iOS entry, then
   validate startup, input, lifecycle, and accessibility in Simulator and on
   device before shipping signed archives to TestFlight.
 - Extend native Windows and macOS interaction, installation and rendering tests

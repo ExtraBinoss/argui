@@ -294,6 +294,9 @@ fn app_model_defaults_are_noop_and_return_empty_resources() {
     };
 
     assert!(model.view(&main, WindowEnvironment::default()).is_some());
+    assert!(model.theme(&main).is_none());
+    assert_eq!(model.tasks_ready(&main), AppUpdate::none());
+    assert!(model.take_ui_commands(&main).is_empty());
     assert_eq!(model.animation_frame(&main, frame), AppUpdate::none());
     assert!(!model.wants_animation_frame(&main));
     assert_eq!(

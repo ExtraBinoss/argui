@@ -20,7 +20,7 @@ argui-host.workspace = true
 argui-inspect.workspace = true
 argui-layout = { workspace = true, features = ["metrics"] }
 argui-render.workspace = true
-argui-runtime.workspace = true
+argui-runtime = { workspace = true, features = ["inspect"] }
 argui-text.workspace = true
 argui-ui.workspace = true
 serde.workspace = true

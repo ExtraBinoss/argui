@@ -11,6 +11,7 @@ use super::{
 use crate::{AppCommand, ThemeRequest, WindowEnvironment};
 use argui_animation::Frame;
 use argui_core::{PointerId, Rect};
+#[cfg(feature = "inspect")]
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_render::EffectDefinition;
@@ -32,6 +33,7 @@ pub struct Context<T> {
     pub(super) owner: Option<(PresentationId, Observer)>,
     pub(super) environment: WindowEnvironment,
     pub(super) environment_read: Cell<bool>,
+    pub(super) theme_reads: RefCell<HashSet<argui_theme::ThemeTokenId>>,
     pub(super) event_target: Option<argui_ui::NodeId>,
     pub(super) handlers: Vec<LocalHandler<T>>,
     pub(super) dependencies: Vec<Subscription>,
@@ -48,6 +50,7 @@ impl<T> Default for Context<T> {
             owner: None,
             environment: WindowEnvironment::default(),
             environment_read: Cell::new(false),
+            theme_reads: RefCell::default(),
             event_target: None,
             handlers: Vec::new(),
             dependencies: Vec::new(),
@@ -94,6 +97,16 @@ impl<T: 'static> Context<T> {
 }
 
 impl<T: Render> Context<T> {
+    /// Reads resolved theme token `id` for this presentation.
+    /// Render-time reads register only this token as a dependency, so changes to
+    /// unrelated tokens preserve the cached view. Returns `None` when no theme
+    /// is installed or `id` does not belong to its schema.
+    #[must_use]
+    pub fn theme_value(&self, id: argui_theme::ThemeTokenId) -> Option<argui_theme::ThemeValue> {
+        self.theme_reads.borrow_mut().insert(id);
+        self.environment.theme_value(id).cloned()
+    }
+
     /// Reads current interaction state for a retained source identity.
     ///
     /// `identity` identifies the source element being observed. A read during
@@ -312,6 +325,7 @@ pub trait Render: 'static {
     }
 
     /// Returns the component's inspection handle, if available.
+    #[cfg(feature = "inspect")]
     fn inspector(&self) -> Option<InspectorHandle> {
         None
     }

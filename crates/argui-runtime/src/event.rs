@@ -122,6 +122,10 @@ pub(crate) enum UserEvent {
         window: WindowKey,
         preferences: argui_platform::SystemPreferences,
     },
+    ThemeChanged {
+        window: WindowKey,
+        change: argui_theme::ThemeChange,
+    },
     #[cfg(target_arch = "wasm32")]
     ClipboardText {
         window: WindowKey,
@@ -152,6 +156,7 @@ pub(crate) enum UserEvent {
 impl Application {
     pub(crate) fn set_event_proxy(&mut self, proxy: impl Into<crate::host::EventProxy>) {
         let proxy = proxy.into();
+        self.watch_theme(&proxy);
         for registration in self.renderer_config.gpu_canvases.registrations() {
             let wake = proxy.clone();
             registration.set_wake(move |id| {

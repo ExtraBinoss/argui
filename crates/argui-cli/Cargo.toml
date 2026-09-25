@@ -19,6 +19,7 @@ argui-automation = { workspace = true, features = ["desktop-metrics"] }
 serde.workspace = true
 serde_json.workspace = true
 image.workspace = true
+sha2 = "0.10.9"
 
 [dev-dependencies]
 tempfile.workspace = true

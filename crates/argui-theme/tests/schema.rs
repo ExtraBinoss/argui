@@ -1,7 +1,6 @@
-use std::{cell::Cell, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use argui_core::Color;
-use argui_reactive::Computed;
 use argui_theme::{
     ThemeError, ThemeImpact, ThemeRuntime, ThemeSchema, ThemeTokenDefinition, ThemeValue,
     ThemeValueType,
@@ -78,7 +77,7 @@ fn variants_and_overrides_update_derived_tokens_atomically() {
     let background = schema.token("background").unwrap();
     let button = schema.token("button-background").unwrap();
     let spacing = schema.token("spacing").unwrap();
-    let mut runtime = ThemeRuntime::new(schema);
+    let runtime = ThemeRuntime::new(schema);
     runtime
         .define_variant(
             "dark",
@@ -109,31 +108,42 @@ fn variants_and_overrides_update_derived_tokens_atomically() {
 }
 
 #[test]
-fn token_reads_are_selectively_reactive() {
+fn token_notifications_are_selective() {
     let schema = schema();
     let background = schema.token("background").unwrap();
     let spacing = schema.token("spacing").unwrap();
-    let mut runtime = ThemeRuntime::new(schema);
+    let runtime = ThemeRuntime::new(schema);
     let reader = runtime.clone();
-    let evaluations = Rc::new(Cell::new(0));
-    let counter = Rc::clone(&evaluations);
-    let paint_binding = Computed::new("paint token", move || {
-        counter.set(counter.get() + 1);
-        reader.value(background).unwrap()
-    });
-    assert_eq!(paint_binding.get(), Ok(ThemeValue::Color(Color::WHITE)));
+    let receiver = reader.subscribe_tokens(&[background]).unwrap();
+    assert_eq!(
+        reader.value(background),
+        Some(ThemeValue::Color(Color::WHITE))
+    );
 
     runtime
         .set_override(spacing, ThemeValue::Length(16.0))
         .unwrap();
-    assert_eq!(paint_binding.get(), Ok(ThemeValue::Color(Color::WHITE)));
-    assert_eq!(evaluations.get(), 1);
+    assert!(receiver.try_recv().is_err());
+    assert_eq!(
+        reader.value(background),
+        Some(ThemeValue::Color(Color::WHITE))
+    );
 
     runtime
         .set_override(background, ThemeValue::Color(Color::BLACK))
         .unwrap();
-    assert_eq!(paint_binding.get(), Ok(ThemeValue::Color(Color::BLACK)));
-    assert_eq!(evaluations.get(), 2);
+    assert_eq!(
+        receiver.try_recv().unwrap().tokens(),
+        [background, schema_token_button(&reader)]
+    );
+    assert_eq!(
+        reader.value(background),
+        Some(ThemeValue::Color(Color::BLACK))
+    );
+}
+
+fn schema_token_button(runtime: &ThemeRuntime) -> argui_theme::ThemeTokenId {
+    runtime.schema().token("button-background").unwrap()
 }
 
 #[test]
@@ -171,7 +181,7 @@ fn variant_and_override_noops_rejections_and_replacements_are_explicit() {
     let schema = schema();
     let background = schema.token("background").unwrap();
     let spacing = schema.token("spacing").unwrap();
-    let mut runtime = ThemeRuntime::new(schema.clone());
+    let runtime = ThemeRuntime::new(schema.clone());
     assert_eq!(runtime.schema().len(), 3);
     assert_eq!(
         runtime.value(background),

@@ -7,7 +7,7 @@ use argui_paint::{GpuCanvasId, ImageAsset, VectorAsset};
 use argui_platform::{CloseBehavior, GlobalShortcut, TrayConfig, WindowKey, WindowSpec};
 use argui_render::{DamageTracking, EffectRegistry, GpuCanvasRegistry};
 use argui_schema::{AssetHandle, SchemaValue, builtin};
-use argui_ui::{TreeUpdate, UiEventKind};
+use argui_ui::{TreeUpdate, UiEvent, UiEventKind};
 
 use crate::CallbackDelivery;
 
@@ -179,4 +179,55 @@ pub struct NativeHostCommit {
 pub struct NativeHostDelivery {
     pub callback: CallbackDelivery,
     pub kind: UiEventKind,
+    /// Pointer coordinates and measured callback bounds when the event has a position.
+    pub pointer: Option<NativePointerPosition>,
+}
+
+/// Pointer position in the window and relative to the callback's measured node.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NativePointerPosition {
+    /// Horizontal window coordinate in logical pixels.
+    pub x: f32,
+    /// Vertical window coordinate in logical pixels.
+    pub y: f32,
+    /// Horizontal coordinate relative to the callback node.
+    pub local_x: f32,
+    /// Vertical coordinate relative to the callback node.
+    pub local_y: f32,
+    /// Measured callback-node width.
+    pub width: f32,
+    /// Measured callback-node height.
+    pub height: f32,
+}
+
+impl NativePointerPosition {
+    /// Resolves a pointer event against the measured bounds of its callback node.
+    /// `event` supplies the window position; `layout` supplies current logical bounds.
+    /// Returns `None` for events without a pointer or without measured bounds.
+    #[must_use]
+    pub fn from_event(event: &UiEvent, layout: &argui_layout::LayoutOutput) -> Option<Self> {
+        let position = match &event.kind {
+            UiEventKind::Pointer(pointer) | UiEventKind::PointerOutside(pointer) => {
+                Some(pointer.position)
+            }
+            UiEventKind::Click(click) => click.position(),
+            UiEventKind::ContextMenu { position, .. } | UiEventKind::Wheel { position, .. } => {
+                Some(*position)
+            }
+            _ => None,
+        }?;
+        let bounds = layout
+            .nodes
+            .iter()
+            .find(|node| node.node == event.current_target())?
+            .bounds;
+        Some(Self {
+            x: position.x,
+            y: position.y,
+            local_x: position.x - bounds.origin.x,
+            local_y: position.y - bounds.origin.y,
+            width: bounds.size.width,
+            height: bounds.size.height,
+        })
+    }
 }

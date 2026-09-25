@@ -29,7 +29,7 @@ pub(crate) fn scaffold(app: &Path, name: &str, framework: Framework) -> Result<(
     )?;
     project::write(
         &app.join("src/mount.ts"),
-        "import init, { ArguiWebHost } from '../../web-host/pkg/argui_web_host.js'\nimport type { NativeBridge } from '@argui/host'\nimport { mountGallery } from './main'\n\n/** Mounts the Argui WASM renderer and TSX application in an existing element. */\nexport async function mountArgui(elementId: string): Promise<() => void> {\n  const root = document.getElementById(elementId)\n  if (!root) throw new Error(`Missing Argui mount element #${elementId}`)\n  root.addEventListener('argui:error', event => {\n    root.textContent = `Argui could not render: ${String((event as CustomEvent).detail)}`\n  })\n  await init()\n  const bridge = new ArguiWebHost(elementId)\n  const adapter: NativeBridge = {\n    contract: () => bridge.contract(),\n    commit: operations => bridge.commit(operations),\n    subscribe: callback => {\n      const unsubscribe = bridge.subscribe(callback)\n      return () => unsubscribe()\n    },\n  }\n  return mountGallery(adapter, adapter.contract().abiHash)\n}\n",
+        "import init, { ArguiWebHost } from '../../web-host/pkg/argui_web_host.js'\nimport type { NativeBridge } from '@argui/host'\nimport { mountGallery } from './main'\n\n/** Mounts the Argui WASM renderer and TSX application in an existing element. */\nexport async function mountArgui(elementId: string): Promise<() => void> {\n  const root = document.getElementById(elementId)\n  if (!root) throw new Error(`Missing Argui mount element #${elementId}`)\n  root.addEventListener('argui:error', event => {\n    root.textContent = `Argui could not render: ${String((event as CustomEvent).detail)}`\n  })\n  await init()\n  const bridge = new ArguiWebHost(elementId)\n  const adapter: NativeBridge = {\n    contract: () => bridge.contract(),\n    commit: operations => bridge.commit(operations),\n    subscribe: callback => {\n      const unsubscribe = bridge.subscribe(callback)\n      return () => unsubscribe()\n    },\n    theme: {\n      create: definition => bridge.themeCreate(definition),\n      update: (id, patch) => bridge.themeUpdate(id, patch),\n      subscribe: (id, callback) => bridge.themeSubscribe(id, callback),\n      dispose: id => bridge.themeDispose(id),\n    },\n  }\n  return mountGallery(adapter, adapter.contract().abiHash)\n}\n",
     )?;
     project::write(
         &app.join("src/web.ts"),
@@ -267,60 +267,8 @@ pub(crate) fn readme(name: &str, framework: Framework) -> String {
     )
 }
 
-/// Solid counter application rendered through the Argui host protocol.
-pub(crate) const SOLID_APP: &str = r##"import { NativeHost, type NativeBridge, type NativeNode } from '@argui/host'
-import { createSignal, render, useNativeHost } from '@argui/solid'
-import { Button, palette } from '@argui/widgets/solid'
+/// Solid counter application shared with the native target.
+pub(crate) const SOLID_APP: &str = project::SOLID_APP;
 
-const theme = palette('dark', 'blue')
-function App() {
-  const [count, setCount] = createSignal(0)
-  return <column width="fill" height="fill" padding={32} gap={20} background={theme.background}>
-    <text text="Argui counter" color={theme.foreground} font_size={32} />
-    <rectangle width="fill" height={140} radius={18} background="#334155dd" backdrop_filter="blur(12px)">
-      <text text="Argui backdrop blur with a translucent fallback" color="#ffffff" font_size={18} />
-    </rectangle>
-    <text text={`Count: ${count()}`} color={theme.foreground} font_size={20} />
-    <Button id="increment" label="Increment" theme={theme} kind="primary" onClick={() => setCount(count() + 1)} />
-  </column>
-}
-/** Mounts the Solid application through an Argui bridge. */
-export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {
-  const host = new NativeHost(bridge, expectedAbiHash)
-  useNativeHost(host)
-  const root = host.createElement('Column')
-  host.setProperty(root, 'width', 'fill')
-  host.setProperty(root, 'height', 'fill')
-  const dispose = render(() => <App /> as NativeNode, root)
-  host.setRoot(root)
-  return () => { dispose(); host.dispose() }
-}
-"##;
-
-/// React counter application rendered through the Argui host protocol.
-pub(crate) const REACT_APP: &str = r##"/** @jsxImportSource @argui/react */
-import { NativeHost, type NativeBridge } from '@argui/host'
-import { createRoot } from '@argui/react'
-import { useState } from 'react'
-import { Button, palette } from '@argui/widgets/react'
-
-const theme = palette('dark', 'blue')
-function App() {
-  const [count, setCount] = useState(0)
-  return <column width="fill" height="fill" padding={32} gap={20} background={theme.background}>
-    <text text="Argui counter" color={theme.foreground} font_size={32} />
-    <rectangle width="fill" height={140} radius={18} background="#334155dd" backdrop_filter="blur(12px)">
-      <text text="Argui backdrop blur with a translucent fallback" color="#ffffff" font_size={18} />
-    </rectangle>
-    <text text={`Count: ${count}`} color={theme.foreground} font_size={20} />
-    <Button id="increment" label="Increment" theme={theme} kind="primary" onClick={() => setCount(value => value + 1)} />
-  </column>
-}
-/** Mounts the React application through an Argui bridge. */
-export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {
-  const host = new NativeHost(bridge, expectedAbiHash)
-  const root = createRoot(host, 'Column', { width: 'fill', height: 'fill' })
-  root.render(<App />)
-  return () => root.unmount()
-}
-"##;
+/// React counter application shared with the native target.
+pub(crate) const REACT_APP: &str = project::REACT_APP;

@@ -15,6 +15,8 @@ pub struct WindowEnvironment {
     pub ui_zoom: f32,
     /// Optional theme tokens; no map is allocated in ordinary environments.
     pub theme_overrides: Option<std::sync::Arc<argui_theme::ThemeOverrides>>,
+    /// Coherent resolved token values for the current application window.
+    pub theme: Option<argui_theme::ThemeSnapshot>,
 }
 
 impl Default for WindowEnvironment {
@@ -28,7 +30,16 @@ impl Default for WindowEnvironment {
             safe_area_insets: Insets::ZERO,
             ui_zoom: 1.0,
             theme_overrides: None,
+            theme: None,
         }
+    }
+}
+
+impl WindowEnvironment {
+    /// Returns resolved `id` from the current typed theme, if one is installed.
+    #[must_use]
+    pub fn theme_value(&self, id: argui_theme::ThemeTokenId) -> Option<&argui_theme::ThemeValue> {
+        self.theme.as_ref()?.value(id)
     }
 }
 

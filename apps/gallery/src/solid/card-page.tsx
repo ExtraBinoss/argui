@@ -1,0 +1,41 @@
+import { createSignal } from '@argui/solid'
+import type { JSX } from '@argui/solid/jsx-runtime'
+import { Button, type Palette } from '@argui/widgets/solid'
+import { Badge } from '../../../../packages/widgets/src/solid/badge'
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../../packages/widgets/src/solid/card'
+
+/** Builds a card composition with header action, live status, and footer action. */
+export function CardPage(props: { theme: Palette }): JSX.Element {
+  const [deployments, setDeployments] = createSignal(0)
+  const [opened, setOpened] = createSignal(false)
+  return <column width="fill" gap={14}>
+    <text text="Cards group related content and actions on a themed surface." color={props.theme.muted} font_size={14} />
+    <Card theme={props.theme}>
+      <CardHeader theme={props.theme} action={<CardAction>
+        <Button id="card-open-report" label={opened() ? 'Report open' : 'Open report'} theme={props.theme}
+          kind="ghost" selected={opened()} onClick={() => setOpened(!opened())} />
+      </CardAction>}>
+        <CardTitle theme={props.theme} text="Production deployment" />
+        <CardDescription theme={props.theme} text="Release controls for the default environment." />
+      </CardHeader>
+      <CardContent theme={props.theme}>
+        <row width="fill" justify_content="space_between" align_items="center" gap={8}>
+          <text text="Environment" color={props.theme.muted} font_size={13} />
+          <Badge theme={props.theme} label="Healthy" variant="secondary" size="compact" />
+        </row>
+        <text text={`Deployments today: ${deployments()}`} color={props.theme.foreground} font_size={14} />
+      </CardContent>
+      <CardFooter theme={props.theme} justify="space_between">
+        <text text={opened() ? 'Report selected' : 'Ready to deploy'} color={props.theme.muted} font_size={12} />
+        <Button id="card-deploy" label="Deploy" theme={props.theme} kind="primary"
+          onClick={() => setDeployments((count) => count + 1)} />
+      </CardFooter>
+    </Card>
+    <Card theme={props.theme} elevated={false} padding={props.theme.controlPadding}>
+      <CardContent theme={props.theme}>
+        <text text="Flat compact card" color={props.theme.foreground} font_size={14} weight={600} />
+        <text text="The same surface can be used without elevation." color={props.theme.muted} font_size={13} />
+      </CardContent>
+    </Card>
+  </column>
+}

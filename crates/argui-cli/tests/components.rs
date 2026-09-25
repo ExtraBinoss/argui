@@ -1,9 +1,237 @@
 #![cfg(not(target_arch = "wasm32"))]
 
-use argui_cli::{Framework, Project, component_files, install, run_in};
+use argui_cli::{Framework, Project, catalog, component_files, install, run_in};
+use sha2::{Digest, Sha256};
 use std::{fs, path::Path};
 
 const REGISTRY: &str = include_str!("fixtures/registry.json");
+
+/// Builds one release-pinned registry fixture with an exact source checksum.
+fn versioned_registry(body: &str) -> String {
+    serde_json::json!({
+        "version": 2,
+        "arguiVersion": env!("CARGO_PKG_VERSION"),
+        "files": { "solid/badge.tsx": format!("{:x}", Sha256::digest(body.as_bytes())) },
+        "components": {
+            "badge": {
+                "version": env!("CARGO_PKG_VERSION"),
+                "source": { "solid": format!("https://github.com/ExtraBinoss/argui/blob/v{}/packages/widgets/src/solid/badge.tsx", env!("CARGO_PKG_VERSION")),
+                    "react": format!("https://github.com/ExtraBinoss/argui/blob/v{}/packages/widgets/src/react/badge.tsx", env!("CARGO_PKG_VERSION")) },
+                "solid": ["solid/badge.tsx"],
+                "react": []
+            }
+        }
+    }).to_string()
+}
+
+#[test]
+/// Versioned installs validate source bytes before mutation and protect edited local files.
+fn versioned_install_rejects_checksum_mismatch_and_local_edits() {
+    let temp = tempfile::tempdir().unwrap();
+    project(temp.path(), "solid");
+    let registry = versioned_registry("trusted source");
+    assert!(
+        install(
+            temp.path(),
+            Framework::Solid,
+            &["badge".into()],
+            &registry,
+            |_| Ok("changed source".into())
+        )
+        .unwrap_err()
+        .contains("checksum mismatch")
+    );
+    assert!(!temp.path().join("src/argui-ui/solid/badge.tsx").exists());
+    install(
+        temp.path(),
+        Framework::Solid,
+        &["badge".into()],
+        &registry,
+        |_| Ok("trusted source".into()),
+    )
+    .unwrap();
+    let installed = temp.path().join("src/argui-ui/solid/badge.tsx");
+    let manifest: Project =
+        serde_json::from_slice(&fs::read(temp.path().join("argui.json")).unwrap()).unwrap();
+    assert!(manifest.component_checksums.contains_key("solid/badge.tsx"));
+    assert_eq!(
+        manifest.component_versions["solid/badge"],
+        env!("CARGO_PKG_VERSION")
+    );
+    fs::write(&installed, "local change").unwrap();
+    assert!(
+        install(
+            temp.path(),
+            Framework::Solid,
+            &["badge".into()],
+            &registry,
+            |_| Ok("trusted source".into())
+        )
+        .unwrap_err()
+        .contains("locally modified")
+    );
+    assert_eq!(fs::read_to_string(installed).unwrap(), "local change");
+}
+
+#[test]
+/// The release catalog reports pinned source, adapter, installed state, and file paths.
+fn catalog_reports_versioned_component_metadata() {
+    let registry = versioned_registry("trusted source");
+    let output = catalog(&registry, None, Some(Framework::Solid), true).unwrap();
+    let entries: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(entries.as_array().unwrap().len(), 1);
+    assert_eq!(entries[0]["name"], "badge");
+    assert_eq!(entries[0]["framework"], "solid");
+    assert_eq!(entries[0]["files"][0], "solid/badge.tsx");
+    assert!(entries[0]["source"].as_str().unwrap().contains("/blob/v"));
+}
+
+#[test]
+/// Versioned entries require complete provenance and checksums for every selected file.
+fn versioned_registry_rejects_incomplete_release_metadata() {
+    let base: serde_json::Value =
+        serde_json::from_str(&versioned_registry("trusted source")).unwrap();
+    type RegistryChange = (Box<dyn Fn(&mut serde_json::Value)>, &'static str);
+    let changes: [RegistryChange; 7] = [
+        (
+            Box::new(|value| value["arguiVersion"] = "".into()),
+            "lacks arguiVersion",
+        ),
+        (
+            Box::new(|value| value["components"]["badge"]["version"] = "".into()),
+            "immutable source URL or version",
+        ),
+        (
+            Box::new(|value| {
+                value["components"]["badge"]["source"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("solid");
+            }),
+            "source does not match",
+        ),
+        (
+            Box::new(|value| {
+                value["components"]["badge"]["source"]["solid"] =
+                    "https://elsewhere.test/blob/v0".into()
+            }),
+            "source does not match",
+        ),
+        (
+            Box::new(|value| {
+                value["files"].as_object_mut().unwrap().clear();
+            }),
+            "lacks a SHA-256 checksum",
+        ),
+        (
+            Box::new(|value| value["files"]["solid/badge.tsx"] = "ABC".into()),
+            "lacks a SHA-256 checksum",
+        ),
+        (
+            Box::new(|value| {
+                value["components"]["badge"] =
+                    serde_json::json!({"solid":["solid/badge.tsx"],"react":[]})
+            }),
+            "lacks versioned metadata",
+        ),
+    ];
+    for (change, expected) in changes {
+        let mut registry = base.clone();
+        change(&mut registry);
+        let error = component_files(&registry.to_string(), Framework::Solid, &["badge".into()])
+            .unwrap_err();
+        assert!(error.contains(expected), "{registry}: {error}");
+    }
+    let filtered = catalog(&base.to_string(), None, Some(Framework::Solid), false).unwrap();
+    assert!(filtered.contains("badge"));
+    assert!(!filtered.contains("react"));
+}
+
+#[test]
+/// `argui add` accepts flags around names and installs both adapters in one batch.
+fn add_accepts_mixed_frameworks_and_an_explicit_project() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let app = root.join("apps/demo");
+    project(&app, "react");
+    fs::write(
+        app.join("package.json"),
+        r#"{"dependencies":{"@argui/react":"workspace:*","react":"19.2.0"}}"#,
+    )
+    .unwrap();
+    fs::create_dir_all(root.join("packages/host")).unwrap();
+    fs::create_dir_all(root.join("apps/gallery/quickjs-host")).unwrap();
+    fs::create_dir_all(root.join("components")).unwrap();
+    fs::write(root.join("packages/host/package.json"), "{}").unwrap();
+    fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
+    fs::write(root.join("components/registry.json"), REGISTRY).unwrap();
+    for (framework, name) in [(Framework::Solid, "button"), (Framework::React, "popover")] {
+        for path in component_files(REGISTRY, framework, &[name.into()]).unwrap() {
+            let source = root.join("packages/widgets/src").join(&path);
+            fs::create_dir_all(source.parent().unwrap()).unwrap();
+            fs::write(source, format!("fixture source: {path}")).unwrap();
+        }
+    }
+    run_in(
+        root,
+        &[
+            "add".into(),
+            "--solid".into(),
+            "button".into(),
+            "--react".into(),
+            "popover".into(),
+            "--project".into(),
+            "apps/demo".into(),
+        ],
+    )
+    .unwrap();
+    let manifest: Project =
+        serde_json::from_slice(&fs::read(app.join("argui.json")).unwrap()).unwrap();
+    assert_eq!(manifest.components, ["react/popover", "solid/button"]);
+    let package: serde_json::Value =
+        serde_json::from_slice(&fs::read(app.join("package.json")).unwrap()).unwrap();
+    assert_eq!(package["dependencies"]["@argui/solid"], "workspace:*");
+    assert_eq!(package["dependencies"]["solid-js"], "1.9.15");
+
+    let app_with_trailing_flag = root.join("apps/trailing-flag");
+    project(&app_with_trailing_flag, "react");
+    fs::write(
+        app_with_trailing_flag.join("package.json"),
+        "{\"dependencies\":{}}",
+    )
+    .unwrap();
+    run_in(
+        root,
+        &[
+            "add".into(),
+            "button".into(),
+            "--solid".into(),
+            "--project".into(),
+            "apps/trailing-flag".into(),
+        ],
+    )
+    .unwrap();
+    let manifest: Project =
+        serde_json::from_slice(&fs::read(app_with_trailing_flag.join("argui.json")).unwrap())
+            .unwrap();
+    assert_eq!(manifest.components, ["solid/button"]);
+    assert!(
+        run_in(
+            root,
+            &[
+                "add".into(),
+                "button".into(),
+                "--solid".into(),
+                "--react".into(),
+                "popover".into(),
+                "--project".into(),
+                "apps/trailing-flag".into(),
+            ],
+        )
+        .unwrap_err()
+        .contains("between framework selectors")
+    );
+}
 
 /// Writes a minimal project manifest for an offline component install.
 fn project(path: &Path, framework: &str) {
@@ -298,14 +526,25 @@ fn add_explains_incomplete_checkout_sources() {
 fn production_registry_matches_split_widget_files() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let registry = fs::read_to_string(root.join("components/registry.json")).unwrap();
+    let manifest: serde_json::Value = serde_json::from_str(&registry).unwrap();
+    let names = manifest["components"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .collect::<Vec<_>>();
     for framework in [Framework::Solid, Framework::React] {
-        for name in ["button", "input-field", "select", "popover", "dialog"] {
-            let files = component_files(&registry, framework, &[name.into()]).unwrap();
+        for name in &names {
+            let files = component_files(&registry, framework, &[name.as_str().into()]).unwrap();
             let expected = format!("{}/{name}.tsx", framework.name());
             assert!(files.contains(&expected), "{name} lacks its own file");
             for file in &files {
                 let source = root.join("packages/widgets/src").join(file);
                 let text = fs::read_to_string(&source).unwrap();
+                assert_eq!(
+                    manifest["files"][file].as_str(),
+                    Some(format!("{:x}", Sha256::digest(text.as_bytes())).as_str()),
+                    "{name} has a stale source checksum for {file}",
+                );
                 for line in text
                     .lines()
                     .filter(|line| line.contains(" from './") || line.contains(" from '../"))

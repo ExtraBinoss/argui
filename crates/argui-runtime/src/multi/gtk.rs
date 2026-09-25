@@ -100,6 +100,11 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
                     entry.runtime.gtk_preferences(preferences);
                 }
             }
+            Event::UserEvent(UserEvent::ThemeChanged { window, change }) => {
+                if let Some(entry) = application.windows.get_mut(&window) {
+                    entry.runtime.apply_theme_change(&change);
+                }
+            }
             #[cfg(feature = "tasks")]
             Event::UserEvent(UserEvent::TasksReady) => {
                 application.tasks_ready(&context);

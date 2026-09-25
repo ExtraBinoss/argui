@@ -1,5 +1,6 @@
 use super::{
     Context, Entity, Mount, Render, ScopeClosed, ViewUpdate, WeakEntity, inherit_environment_use,
+    inherit_theme_reads,
 };
 use argui_ui::Element;
 
@@ -109,6 +110,7 @@ impl<T: Render> Context<T> {
             &self.environment_read,
             &entity.0.presentation.environment_used,
         );
+        inherit_theme_reads(&self.theme_reads, &entity.0.presentation.theme_reads);
         if visible && let Some((_, observer)) = &self.owner {
             self.dependencies
                 .push(entity.0.model.signal.subscribe(observer.clone()));

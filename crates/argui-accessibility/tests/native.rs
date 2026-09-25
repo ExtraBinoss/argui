@@ -31,6 +31,24 @@ fn protected_text_uses_the_native_password_role_without_a_value() {
     assert!(update.nodes[0].1.value().is_none());
 }
 
+/// Confirms the radio group role is preserved in the native accessibility tree.
+#[test]
+fn radio_group_uses_the_native_accesskit_role() {
+    let root = SemanticNodeId::new(1);
+    let tree = SemanticTree {
+        root,
+        focus: root,
+        nodes: vec![SemanticNode {
+            id: root,
+            bounds: Rect::default(),
+            children: Vec::new(),
+            semantics: Semantics::new(Role::RadioGroup).label("Display density"),
+        }],
+    };
+    let update = AccessKitTree::full(&tree);
+    assert_eq!(update.nodes[0].1.role(), accesskit::Role::RadioGroup);
+}
+
 #[test]
 fn complete_snapshots_are_valid_accesskit_trees() {
     let root = SemanticNodeId::new(1);

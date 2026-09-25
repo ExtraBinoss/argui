@@ -12,21 +12,32 @@ mod event;
 mod host;
 mod input;
 mod launch;
+pub mod mobile;
 mod model;
 mod multi;
 mod native_host;
 #[cfg(feature = "tasks")]
 pub mod tasks;
+mod theme_bridge;
 mod translate;
 
+#[cfg(feature = "inspect")]
 pub use app::{Inspection, InspectionCache};
 pub use application::{
     AppCommand, AppEvent, AppModel, AppUpdate, SingleWindowModel, WindowInvalidation,
 };
+pub use argui_core::Color;
 pub use argui_host::{
     CallbackDelivery, CallbackId, CommitResult as HostCommitResult, Host as NativeHost, HostError,
     HostId, Operation as HostOperation,
 };
+pub use argui_platform::{ApplicationConfig, ApplicationIdentity, WindowConfig};
+pub use argui_render::RendererConfig;
+pub use argui_theme::{
+    ThemeChange, ThemeDimension, ThemeError, ThemeImpact, ThemeMode, ThemeRuntime, ThemeSchema,
+    ThemeSnapshot, ThemeTokenDefinition, ThemeTokenId, ThemeValue, ThemeValueType,
+};
+pub use argui_ui::{Element, EventType, UiTree};
 pub use effect::{VisualEffectTarget, apply_visual_effect, apply_visual_effect_scoped};
 pub use environment::{ThemeRequest, WindowEnvironment};
 pub use error::RuntimeError;
@@ -41,7 +52,7 @@ pub use launch::{
     run, run_app, run_app_with_text_engine, run_application, run_application_with_text_engine,
     run_ui, run_ui_with_text_engine, run_with_text, run_with_text_engine,
 };
-#[cfg(target_os = "android")]
+#[cfg(all(feature = "android", target_os = "android"))]
 #[doc(hidden)]
 pub use launch::{
     run_android_application, run_android_application_with_text_engine,
@@ -56,8 +67,9 @@ pub use model::{
 };
 pub use native_host::{
     NativeHostApplicationRequest, NativeHostAssets, NativeHostBatch, NativeHostCommit,
-    NativeHostControl, NativeHostDelivery, NativeWindowInfo, WireHostId, WireOperation, WireValue,
-    validate_native_host_assets, validate_native_host_canvases,
+    NativeHostControl, NativeHostDelivery, NativePointerPosition, NativeWindowInfo, WireHostId,
+    WireOperation, WireValue, validate_native_host_assets, validate_native_host_canvases,
 };
+pub use theme_bridge::ThemeBridge;
 
 pub use model::shutdown_presentations;

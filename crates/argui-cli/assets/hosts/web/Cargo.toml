@@ -1,0 +1,33 @@
+[package]
+name = "argui-app-web"
+version = "0.3.3"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+description = "WebAssembly host owned by this Argui application"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+tasks = ["argui-runtime/tasks"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[dependencies]
+argui-core = "=0.3.3"
+argui-platform = "=0.3.3"
+argui-render = "=0.3.3"
+argui-runtime = "=0.3.3"
+argui-ui = "=0.3.3"
+serde_json = "=1.0.151"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "=0.3.104"
+wasm-bindgen = "=0.2.127"
+web-sys = { version = "=0.3.104", features = ["console", "CustomEvent", "CustomEventInit", "Document", "Element", "Event", "EventTarget", "MediaQueryList", "Window"] }
+
+[workspace]
+resolver = "3"

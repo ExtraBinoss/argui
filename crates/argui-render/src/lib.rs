@@ -15,6 +15,7 @@ mod offscreen;
 mod profile;
 mod quad;
 mod registry;
+pub mod shader;
 mod surface;
 mod target;
 mod text;

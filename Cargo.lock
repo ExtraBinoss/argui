@@ -228,17 +228,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-android"
-version = "0.3.3"
-dependencies = [
- "argui-platform",
- "argui-render",
- "argui-runtime",
- "argui-text",
- "winit",
-]
-
-[[package]]
 name = "argui-animation"
 version = "0.3.3"
 dependencies = [
@@ -272,6 +261,7 @@ dependencies = [
  "image",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 
@@ -324,13 +314,6 @@ dependencies = [
  "argui-core",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "argui-ios"
-version = "0.3.3"
-dependencies = [
- "argui-runtime",
 ]
 
 [[package]]
@@ -407,21 +390,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-reactive"
-version = "0.3.3"
-
-[[package]]
 name = "argui-render"
 version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
- "argui-shader",
  "argui-text",
  "bytemuck",
  "naga",
  "pollster 1.0.1",
  "resvg",
+ "thiserror 2.0.20",
  "web-time",
  "wgpu",
  "winit",
@@ -479,15 +458,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-shader"
-version = "0.3.3"
-dependencies = [
- "argui-core",
- "naga",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-text"
 version = "0.3.3"
 dependencies = [
@@ -503,7 +473,6 @@ version = "0.3.3"
 dependencies = [
  "argui-core",
  "argui-paint",
- "argui-reactive",
 ]
 
 [[package]]

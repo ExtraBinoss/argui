@@ -1,11 +1,13 @@
 use argui_animation::Frame;
 use argui_core::PointerId;
+#[cfg(feature = "inspect")]
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{
     GlobalShortcutEvent, PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec,
 };
 use argui_render::{DamageTracking, EffectDefinition};
+use argui_theme::ThemeRuntime;
 use argui_ui::{
     ClipboardRequest, Element, FocusRequest, HitRegion, RetainedIdentity, TextSelectionRequest,
     UiEvent, UiTree,
@@ -168,6 +170,13 @@ fn strongest(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
 }
 
 pub trait AppModel: 'static {
+    /// Returns the theme assigned to `window`, if the application uses typed tokens.
+    /// Clones of one runtime share values across windows; returning distinct runtimes
+    /// gives each window independent theme state.
+    fn theme(&self, _window: &WindowKey) -> Option<ThemeRuntime> {
+        None
+    }
+
     /// Takes pending UI commands for a window. The default implementation has none.
     ///
     /// `_window` identifies the window whose pending commands are requested.
@@ -245,6 +254,7 @@ pub trait AppModel: 'static {
     /// Returns the inspection handle for the window, if inspection is enabled.
     ///
     /// `_window` identifies the window whose inspector is requested.
+    #[cfg(feature = "inspect")]
     fn inspector(&self, _window: &WindowKey) -> Option<InspectorHandle> {
         None
     }
@@ -295,6 +305,7 @@ pub struct SingleWindowModel<A: Render> {
     focus: std::cell::RefCell<Option<FocusRequest>>,
     text_selection: std::cell::RefCell<Option<TextSelectionRequest>>,
     theme: std::cell::RefCell<Option<ThemeRequest>>,
+    theme_runtime: Option<ThemeRuntime>,
     animation_requested: std::cell::Cell<bool>,
     observation_index: std::cell::RefCell<crate::SourceIdentityIndex>,
     observation_snapshot: std::cell::RefCell<crate::model::InteractionSnapshot>,
@@ -327,6 +338,7 @@ impl<A: Render> SingleWindowModel<A> {
             focus: std::cell::RefCell::new(None),
             text_selection: std::cell::RefCell::new(None),
             theme: std::cell::RefCell::new(None),
+            theme_runtime: None,
             animation_requested: std::cell::Cell::new(false),
             observation_index: std::cell::RefCell::new(crate::SourceIdentityIndex::default()),
             observation_snapshot: std::cell::RefCell::new(Default::default()),
@@ -337,6 +349,14 @@ impl<A: Render> SingleWindowModel<A> {
     #[must_use]
     pub fn window_key(mut self, window: WindowKey) -> Self {
         self.window = window;
+        self
+    }
+
+    /// Assigns `theme` as the typed token source for this window.
+    /// The caller can retain a clone to update the live theme after launch.
+    #[must_use]
+    pub fn with_theme(mut self, theme: ThemeRuntime) -> Self {
+        self.theme_runtime = Some(theme);
         self
     }
 
@@ -424,6 +444,12 @@ impl<A: Render> Drop for SingleWindowModel<A> {
 }
 
 impl<A: Render> AppModel for SingleWindowModel<A> {
+    fn theme(&self, window: &WindowKey) -> Option<ThemeRuntime> {
+        (window == &self.window)
+            .then(|| self.theme_runtime.clone())
+            .flatten()
+    }
+
     #[cfg(feature = "tasks")]
     fn tasks_ready(&mut self, window: &WindowKey) -> AppUpdate {
         if window != &self.window {
@@ -498,6 +524,7 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
         self.app.entity.erase().effect_definitions()
     }
 
+    #[cfg(feature = "inspect")]
     fn inspector(&self, window: &WindowKey) -> Option<InspectorHandle> {
         (window == &self.window)
             .then(|| self.app.entity.erase().inspector())

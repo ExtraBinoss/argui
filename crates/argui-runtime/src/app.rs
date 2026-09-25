@@ -2,6 +2,7 @@ use crate::{
     AnyEntity, RuntimeError, RuntimeEvent, ScrollRequest, ViewUpdate, animation::RuntimeAnimations,
 };
 use argui_core::{Point, PointerId, Size};
+#[cfg(feature = "inspect")]
 use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{ImageAsset, VectorAsset};
@@ -22,11 +23,14 @@ mod frame;
 mod frame_route;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 mod gtk;
+#[cfg(feature = "inspect")]
 mod inspect;
 mod layout;
 mod model_updates;
 mod native_host;
+mod view;
 mod visibility;
+#[cfg(feature = "inspect")]
 pub use inspect::{Inspection, InspectionCache};
 mod inertia;
 mod lifecycle;
@@ -74,6 +78,8 @@ pub(crate) struct Application {
     preferences: argui_platform::SystemPreferences,
     system_color_scheme: Option<argui_core::ColorScheme>,
     theme_request: crate::ThemeRequest,
+    theme_runtime: Option<argui_theme::ThemeRuntime>,
+    theme_subscription: Option<argui_theme::ThemeSubscription>,
     environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
     pub(super) renderer_profiling_requested: bool,
@@ -107,7 +113,9 @@ pub(crate) struct Application {
     vector_assets: Vec<VectorAsset>,
     base_effects: EffectRegistry,
     effect_definitions: Vec<EffectDefinition>,
+    #[cfg(feature = "inspect")]
     pub(super) inspector: Option<InspectorHandle>,
+    #[cfg(feature = "inspect")]
     inspection_cache: InspectionCache,
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
@@ -160,7 +168,7 @@ pub(crate) struct Application {
     window_drag: window::WindowDragState,
     pending_window_frame: frame::PendingWindowFrame,
     pub(super) pending_ui_frame: frame::PendingUiFrame,
-    pub(super) frame_record: argui_inspect::FrameRecord,
+    pub(super) frame_record: frame::FrameTiming,
     pub(super) last_redraw: Option<Instant>,
     pub(crate) fatal_error: Option<RuntimeError>,
     pub(crate) pending_app_commands: Vec<crate::AppCommand>,
@@ -178,8 +186,10 @@ impl Application {
         model: Option<AnyEntity>,
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Self {
+        #[cfg(feature = "inspect")]
         let inspector = model.as_ref().and_then(AnyEntity::inspector);
         let renderer_profiling_requested = renderer_config.profiling;
+        #[cfg(feature = "inspect")]
         let renderer_config = RendererConfig {
             profiling: renderer_config.profiling || inspector.is_some(),
             ..renderer_config
@@ -221,6 +231,8 @@ impl Application {
             preferences: argui_platform::SystemPreferences::default(),
             system_color_scheme: None,
             theme_request: crate::ThemeRequest::default(),
+            theme_runtime: None,
+            theme_subscription: None,
             renderer_config,
             renderer_profiling_requested,
             window: None,
@@ -253,7 +265,9 @@ impl Application {
             vector_assets,
             base_effects,
             effect_definitions,
+            #[cfg(feature = "inspect")]
             inspector,
+            #[cfg(feature = "inspect")]
             inspection_cache: InspectionCache::default(),
             text_engine,
             text_scene,
@@ -306,7 +320,7 @@ impl Application {
             window_drag: window::WindowDragState::default(),
             pending_window_frame: frame::PendingWindowFrame::default(),
             pending_ui_frame: frame::PendingUiFrame::default(),
-            frame_record: argui_inspect::FrameRecord::default(),
+            frame_record: frame::FrameTiming::default(),
             last_redraw: None,
             fatal_error: None,
             on_event: Box::new(on_event),
@@ -501,13 +515,16 @@ impl Application {
         {
             self.prepared_text = Some(self.text_engine.prepare(&layout.text, self.scale_factor));
         }
+        #[cfg(feature = "inspect")]
         self.publish_inspection();
+        #[cfg(feature = "inspect")]
         self.paint_inspection_highlight();
     }
 
     /// Applies retained compositor properties, falling back to paint when a
     /// previous snapshot cannot represent the requested transform.
     pub(super) fn composite(&mut self) {
+        #[cfg(feature = "inspect")]
         if self
             .inspector
             .as_ref()
@@ -524,7 +541,9 @@ impl Application {
         };
         if composited {
             self.composite_frame = true;
+            #[cfg(feature = "inspect")]
             self.publish_inspection();
+            #[cfg(feature = "inspect")]
             self.paint_inspection_highlight();
         } else {
             self.repaint();

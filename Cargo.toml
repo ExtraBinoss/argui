@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/argui-accessibility",
-    "crates/argui-android",
     "crates/argui-animation",
     "crates/argui-automation",
     "crates/argui-core",
@@ -11,15 +10,12 @@ members = [
     "crates/argui-i18n",
     "crates/argui-media",
     "crates/argui-inspect",
-    "crates/argui-ios",
     "crates/argui-layout",
     "crates/argui-paint",
     "crates/argui-platform",
-    "crates/argui-reactive",
     "crates/argui-render",
     "crates/argui-runtime",
     "crates/argui-schema",
-    "crates/argui-shader",
     "crates/argui-text",
     "crates/argui-theme",
     "crates/argui-ui",
@@ -38,7 +34,6 @@ homepage = "https://extrabinoss.github.io/argui/"
 readme = "README.md"
 
 [workspace.dependencies]
-argui-android = { path = "crates/argui-android", version = "0.3.3" }
 argui-accessibility = { path = "crates/argui-accessibility", version = "0.3.3" }
 argui-animation = { path = "crates/argui-animation", version = "0.3.3" }
 argui-automation = { path = "crates/argui-automation", version = "0.3.3" }
@@ -48,15 +43,12 @@ argui-host = { path = "crates/argui-host", version = "0.3.3" }
 argui-layout = { path = "crates/argui-layout", version = "0.3.3" }
 argui-media = { path = "crates/argui-media", version = "0.3.3", default-features = false }
 argui-i18n = { path = "crates/argui-i18n", version = "0.3.3" }
-argui-ios = { path = "crates/argui-ios", version = "0.3.3" }
 argui-inspect = { path = "crates/argui-inspect", version = "0.3.3" }
 argui-paint = { path = "crates/argui-paint", version = "0.3.3" }
 argui-platform = { path = "crates/argui-platform", version = "0.3.3" }
 argui-render = { path = "crates/argui-render", version = "0.3.3" }
-argui-reactive = { path = "crates/argui-reactive", version = "0.3.3" }
 argui-runtime = { path = "crates/argui-runtime", version = "0.3.3" }
 argui-schema = { path = "crates/argui-schema", version = "0.3.3" }
-argui-shader = { path = "crates/argui-shader", version = "0.3.3" }
 argui-text = { path = "crates/argui-text", version = "0.3.3" }
 argui-theme = { path = "crates/argui-theme", version = "0.3.3" }
 argui-ui = { path = "crates/argui-ui", version = "0.3.3" }

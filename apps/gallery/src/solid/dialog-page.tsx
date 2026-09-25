@@ -17,7 +17,8 @@ export function DialogPage(props: { theme: Palette }): JSX.Element {
           onClick={() => setOpen(true)} />
       </column>
     </rectangle>
-    <Dialog id="gallery-dialog" title="Welcome to Argui" theme={props.theme}
+    <Dialog id="gallery-dialog" title="Welcome to Argui" description="A native modal surface with a focus trap."
+      theme={props.theme}
       open={open()} onOpenChange={setOpen} blur={18}>
       <text width="fill" text="This modal stays centered. The colors behind it are blurred, and its button closes it."
         color={props.theme.muted} font_size={14} />

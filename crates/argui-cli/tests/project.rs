@@ -32,6 +32,10 @@ fn init_writes_both_adapter_templates_and_rejects_unsafe_names() {
                 .unwrap()
                 .contains("backdrop_filter")
         );
+        let source = fs::read_to_string(app.join("src/main.tsx")).unwrap();
+        assert!(source.contains("createThemeRuntime(bridge, widgetThemeDefinition)"));
+        assert!(source.contains("useTheme("));
+        assert!(!source.contains("palette("));
         assert!(run_in(temp.path(), &["init".into(), framework.into(), name.into()]).is_err());
     }
     assert!(
@@ -121,6 +125,11 @@ fn web_scaffold_has_target_and_embed_entry() {
                 .contains("ArguiWebHost")
         );
         assert!(
+            fs::read_to_string(app.join("src/mount.ts"))
+                .unwrap()
+                .contains("bridge.themeCreate(definition)")
+        );
+        assert!(
             fs::read_to_string(app.join("README.md"))
                 .unwrap()
                 .contains("mountArgui")
@@ -135,7 +144,7 @@ fn web_scaffold_has_target_and_embed_entry() {
     let counter = |path: &str| {
         let source = fs::read_to_string(temp.path().join(path)).unwrap();
         source
-            .split("function App() {")
+            .split("function App(props:")
             .nth(1)
             .unwrap()
             .split("/** Mounts")
@@ -183,4 +192,44 @@ fn overview_and_help_are_usable_without_a_project() {
     fake_root(temp.path());
     run_in(temp.path(), &["init".into(), "solid".into(), "demo".into()]).unwrap();
     run_in(&temp.path().join("apps/demo"), &[]).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+/// Checkout-compatible init reports missing, failed, and incomplete release clones.
+fn checkout_compatible_init_reports_clone_failures() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fs::create_dir(root.join("bin")).unwrap();
+    let invoke = |name: &str, mode: &str| {
+        Command::new(env!("CARGO_BIN_EXE_argui"))
+            .args(["init", "react", name])
+            .current_dir(root)
+            .env("PATH", root.join("bin"))
+            .env("ARGUI_FAKE_CLONE", mode)
+            .output()
+            .unwrap()
+    };
+    let missing = invoke("missing", "missing");
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("Git is required"));
+    fs::write(root.join("bin/git"), "#!/bin/sh\nif [ \"$ARGUI_FAKE_CLONE\" = fail ]; then exit 2; fi\nfor value do target=$value; done\n/bin/mkdir -p \"$target/apps/gallery/quickjs-host/src\"\nif [ \"$ARGUI_FAKE_CLONE\" = complete ]; then printf 'ARGUI_APP_BUNDLE' > \"$target/apps/gallery/quickjs-host/src/runner.rs\"; fi\n").unwrap();
+    fs::set_permissions(root.join("bin/git"), fs::Permissions::from_mode(0o755)).unwrap();
+    let failed = invoke("failed", "fail");
+    assert!(!failed.status.success());
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("could not clone"));
+    let incomplete = invoke("incomplete", "incomplete");
+    assert!(!incomplete.status.success());
+    assert!(
+        String::from_utf8_lossy(&incomplete.stderr)
+            .contains("does not include the project bundle host")
+    );
+    let complete = invoke("complete", "complete");
+    assert!(
+        complete.status.success(),
+        "{}",
+        String::from_utf8_lossy(&complete.stderr)
+    );
+    assert!(root.join("complete/apps/complete/argui.json").is_file());
 }
