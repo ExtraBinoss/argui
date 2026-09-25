@@ -17,6 +17,8 @@ fn frame_diagnostic_correlates_distinct_update_and_render_actions() {
     }];
     let records = [FrameRecord {
         model: Duration::from_millis(1),
+        surface: Duration::from_millis(2),
+        resize_events: 3,
         passes: 3,
         damaged_pixels: 123,
         gpu: Some(GpuFrameRecord {
@@ -43,7 +45,9 @@ fn frame_diagnostic_correlates_distinct_update_and_render_actions() {
     let frame = frame_diagnostics(&frames, &records, &actions).remove(0);
     assert_eq!(frame.update_action_index, Some(0));
     assert_eq!(frame.render_action_index, Some(1));
-    assert_eq!(frame.total_cpu_ms, 11.0);
+    assert_eq!(frame.total_cpu_ms, 13.0);
+    assert_eq!(frame.surface_cpu_ms, 2.0);
+    assert_eq!(frame.resize_events, 3);
     assert_eq!(frame.dominant_cpu_phase, "layout");
     assert_eq!(frame.gpu_ms, Some(5.0));
     assert_eq!(frame.gpu_passes[0].name, "surface.main");

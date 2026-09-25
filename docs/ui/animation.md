@@ -72,7 +72,7 @@ while the remaining container values animate implicitly.
 
 The Solid/React TSX gallery's **Animation Lab** demonstrates native loops,
 implicit transitions, composition, spring retargeting and held keyframes. Its
-current source is [`animation-lab.tsx`](../../apps/gallery/src/animation-lab.tsx);
+current source is [`animation-lab.tsx`](../../apps/gallery/src/solid/animation-lab.tsx);
 gallery build and hot-reload instructions are in the
 [gallery README](../../apps/gallery/README.md).
 

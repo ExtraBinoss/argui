@@ -7,7 +7,9 @@
     "check:ts": "tsc --noEmit -p tsconfig.json",
     "generate:jsx": "bun packages/solid/scripts/generate-jsx.mjs && bun packages/react/scripts/generate-jsx.mjs",
     "generate:assets": "bun apps/gallery/scripts/generate-assets.mjs",
-    "build:gallery": "bun run generate:assets && ARGUI_GALLERY_ENTRY=core vite build --config apps/gallery/vite.config.ts && ARGUI_GALLERY_ENTRY=react vite build --config apps/gallery/vite.config.ts"
+    "build:gallery": "bun run generate:assets && ARGUI_GALLERY_ENTRY=core vite build --config apps/gallery/vite.config.ts && ARGUI_GALLERY_ENTRY=react vite build --config apps/gallery/vite.config.ts",
+    "gallery": "bun apps/gallery/scripts/dev.mjs solid",
+    "gallery:react": "bun apps/gallery/scripts/dev.mjs react"
   },
   "devDependencies": {
     "@types/bun": "1.3.11",

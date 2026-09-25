@@ -14,6 +14,8 @@ fn fixture(root: &Path) {
         "apps/demo/src",
         "apps/demo/node_modules/@argui/solid",
         "apps/gallery/quickjs-host",
+        "apps/gallery/src",
+        "apps/gallery/node_modules/@argui/solid",
         "apps/gallery/dist",
         "packages/host",
         "node_modules/typescript",
@@ -25,6 +27,16 @@ fn fixture(root: &Path) {
     fs::write(root.join("packages/host/package.json"), "{}").unwrap();
     fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
     fs::write(root.join("apps/gallery/dist/gallery-core.mjs"), "").unwrap();
+    fs::write(
+        root.join("apps/gallery/argui.json"),
+        r#"{"name":"gallery","framework":"solid"}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("apps/gallery/src/main.tsx"),
+        "export function mountGallery() {}\n",
+    )
+    .unwrap();
     fs::write(
         root.join("apps/demo/argui.json"),
         r#"{"name":"demo","framework":"solid"}"#,
@@ -69,7 +81,7 @@ if [ "${FAKE_AUTOMATION_FAIL:-}" = 1 ]; then
   printf '{"ok":false,"error":"assertion failed","startedUnixMs":%s,"steps":[{"started_ms":0,"duration_ms":1,"ok":false}]}\n' "$started" > "$ARGUI_AUTOMATION_OUT/report.json"
   exit 2
 fi
-printf '{"ok":true,"startedUnixMs":%s,"steps":[{"started_ms":0,"duration_ms":1,"ok":true}],"frames":[{}]}\n' "$started" > "$ARGUI_AUTOMATION_OUT/report.json"
+printf '{"ok":true,"startedUnixMs":%s,"steps":[{"started_ms":0,"duration_ms":1,"ok":true}],"frames":[{}],"galleryAssets":%s}\n' "$started" "${ARGUI_AUTOMATION_GALLERY_ASSETS:-0}" > "$ARGUI_AUTOMATION_OUT/report.json"
 HOST
 chmod +x "$target/debug/argui-gallery-quickjs"
 if [ "${FAKE_HOST_UNEXEC:-}" = 1 ]; then chmod 644 "$target/debug/argui-gallery-quickjs"; fi
@@ -140,6 +152,7 @@ fn test_command_reports_arguments_and_native_process_metrics() {
     let report: serde_json::Value =
         serde_json::from_slice(&fs::read(root.join("artifacts/report.json")).unwrap()).unwrap();
     assert_eq!(report["ok"], true);
+    assert_eq!(report["galleryAssets"], 0);
     assert!(report["processMetrics"]["hostPid"].as_u64().unwrap() > 0);
     assert!(report["processMetrics"]["peakRssBytes"].as_u64().unwrap() > 0);
     assert!(
@@ -173,6 +186,26 @@ fn test_command_reports_arguments_and_native_process_metrics() {
         &[],
     );
     assert!(tsx.status.success());
+    let gallery = cli(
+        root,
+        &[
+            "test",
+            "apps/gallery",
+            "demo.test.ts",
+            "--out",
+            "gallery-assets",
+        ],
+        &[],
+    );
+    assert!(
+        gallery.status.success(),
+        "{}",
+        String::from_utf8_lossy(&gallery.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("gallery-assets/report.json")).unwrap())
+            .unwrap();
+    assert_eq!(report["galleryAssets"], 1);
 }
 
 #[test]

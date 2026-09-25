@@ -62,6 +62,10 @@ pub struct FrameDiagnostic {
     pub interval_ms: Option<f64>,
     /// CPU work before geometry computation, including host or input updates.
     pub pre_layout_cpu_ms: f64,
+    /// CPU time spent resizing the offscreen surface before scene submission.
+    pub surface_cpu_ms: f64,
+    /// Number of viewport changes represented by this frame.
+    pub resize_events: u32,
     /// CPU geometry, reconciliation, measurement, and placement time.
     pub layout_cpu_ms: f64,
     /// CPU paint output or scroll presentation time.
@@ -105,6 +109,7 @@ pub fn frame_diagnostics(
                 (frame.cpu_ms - pre_layout_cpu_ms - frame.layout_ms - frame.paint_ms).max(0.0);
             let phases = [
                 ("pre_layout", pre_layout_cpu_ms),
+                ("surface", ms(record.surface)),
                 ("layout", frame.layout_ms),
                 ("paint", frame.paint_ms),
                 ("other_update", other_update_cpu_ms),
@@ -125,11 +130,15 @@ pub fn frame_diagnostics(
                     .and_then(|time| action_at(time, actions)),
                 interval_ms: frame.interval_ms,
                 pre_layout_cpu_ms,
+                surface_cpu_ms: ms(record.surface),
+                resize_events: record.resize_events,
                 layout_cpu_ms: frame.layout_ms,
                 paint_cpu_ms: frame.paint_ms,
                 other_update_cpu_ms,
                 render_submit_cpu_ms: frame.render_cpu_ms,
-                total_cpu_ms: frame.cpu_ms + frame.render_cpu_ms.unwrap_or(0.0),
+                total_cpu_ms: frame.cpu_ms
+                    + ms(record.surface)
+                    + frame.render_cpu_ms.unwrap_or(0.0),
                 dominant_cpu_phase,
                 layout_passes: frame.layout_passes,
                 gpu_sequence: gpu.map(|profile| profile.sequence),

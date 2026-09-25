@@ -120,6 +120,22 @@ pub(super) fn register_window_services(
             NativeHostApplicationRequest::SetWindowSize(key, width, height, reply)
         })
     });
+    let position_sender = sender.clone();
+    registry.register("windows", "setPosition", move |payload| {
+        let key = match window_key(&payload) {
+            Ok(key) => key,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        let (Some(x), Some(y)) = (
+            payload.get("x").and_then(Value::as_f64),
+            payload.get("y").and_then(Value::as_f64),
+        ) else {
+            return ServiceOutcome::Error("window position requires numeric x and y".into());
+        };
+        dispatch(&position_sender, |reply| {
+            NativeHostApplicationRequest::SetWindowPosition(key, x, y, reply)
+        })
+    });
     registry.register("windows", "setDecorations", move |payload| {
         let key = match window_key(&payload) {
             Ok(key) => key,
@@ -235,6 +251,7 @@ fn window_info_json(info: NativeWindowInfo) -> Value {
     json!({
         "window": info.window.as_str(), "title": info.title,
         "width": info.width, "height": info.height, "visible": info.visible,
+        "x": info.x, "y": info.y,
         "decorations": info.decorations, "transparent": info.transparent,
         "backdrop": info.backdrop.is_some(),
         "backdropAvailable": info.backdrop_available,

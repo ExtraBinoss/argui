@@ -150,12 +150,17 @@ fn run(app: &Path, test: &Path, out: &Path) -> Result<(), String> {
     let binary = project::native_target(&root)
         .join("debug")
         .join(project::binary_name());
-    let mut child = Command::new(&binary)
+    let mut command = Command::new(&binary);
+    command
         .env("ARGUI_AUTOMATION_TEST", bundle_dir.join("test.mjs"))
         .env("ARGUI_AUTOMATION_OUT", out)
         .env("ARGUI_AUTOMATION_GATE", "1")
         .current_dir(app)
-        .stdin(Stdio::piped())
+        .stdin(Stdio::piped());
+    if app.canonicalize().ok() == root.join("apps/gallery").canonicalize().ok() {
+        command.env("ARGUI_AUTOMATION_GALLERY_ASSETS", "1");
+    }
+    let mut child = command
         .spawn()
         .map_err(|error| format!("{}: {error}", binary.display()))?;
     let sampler_started = unix_ms();

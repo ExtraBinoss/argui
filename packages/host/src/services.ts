@@ -46,6 +46,8 @@ export interface NativeWindowInfo {
   title: string
   width: number
   height: number
+  x: number | null
+  y: number | null
   visible: boolean | null
   decorations: boolean
   transparent: boolean
@@ -164,6 +166,11 @@ export class ApplicationServices {
   /** Requests a new logical client size for an existing window. */
   setWindowSize(window: string, width: number, height: number, signal?: AbortSignal): Promise<void> {
     return this.call('windows', 'setSize', { window, width, height }, signal)
+  }
+
+  /** Requests outer top-left coordinates in logical screen pixels where supported. */
+  setWindowPosition(window: string, x: number, y: number, signal?: AbortSignal): Promise<void> {
+    return this.call('windows', 'setPosition', { window, x, y }, signal)
   }
 
   /** Enables or removes the native title bar and borders on an existing window. */

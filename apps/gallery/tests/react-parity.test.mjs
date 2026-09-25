@@ -196,6 +196,12 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       compare(key)
     }
     compare('initial Button page')
+    for (const presentation of [solid, react]) {
+      const animationPane = allNodes(tree(presentation))
+        .find((node) => node.properties.key?.value === 'scroll-Animation Lab')
+      assert.ok(animationPane)
+      assert.ok(!allNodes(animationPane).some((node) => node.properties.key?.value === 'motion-target'))
+    }
     const type = async (key, eventName, value) => {
       edit(solid, key, eventName, value)
       edit(react, key, eventName, value)
@@ -227,6 +233,7 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       assert.ok(!allNodes(current).some((node) => node.properties.key?.value === 'page-button'))
     }
     await click('page-input')
+    const inputIdentities = [solid, react].map((presentation) => nativeIdentity(presentation, 'input-name'))
     await type('input-name', 'input', 'Ada')
     await type('input-name', 'submit', 'Ada')
     await type('input-password', 'input', 'secret')
@@ -356,7 +363,7 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       assert.ok(nodes.some((node) => node.type === 'Text' && node.properties.text?.value === 'EXAMPLES'))
       const overlayPane = nodes.find((node) => node.properties.key?.value === 'scroll-Overlay')
       assert.ok(overlayPane)
-      assert.equal(allNodes(overlayPane).filter((node) => node.properties.backdrop_filter?.value).length, 12)
+      assert.equal(allNodes(overlayPane).filter((node) => node.properties.backdrop_filter?.value).length, 0)
     }
     await type('gallery-search', 'input', 'Theming')
     await click('page-theming')
@@ -386,8 +393,20 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     }
     await type('gallery-search', 'input', 'Overlay')
     await click('page-overlay')
+    for (const presentation of [solid, react]) {
+      const overlayPane = allNodes(tree(presentation))
+        .find((node) => node.properties.key?.value === 'scroll-Overlay')
+      assert.equal(allNodes(overlayPane).filter((node) => node.properties.backdrop_filter?.value).length, 12)
+    }
     await click('menu')
     await click('menu')
+    await type('gallery-search', 'input', '')
+    await click('page-input')
+    for (const [index, presentation] of [solid, react].entries()) {
+      assert.equal(nativeIdentity(presentation, 'input-name'), inputIdentities[index])
+      assert.ok(allNodes(tree(presentation)).some((node) => node.type === 'Text'
+        && node.properties.text?.value === 'Submitted: Ada'))
+    }
   } finally {
     solid.dispose()
     react.dispose()

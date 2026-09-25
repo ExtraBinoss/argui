@@ -1,0 +1,5 @@
+{
+  "name": "gallery",
+  "framework": "solid",
+  "target": "native"
+}

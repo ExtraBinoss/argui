@@ -3,10 +3,10 @@ import { ApplicationServices, NativeHost, type NativeBridge } from '@argui/host'
 import { createRoot } from '@argui/react'
 import { WidgetAssetProvider } from '@argui/widgets/react'
 import { isI18nBridgeAvailable, loadI18n, subscribeI18n, tr } from '@argui/i18n'
-import enUS from './i18n/en-US.json'
-import fr from './i18n/fr.json'
-import { mediaAssets } from './assets.generated'
-import { ReactGallery } from './react-gallery'
+import enUS from '../i18n/en-US.json'
+import fr from '../i18n/fr.json'
+import { mediaAssets } from '../assets.generated'
+import { ReactGallery } from './gallery'
 
 /** Mounts the React gallery through the same Argui native host and schema. */
 export function mountReactGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {

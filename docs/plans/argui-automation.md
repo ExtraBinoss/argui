@@ -96,11 +96,18 @@ keeps the API small while covering common interactions. The first acceptance
 tests should cover a counter click, list scroll, context click, field entry,
 and drag. Add touch, IME composition, complex shortcuts, and other gestures
 only when a concrete application test needs them. Define clear timeouts and
-cancellation for async application work. Offer an explicit, bounded
-`ui.wait(ms)` for captures that need a chosen delay; keep the app scheduler,
-animations, and callbacks advancing during that wait. Prefer semantic
-assertions when elapsed time is not part of the test. A virtual
-clock can be added when animation tests require deterministic frame timing.
+cancellation for async application work. `ui.wait(ms)` advances the app
+scheduler, animations, and callbacks. `ui.pause()` and `ui.resume()` freeze and
+restore application time around captures; `ui.sleep(ms)` spends bounded wall
+time without advancing the app. Prefer semantic assertions when elapsed time
+is not part of the test. A user-controlled virtual clock can be added when
+animation tests require a chosen frame timestamp.
+
+The windowless driver addresses its single viewport with the stable `main`
+window key. `ui.window('main').resize(...)` recomputes and renders it, recording
+layout, surface, and renderer phases. Native `setWindowPosition` and
+`getWindowInfo` use the same stable key; absolute position depends on the OS.
+The windowless driver rejects position requests because it owns no OS window.
 
 ## Implementation sequence
 

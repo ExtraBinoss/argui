@@ -94,28 +94,30 @@ test('main window sends a message and receives a companion reply', async () => {
   services.dispose()
 })
 
-test('window details and live title, size, and decoration requests retain the target key', async () => {
+test('window details and live title, size, position, and decoration requests retain the target key', async () => {
   const mock = bridge()
   const services = new ApplicationServices(mock.native)
   const info = services.getWindowInfo('companion')
   expect(mock.requests[0]).toMatchObject({ service: 'windows', method: 'getInfo', payload: { window: 'companion' } })
   mock.deliver({ requestId: 1, window: 'main', status: 'ok', value: {
-    window: 'companion', title: 'Preview', width: 640, height: 360,
+    window: 'companion', title: 'Preview', width: 640, height: 360, x: 40, y: 80,
     visible: true, decorations: false, transparent: true,
     backdrop: true, backdropAvailable: false,
   } })
-  expect(await info).toMatchObject({ width: 640, backdropAvailable: false })
+  expect(await info).toMatchObject({ width: 640, x: 40, y: 80, backdropAvailable: false })
   const changed = [
     services.setWindowTitle('companion', 'Renamed'),
     services.setWindowSize('companion', 800, 500),
+    services.setWindowPosition('companion', -20, 40),
     services.setWindowDecorations('companion', true),
   ]
   expect(mock.requests.slice(1)).toMatchObject([
     { method: 'setTitle', payload: { window: 'companion', title: 'Renamed' } },
     { method: 'setSize', payload: { window: 'companion', width: 800, height: 500 } },
+    { method: 'setPosition', payload: { window: 'companion', x: -20, y: 40 } },
     { method: 'setDecorations', payload: { window: 'companion', decorations: true } },
   ])
-  for (let requestId = 2; requestId <= 4; requestId++) {
+  for (let requestId = 2; requestId <= 5; requestId++) {
     mock.deliver({ requestId, window: 'main', status: 'ok', value: null })
   }
   await Promise.all(changed)

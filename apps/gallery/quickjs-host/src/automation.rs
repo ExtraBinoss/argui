@@ -15,13 +15,16 @@ use argui_automation::{
     Action, ActionWindow, Driver, Viewport, frame_diagnostics, summarize_metrics,
 };
 use argui_core::MetricTrace;
-use argui_render::{RendererConfig, SurfaceRenderer};
-use argui_runtime::WireOperation;
-use image::{ColorType, ImageFormat};
+use argui_runtime::{NativeHostAssets, WireOperation};
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{QuickJsGallery, decode_wire_operations, delivery::event_json};
+
+mod clock;
+mod capture;
+use capture::CaptureState;
+use clock::TestClock;
 
 #[derive(Debug)]
 struct Request {
@@ -29,13 +32,6 @@ struct Request {
     method: String,
     target: String,
     args: String,
-}
-
-/// Monotonic origin and timeout shared by queued test actions.
-#[derive(Clone, Copy)]
-struct TestClock {
-    started: Instant,
-    deadline: Instant,
 }
 
 #[derive(Serialize)]
@@ -68,6 +64,12 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
     let contract = include_str!("../../../../packages/host/src/contract.generated.json");
     let viewport = Viewport::default();
     let driver = Rc::new(RefCell::new(Driver::new(viewport)?));
+    let assets = if std::env::var_os("ARGUI_AUTOMATION_GALLERY_ASSETS").is_some() {
+        argui_gallery_assets::load()?
+    } else {
+        NativeHostAssets::default()
+    };
+    driver.borrow_mut().install_assets(&assets);
     let metrics = driver.borrow().metrics();
     let queue = Rc::new(RefCell::new(VecDeque::new()));
     let next_id = Rc::new(Cell::new(1_i32));
@@ -76,7 +78,7 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
     let ids = Rc::clone(&next_id);
     let started = Instant::now();
     let mut steps = Vec::new();
-    let mut adapter: Option<Value> = None;
+    let mut capture = CaptureState::new(&out, &assets);
     let result = (|| -> Result<(), String> {
         let mount = metrics.span("js.mount");
         let gallery = QuickJsGallery::new_automation(
@@ -116,8 +118,7 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
             .unwrap_or(30_000)
             .clamp(100, 300_000);
         let deadline = started + Duration::from_millis(timeout);
-        let clock = TestClock { started, deadline };
-        let mut renderer = None;
+        let mut clock = TestClock::new(started, deadline);
         loop {
             if Instant::now() >= deadline {
                 return Err(format!(
@@ -136,10 +137,8 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
                     &request,
                     &driver,
                     &gallery,
-                    &out,
-                    &mut renderer,
-                    &mut adapter,
-                    clock,
+                    &mut capture,
+                    &mut clock,
                 );
                 drop(action);
                 let error = outcome.as_ref().err().cloned();
@@ -183,9 +182,13 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
                 }
                 return Err(error.to_owned());
             }
+            if clock.paused() {
+                std::thread::sleep(Duration::from_millis(10));
+                continue;
+            }
             driver.borrow_mut().advance()?;
             deliver_pending(&driver, &gallery, &metrics)?;
-            let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+            let elapsed = clock.elapsed_ms();
             let tick = metrics.span("js.tick");
             gallery.tick(elapsed)?;
             drop(tick);
@@ -195,16 +198,16 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
             }
         }
     })();
-    let report = report(&driver.borrow(), &steps, adapter, &result, started_unix_ms);
+    let report = report(&driver.borrow(), &steps, capture.adapter, &result, started_unix_ms);
     fs::write(out.join("report.json"), serde_json::to_vec_pretty(&report)?)?;
     result.map_err(Into::into)
 }
 
 /// Executes one queued test action and returns its JSON result.
 /// `request` names the typed action; `driver` owns the retained UI; `gallery`
-/// receives callback deliveries; `out` bounds screenshot files; `renderer`
-/// lazily owns the GPU; `adapter` records its identity; `clock` bounds an
-/// explicit wait while JavaScript timers keep running.
+/// receives callback deliveries; `capture` owns output paths and the GPU;
+/// `clock` bounds an
+/// explicit wait while JavaScript timers keep running and tracks pauses.
 ///
 /// # Errors
 /// Returns a target, assertion, GPU, or file error with the failing step named.
@@ -212,10 +215,8 @@ fn execute(
     request: &Request,
     driver: &Rc<RefCell<Driver>>,
     gallery: &QuickJsGallery,
-    out: &Path,
-    renderer: &mut Option<SurfaceRenderer>,
-    adapter: &mut Option<Value>,
-    clock: TestClock,
+    capture: &mut CaptureState<'_>,
+    clock: &mut TestClock,
 ) -> Result<String, String> {
     let trace = driver.borrow().metrics();
     let args: Value = serde_json::from_str(&request.args)
@@ -225,6 +226,17 @@ fn execute(
             .as_str()
             .ok_or_else(|| format!("{} needs {key}", request.method))
     };
+    if clock.paused()
+        && !matches!(
+            request.method.as_str(),
+            "pause" | "resume" | "sleep" | "screenshot" | "expectText" | "performance"
+        )
+    {
+        return Err(format!(
+            "{} cannot run while paused; call ui.resume() first",
+            request.method
+        ));
+    }
     match request.method.as_str() {
         "click" => driver.borrow_mut().act(Action::Click {
             target: request.target.clone(),
@@ -248,84 +260,100 @@ fn execute(
             to: string("to")?.to_owned(),
         })?,
         "expectText" => driver.borrow().expect_text(string("text")?)?,
+        "pause" => {
+            driver.borrow_mut().pause();
+            clock.pause();
+        }
+        "resume" => {
+            driver.borrow_mut().resume();
+            clock.resume();
+        }
+        "sleep" => {
+            let duration = wait_duration(&args, "sleep")?;
+            if duration > clock.remaining() {
+                return Err("test timed out while sleeping; increase ARGUI_TEST_TIMEOUT_MS".into());
+            }
+            let already_paused = clock.paused();
+            if !already_paused {
+                driver.borrow_mut().pause();
+                clock.pause();
+            }
+            std::thread::sleep(duration);
+            if !already_paused {
+                driver.borrow_mut().resume();
+                clock.resume();
+            }
+        }
         "wait" => {
-            let ms = args["ms"]
-                .as_f64()
-                .filter(|value| value.is_finite() && (0.0..=300_000.0).contains(value))
-                .ok_or("wait needs a finite duration from 0 to 300000 ms")?;
-            drive_wait(
-                driver,
-                gallery,
-                &trace,
-                clock,
-                Duration::from_secs_f64(ms / 1000.0),
-            )?;
+            let duration = wait_duration(&args, "wait")?;
+            drive_wait(driver, gallery, &trace, *clock, duration)?;
         }
         "performance" => assert_performance(&driver.borrow(), &args)?,
+        "window.info" => {
+            window_main(&request.target)?;
+            return serde_json::to_string(&driver.borrow().viewport())
+                .map_err(|error| error.to_string());
+        }
+        "window.resize" => {
+            window_main(&request.target)?;
+            let current = driver.borrow().viewport();
+            let viewport = Viewport {
+                width: dimension(&args, "width")?,
+                height: dimension(&args, "height")?,
+                scale: args["scale"].as_f64().map_or(current.scale, |scale| scale as f32),
+            };
+            driver.borrow_mut().set_viewport(viewport)?;
+            capture.render_scene(&mut driver.borrow_mut(), &trace)?;
+        }
+        "window.move" => {
+            window_main(&request.target)?;
+            return Err("window movement needs a native desktop window; argui test is windowless".into());
+        }
         "screenshot" => {
-            let _capture = trace.span("render.capture");
-            let name = string("name")?;
-            let path = safe_capture_path(out, name)?;
-            let mut owned = driver.borrow_mut();
-            let viewport = owned.viewport();
-            let (width, height) = viewport.physical_size()?;
-            if renderer.is_none() {
-                let _init = trace.span("render.adapter_init");
-                *renderer = Some(
-                    pollster::block_on(SurfaceRenderer::new_offscreen(
-                        width,
-                        height,
-                        RendererConfig::default().profiling(true),
-                    ))
-                    .map_err(|error| format!("screenshot GPU: {error}"))?,
-                );
-            }
-            let gpu = renderer.as_mut().expect("renderer initialized");
-            let began = Instant::now();
-            {
-                let _prepare = trace.span("render.prepare_text");
-                let (layout, text) = owned.scene()?;
-                let prepared = text.prepare(&layout.text, viewport.scale);
-                drop(_prepare);
-                let _submit = trace.span("render.submit_cpu");
-                gpu.render_ui(text, &prepared, &layout.display_list, viewport.scale)
-                    .map_err(|error| format!("screenshot render: {error}"))?;
-            }
-            owned.record_render(began.elapsed());
-            let _readback = trace.span("render.readback_wait");
-            let pixels = gpu
-                .read_offscreen_rgba()
-                .map_err(|error| format!("screenshot readback: {error}"))?;
-            drop(_readback);
-            if !pixels
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .any(|pixel| pixel != &pixels[..4])
-            {
-                return Err("screenshot was blank; check the mounted app and GPU renderer".into());
-            }
-            let _write = trace.span("artifact.png_write");
-            image::save_buffer_with_format(
-                &path,
-                &pixels,
-                width,
-                height,
-                ColorType::Rgba8,
-                ImageFormat::Png,
-            )
-            .map_err(|error| format!("{}: {error}", path.display()))?;
-            let profile = gpu.last_profile();
-            owned.record_render_profile(&profile);
-            *adapter = Some(json!({ "name": profile.adapter.name,
-                "backend": profile.adapter.backend, "deviceType": profile.adapter.device_type,
-                "timestampQueries": profile.adapter.timestamp_queries }));
+            capture.screenshot(&mut driver.borrow_mut(), string("name")?, &trace)?;
         }
         other => return Err(format!("unknown automation action {other:?}")),
     }
     driver.borrow_mut().advance()?;
     deliver_pending(driver, gallery, &trace)?;
     Ok(String::new())
+}
+
+/// Parses a bounded wall duration for a wait or sleep request.
+/// `args` carries the requested milliseconds and `method` labels errors.
+///
+/// # Errors
+/// Returns an error for a missing, non-finite, or out-of-range duration.
+fn wait_duration(args: &Value, method: &str) -> Result<Duration, String> {
+    let ms = args["ms"]
+        .as_f64()
+        .filter(|value| value.is_finite() && (0.0..=300_000.0).contains(value))
+        .ok_or_else(|| format!("{method} needs a finite duration from 0 to 300000 ms"))?;
+    Ok(Duration::from_secs_f64(ms / 1000.0))
+}
+
+/// Validates the only window key exposed by the windowless test driver.
+///
+/// # Errors
+/// Returns an error for an unknown key.
+fn window_main(key: &str) -> Result<(), String> {
+    if key == "main" {
+        Ok(())
+    } else {
+        Err(format!("window {key:?} is unavailable; this test mounts only main"))
+    }
+}
+
+/// Reads a bounded logical window dimension from `args`.
+///
+/// # Errors
+/// Returns an error for a missing, fractional, or invalid dimension.
+fn dimension(args: &Value, key: &str) -> Result<u32, String> {
+    let value = args[key]
+        .as_u64()
+        .filter(|value| (1..=4096).contains(value))
+        .ok_or_else(|| format!("{key} must be an integer from 1 to 4096"))?;
+    Ok(value as u32)
 }
 
 /// Advances Argui and JavaScript timers for `duration` without resolving the
@@ -344,12 +372,12 @@ fn drive_wait(
     let _wait = trace.span("automation.wait");
     let end = Instant::now() + duration;
     while Instant::now() < end {
-        if Instant::now() >= clock.deadline {
+        if clock.remaining().is_zero() {
             return Err("test timed out while waiting; increase ARGUI_TEST_TIMEOUT_MS".into());
         }
         driver.borrow_mut().advance()?;
         deliver_pending(driver, gallery, trace)?;
-        let elapsed = clock.started.elapsed().as_secs_f64() * 1000.0;
+        let elapsed = clock.elapsed_ms();
         let tick = trace.span("js.tick");
         gallery.tick(elapsed)?;
         drop(tick);
@@ -357,7 +385,7 @@ fn drive_wait(
             .next_wake(elapsed)?
             .clamp(Duration::from_millis(1), Duration::from_millis(10))
             .min(end.saturating_duration_since(Instant::now()))
-            .min(clock.deadline.saturating_duration_since(Instant::now()));
+            .min(clock.remaining());
         if !sleep.is_zero() {
             std::thread::sleep(sleep);
         }

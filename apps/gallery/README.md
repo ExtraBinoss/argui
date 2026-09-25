@@ -6,6 +6,17 @@ The Solid application is the default; the same native contract and media IDs
 are used by the React bundle. Bun is only a build and test tool, not an app
 runtime.
 
+From the repository root, launch the native gallery with live TSX reload:
+
+```sh
+bun run gallery
+bun run gallery:react
+```
+
+The first run builds the native host. Framework pages live in `src/solid/`
+and `src/react/`; generated assets, catalogs, and other shared data remain in
+`src/`.
+
 ## Shared TSX widgets
 
 The gallery's reusable controls live in the workspace package
@@ -22,7 +33,7 @@ asset manifest:
 
 ```tsx
 import { Button, palette, WidgetAssetProvider } from '@argui/widgets/solid'
-import { mediaAssets } from './assets.generated'
+import { mediaAssets } from '../assets.generated'
 
 const theme = palette('dark', 'blue')
 

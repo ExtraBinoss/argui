@@ -2,7 +2,7 @@
 import { useRef, useState, type ReactElement } from 'react'
 import { Button, InputEditController, type Palette } from '@argui/widgets/react'
 import { numberVariable, parseThemeVariables, stringVariable, themeJson, themePresets,
-  validateExampleTheme, type ThemeVariables } from './theme-variables'
+  validateExampleTheme, type ThemeVariables } from '../theme-variables'
 
 /** Exercises the same app-owned JSON theme through the React renderer. */
 export function ReactThemingPage(props: { theme: Palette }): ReactElement {

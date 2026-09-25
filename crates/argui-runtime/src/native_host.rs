@@ -121,6 +121,8 @@ pub enum NativeHostApplicationRequest {
     SetWindowTitle(WindowKey, String, Sender<Result<(), String>>),
     /// Requests a new logical client size for one window.
     SetWindowSize(WindowKey, f64, f64, Sender<Result<(), String>>),
+    /// Requests outer top-left coordinates in logical screen pixels.
+    SetWindowPosition(WindowKey, f64, f64, Sender<Result<(), String>>),
     /// Enables or removes a window's native decorations.
     SetWindowDecorations(WindowKey, bool, Sender<Result<(), String>>),
 }
@@ -136,6 +138,10 @@ pub struct NativeWindowInfo {
     pub width: f64,
     /// Current drawable client height in logical pixels.
     pub height: f64,
+    /// Outer top-left X coordinate when the backend reports it.
+    pub x: Option<f64>,
+    /// Outer top-left Y coordinate when the backend reports it.
+    pub y: Option<f64>,
     /// Native visibility when the backend reports it.
     pub visible: Option<bool>,
     /// Whether the native title bar and borders are requested.

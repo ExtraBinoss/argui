@@ -160,6 +160,10 @@ fn host_commit_inspection_and_pointer_delivery_share_the_real_tree() {
             scale: 1.0,
         })
         .unwrap();
+    assert_eq!(driver.frame_records().last().unwrap().resize_events, 1);
+    let frame_count = driver.frames().len();
+    driver.set_viewport(driver.viewport()).unwrap();
+    assert_eq!(driver.frames().len(), frame_count);
     driver
         .act(Action::Click {
             target: "increment".into(),
@@ -430,4 +434,57 @@ fn scrolling_a_native_flickable_updates_its_position() {
             .any(|delivery| delivery.callback.callback == CallbackId(14))
     );
     assert!(driver.frames().len() > 1);
+}
+
+/// A paused driver keeps the last animated frame and resumes compositor work.
+#[test]
+fn pause_freezes_native_motion_without_forcing_layout_on_resume() {
+    let mut driver = Driver::new(Viewport::default()).unwrap();
+    driver
+        .commit(&[
+            Operation::Create {
+                id: id(1),
+                native_type: builtin::RECTANGLE,
+            },
+            Operation::SetProperty {
+                id: id(1),
+                property: builtin::WIDTH,
+                value: Some(SchemaValue::Dimension(length(100.0))),
+            },
+            Operation::SetProperty {
+                id: id(1),
+                property: builtin::HEIGHT,
+                value: Some(SchemaValue::Dimension(length(100.0))),
+            },
+            Operation::SetProperty {
+                id: id(1),
+                property: builtin::LOOP_MS,
+                value: Some(SchemaValue::Float(1000.0)),
+            },
+            Operation::SetProperty {
+                id: id(1),
+                property: builtin::LOOP_TRANSLATE_X,
+                value: Some(SchemaValue::Float(40.0)),
+            },
+            Operation::SetRoot { id: Some(id(1)) },
+        ])
+        .unwrap();
+    for _ in 0..3 {
+        std::thread::sleep(Duration::from_millis(10));
+        driver.advance().unwrap();
+    }
+    assert!(driver.frames().len() > 1);
+    assert_eq!(driver.frames().last().unwrap().layout_passes, 0);
+    driver.pause();
+    driver.pause();
+    let frozen = driver.frames().len();
+    std::thread::sleep(Duration::from_millis(20));
+    driver.advance().unwrap();
+    assert_eq!(driver.frames().len(), frozen);
+    driver.resume();
+    driver.resume();
+    std::thread::sleep(Duration::from_millis(10));
+    driver.advance().unwrap();
+    assert!(driver.frames().len() > frozen);
+    assert_eq!(driver.frames().last().unwrap().layout_passes, 0);
 }

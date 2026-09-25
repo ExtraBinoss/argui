@@ -5,6 +5,7 @@ import solid from 'vite-plugin-solid'
 const entry = process.env.ARGUI_GALLERY_ENTRY
 const react = entry === 'react'
 const minimal = entry === 'minimal'
+const cliBuild = process.env.ARGUI_CLI_BUILD === '1'
 const allTabler = process.env.ARGUI_GALLERY_ALL_TABLER === '1'
 
 export default defineConfig({
@@ -22,10 +23,11 @@ export default defineConfig({
     : ['solid-js', '@argui/widgets'],
     resolve: { conditions: ['browser'] } },
   build: {
-    ssr: react ? 'src/react-main.tsx' : minimal ? 'src/minimal-main.tsx' : 'src/main.tsx',
+    ssr: react ? 'src/react/main.tsx' : minimal ? 'src/solid/minimal-main.tsx' : 'src/solid/main.tsx',
     outDir: 'dist',
-    emptyOutDir: !react,
+    emptyOutDir: !react && !cliBuild,
     target: 'es2022',
-    rollupOptions: { output: { entryFileNames: react ? 'gallery-react-core.mjs' : 'gallery-core.mjs' } },
+    rollupOptions: { output: { entryFileNames: cliBuild ? 'app.mjs'
+      : react ? 'gallery-react-core.mjs' : 'gallery-core.mjs' } },
   },
 })

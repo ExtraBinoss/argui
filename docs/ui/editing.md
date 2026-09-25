@@ -139,7 +139,7 @@ constraints, reset behavior, and persistence.
 
 The Solid and React TSX gallery's **Input** page demonstrates native editing,
 search, disabled state, and submit validation in
-[`apps/gallery/src/inputs.tsx`](../../apps/gallery/src/inputs.tsx). Rust editor
+[`apps/gallery/src/solid/inputs.tsx`](../../apps/gallery/src/solid/inputs.tsx). Rust editor
 behavior is covered by the [text-input tests](../../crates/argui-ui/tests/text_input.rs)
 and the tests under `crates/argui-ui/tests/text_input/`. For GUI checks, follow
 the [private display procedure](../contributing/linux-testing.md) and inspect

@@ -1,4 +1,5 @@
 import { createMemo, createSignal, onCleanup, VirtualList } from '@argui/solid'
+import { batch } from 'solid-js'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { Button, InputField, Select, palette, type Accent, type Palette, type ThemeMode } from '@argui/widgets/solid'
 import { AnimationLab } from './animation-lab'
@@ -7,8 +8,8 @@ import { DamageControl } from './damage-control'
 import { AccessibilityPage } from './accessibility-page'
 import { InputsPage } from './inputs'
 import { WgslLab } from './wgsl-lab'
-import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
-import { mediaAssets } from './assets.generated'
+import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from '../gallery-pages'
+import { mediaAssets } from '../assets.generated'
 import { I18nPage } from './i18n-page'
 import { ServicesPage } from './services-page'
 import { ThemingPage } from './theming-page'
@@ -22,6 +23,7 @@ const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === tru
 /** The navigable native gallery shell with shared theme and page state. */
 export function Gallery(props: { services: ApplicationServices }): JSX.Element {
   const [page, setPage] = createSignal<Page>('Button')
+  const [visited, setVisited] = createSignal<ReadonlySet<Page>>(new Set<Page>(['Button']))
   const [mode, setMode] = createSignal<ThemeMode>('light')
   const [accent, setAccent] = createSignal<Accent>('blue')
   const [menuOpen, setMenuOpen] = createSignal(true)
@@ -30,10 +32,14 @@ export function Gallery(props: { services: ApplicationServices }): JSX.Element {
   const [lastUsed, setLastUsed] = createSignal('None')
   const [starActive, setStarActive] = createSignal(false)
   const [choice, setChoice] = createSignal<string>(choices[0])
+  const selectPage = (item: Page) => batch(() => {
+    setVisited((previous) => new Set(previous).add(item))
+    setPage(item)
+  })
   onCleanup(props.services.onEvent((event) => {
     if ((event.type === 'menu' && event.id === 'open-services')
       || (event.type === 'shortcut' && event.id === 'wake' && event.state === 'pressed')) {
-      setPage('Services')
+      selectPage('Services')
     }
   }))
   const theme = () => palette(mode(), accent())
@@ -74,14 +80,14 @@ export function Gallery(props: { services: ApplicationServices }): JSX.Element {
               justify_content="center"><text text={item.label} color={theme().muted} font_size={11} /></column>
             return <Button id={navigationKey(item)} label={item.page} theme={theme()}
               kind="ghost" selected={page() === item.page}
-              current={page() === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
+              current={page() === item.page ? 'page' : undefined} onClick={() => selectPage(item.page)} />
           }} />
         {items().length === 0 ? <text text="No pages found" color={theme().muted} font_size={12} /> : null}
       </column>
     </focusScope>
   }
-  // Keep each destination mounted so switching only updates visibility and selection.
-  // The native tree suspends animation bindings beneath invisible branches.
+  // Keep visited destinations mounted so page state survives navigation.
+  // Unvisited pages add no hidden layout or paint work.
   const content = (item: Page) => (
     <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
       <text text={item} color={theme().foreground} font_size={26} />
@@ -105,7 +111,7 @@ export function Gallery(props: { services: ApplicationServices }): JSX.Element {
   const panes = () => pages.map((item) => (
     <column key={`scroll-${item}`} visible={page() === item}
       width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
-      {content(item)}
+      {visited().has(item) ? content(item) : null}
     </column>
   ))
   return (

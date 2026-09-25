@@ -3,21 +3,22 @@ use std::time::Duration;
 use argui_animation::Time;
 use argui_core::{
     Key, KeyInput, KeyState, MetricTrace, Point, PointerButton, PointerEvent, PointerId,
-    PointerPhase, ScrollDelta, Size,
+    PointerPhase, ScrollDelta,
 };
 use argui_host::{Host, Operation};
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, TreeSnapshot};
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_render::RenderProfile;
-use argui_runtime::{Inspection, NativeHostDelivery};
+use argui_runtime::{Inspection, NativeHostAssets, NativeHostDelivery};
 use argui_text::TextEngine;
-use argui_ui::{InteractionUpdate, NodeId, TreeUpdate, UiEventKind, UiTree};
+use argui_ui::{NodeId, TreeUpdate, UiEventKind, UiTree};
 use serde::Serialize;
 use web_time::Instant;
 
 const FONT: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 mod actions;
+mod frame;
 mod input;
 mod viewport;
 use input::parse_key;
@@ -75,6 +76,7 @@ pub struct Driver {
     started: Instant,
     last_advance: Instant,
     last_frame: Option<Instant>,
+    paused_at: Option<Instant>,
     frames: Vec<StepFrame>,
     records: Vec<FrameRecord>,
     metrics: MetricTrace,
@@ -99,6 +101,7 @@ impl Driver {
             started,
             last_advance: started,
             last_frame: None,
+            paused_at: None,
             frames: Vec::new(),
             records: Vec::new(),
             metrics: MetricTrace::new(),
@@ -125,11 +128,26 @@ impl Driver {
     /// Returns a viewport or layout error.
     pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), String> {
         viewport.physical_size()?;
+        if self.viewport.width == viewport.width
+            && self.viewport.height == viewport.height
+            && self.viewport.scale == viewport.scale
+        {
+            return Ok(());
+        }
         self.viewport = viewport;
         if self.tree.is_some() {
             self.refresh(Instant::now())?;
+            if let Some(record) = self.records.last_mut() {
+                record.resize_events = 1;
+            }
         }
         Ok(())
+    }
+
+    /// Installs `assets` for intrinsic media measurement before the app mounts.
+    /// The renderer receives the same assets separately before a screenshot.
+    pub fn install_assets(&mut self, assets: &NativeHostAssets) {
+        self.engine.set_assets(&assets.images, &assets.vectors);
     }
 
     /// Applies a normal `argui-host` operation batch and refreshes retained layout.
@@ -276,6 +294,14 @@ impl Driver {
         }
     }
 
+    /// Adds `duration` spent resizing the offscreen surface to the latest frame.
+    /// A resize action records its event separately when the viewport changes.
+    pub fn record_surface_resize(&mut self, duration: Duration) {
+        if let Some(record) = self.records.last_mut() {
+            record.surface += duration;
+        }
+    }
+
     /// Attaches measured renderer work to the newest frame.
     /// `profile` contains CPU submission, workload counters, adapter identity,
     /// and optional GPU timestamps from the completed offscreen render.
@@ -345,12 +371,37 @@ impl Driver {
         }
     }
 
+    /// Freezes native animation and scroll time at the current frame.
+    /// Repeated calls leave the original pause point in place.
+    pub fn pause(&mut self) {
+        if self.paused_at.is_none() {
+            self.paused_at = Some(Instant::now());
+        }
+    }
+
+    /// Resumes native time without counting the paused interval as animation time.
+    /// Calling this while running leaves the clock unchanged.
+    pub fn resume(&mut self) {
+        let Some(paused_at) = self.paused_at.take() else {
+            return;
+        };
+        let paused = Instant::now().duration_since(paused_at);
+        self.started += paused;
+        self.last_advance += paused;
+        if let Some(last_frame) = &mut self.last_frame {
+            *last_frame += paused;
+        }
+    }
+
     /// Advances retained animations, scroll physics, and coalesced gestures.
     /// Returns after recording any changed scene and queuing callback deliveries.
     ///
     /// # Errors
     /// Returns a layout error if an animated scene cannot be recomputed.
     pub fn advance(&mut self) -> Result<(), String> {
+        if self.paused_at.is_some() {
+            return Ok(());
+        }
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_advance).as_secs_f32();
         self.last_advance = now;
@@ -372,88 +423,7 @@ impl Driver {
         let scrolling = tree.advance_scroll_physics(elapsed, &scroll_regions);
         self.apply(gestures)?;
         self.apply(scrolling)?;
-        if animation != TreeUpdate::None {
-            self.refresh(now)?;
-        }
-        Ok(())
-    }
-
-    /// Recomputes layout after a host commit or input state change.
-    fn refresh(&mut self, began: Instant) -> Result<(), String> {
-        let _frame = self.metrics.span("frame.update");
-        let layout_started = Instant::now();
-        let profile = if let Some(tree) = &mut self.tree {
-            let (output, profile) = self
-                .engine
-                .compute_traced(
-                    tree,
-                    &mut self.text,
-                    Size::new(self.viewport.width as f32, self.viewport.height as f32),
-                    &self.metrics,
-                )
-                .map_err(|error| error.to_string())?;
-            let virtual_events = output.virtual_events.clone();
-            self.metrics
-                .gauge("scene.nodes", output.nodes.len() as f64, "count");
-            self.metrics.gauge(
-                "paint.commands",
-                output.display_list.commands().len() as f64,
-                "count",
-            );
-            self.metrics.gauge(
-                "paint.reused_subtrees",
-                output.paint_stats.reused_subtrees as f64,
-                "count",
-            );
-            self.layout = Some(output);
-            self.queue(virtual_events);
-            profile
-        } else {
-            self.layout = None;
-            Default::default()
-        };
-        let now = Instant::now();
-        let interval = self
-            .last_frame
-            .map(|previous| now.duration_since(previous).as_secs_f64() * 1000.0);
-        self.last_frame = Some(now);
-        self.frames.push(StepFrame {
-            timestamp_ms: self.metrics.now_ms(),
-            interval_ms: interval,
-            cpu_ms: now.duration_since(began).as_secs_f64() * 1000.0,
-            layout_ms: profile.layout.as_secs_f64() * 1000.0,
-            paint_ms: profile.paint.as_secs_f64() * 1000.0,
-            layout_passes: profile.passes,
-            render_cpu_ms: None,
-            rendered_at_ms: None,
-        });
-        self.metrics
-            .gauge("layout.passes", profile.passes as f64, "count");
-        self.records.push(FrameRecord {
-            interval: self
-                .last_frame
-                .and_then(|_| interval.map(|value| Duration::from_secs_f64(value / 1000.0)))
-                .unwrap_or_default(),
-            model: layout_started.duration_since(began),
-            layout: profile.layout,
-            paint: profile.paint,
-            ..FrameRecord::default()
-        });
-        Ok(())
-    }
-
-    /// Converts an interaction update to callbacks and refreshes dirty paint/layout.
-    fn apply(&mut self, update: InteractionUpdate) -> Result<(), String> {
-        let began = Instant::now();
-        let changed = update.layout_changed
-            || update.paint_changed
-            || update.scroll_changed
-            || update.text_input_changed
-            || update.composite_changed;
-        self.queue(update.events);
-        if changed {
-            self.refresh(began)?;
-        }
+        self.present(animation, false, now)?;
         Ok(())
     }
 

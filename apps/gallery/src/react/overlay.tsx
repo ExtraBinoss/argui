@@ -1,6 +1,6 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement } from 'react'
-import { overlayFilters } from './overlay-filters'
+import { overlayFilters } from '../overlay-filters'
 import { Popover as ReactPopover, type Palette } from '@argui/widgets/react'
 
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true

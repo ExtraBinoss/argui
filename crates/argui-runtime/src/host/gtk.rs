@@ -65,11 +65,17 @@ impl WindowHost for GtkHost {
             f64::from(height) / f64::from(scale),
         )
     }
-    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String> {
+    fn outer_position(&self) -> Option<(f64, f64)> {
+        None
+    }
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String> {
         self.platform
             .native()
             .set_inner_size(tao::dpi::LogicalSize::new(width, height));
-        Ok(())
+        Ok(None)
+    }
+    fn set_outer_position(&self, _x: f64, _y: f64) -> Result<(), String> {
+        Err("absolute window positioning is unsupported on this backend".into())
     }
     fn is_minimized(&self) -> Option<bool> {
         Some(self.platform.native().is_minimized())

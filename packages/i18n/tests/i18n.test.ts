@@ -88,17 +88,17 @@ test('notifies and releases subscribers when the native locale changes', () => {
 test('the gallery bundles two JSON catalogs and demonstrates both reactive adapters', () => {
   const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
   const pages = source('../../../apps/gallery/src/gallery-pages.ts')
-  const solidMain = source('../../../apps/gallery/src/main.tsx')
-  const reactMain = source('../../../apps/gallery/src/react-main.tsx')
-  const solidDemo = source('../../../apps/gallery/src/i18n-page.tsx')
-  const reactDemo = source('../../../apps/gallery/src/react-i18n-page.tsx')
+  const solidMain = source('../../../apps/gallery/src/solid/main.tsx')
+  const reactMain = source('../../../apps/gallery/src/react/main.tsx')
+  const solidDemo = source('../../../apps/gallery/src/solid/i18n-page.tsx')
+  const reactDemo = source('../../../apps/gallery/src/react/i18n-page.tsx')
   const english = source('../../../apps/gallery/src/i18n/en-US.json')
   const french = source('../../../apps/gallery/src/i18n/fr.json')
 
   expect(pages).toContain('Internationalization')
   for (const entry of [solidMain, reactMain]) {
-    expect(entry).toContain("import enUS from './i18n/en-US.json'")
-    expect(entry).toContain("import fr from './i18n/fr.json'")
+    expect(entry).toContain("import enUS from '../i18n/en-US.json'")
+    expect(entry).toContain("import fr from '../i18n/fr.json'")
     expect(entry).toContain('loadI18n(')
   }
   for (const demo of [solidDemo, reactDemo]) {

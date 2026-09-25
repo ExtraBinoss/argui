@@ -37,6 +37,26 @@ export interface Viewport {
   scale?: number
 }
 
+/** Stable application window key and its windowless test viewport. */
+export class TestWindow {
+  constructor(readonly id: string) {}
+
+  /** Reads the current logical viewport for this window. */
+  async info(): Promise<Viewport> {
+    return await request('window.info', this.id) as Viewport
+  }
+
+  /** Resizes the test window's logical viewport and recomputes its scene. */
+  async resize(viewport: Viewport): Promise<void> {
+    await request('window.resize', this.id, viewport)
+  }
+
+  /** Requests an OS window position; the windowless test host reports unsupported. */
+  async move(x: number, y: number): Promise<void> {
+    await request('window.move', this.id, { x, y })
+  }
+}
+
 export interface ClickOptions {
   button?: 'left' | 'right'
 }
@@ -78,22 +98,34 @@ export class Locator {
 }
 
 export interface TestUi {
+  /** Addresses the stable window key; windowless tests mount `main`. */
+  window(id: string): TestWindow
   getById(id: string): Locator
   at(x: number, y: number): Locator
   keyboard: { press(key: string): Promise<void> }
   expectText(text: string): Promise<void>
   /** Waits while Argui timers, animations, and native commits keep advancing. */
   wait(ms: number): Promise<void>
+  /** Sleeps for wall time while application timers and animations stay frozen. */
+  sleep(ms: number): Promise<void>
+  /** Freezes application timers and animations at the current frame. */
+  pause(): Promise<void>
+  /** Continues application time from the frozen frame. */
+  resume(): Promise<void>
   screenshot(name: string): Promise<void>
   expectPerformance(budget: PerformanceBudget): Promise<void>
 }
 
 const ui: TestUi = {
+  window: id => new TestWindow(id),
   getById: id => new Locator(id),
   at: (x, y) => new Locator(`${x},${y}`),
   keyboard: { press: async key => { await request('key', '', { key }) } },
   expectText: async text => { await request('expectText', '', { text }) },
   wait: async ms => { await request('wait', '', { ms }) },
+  sleep: async ms => { await request('sleep', '', { ms }) },
+  pause: async () => { await request('pause') },
+  resume: async () => { await request('resume') },
   screenshot: async name => { await request('screenshot', '', { name }) },
   expectPerformance: async budget => { await request('performance', '', budget) },
 }

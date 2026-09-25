@@ -2,18 +2,18 @@
 import { memo, useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { VirtualList as ReactVirtualList } from '@argui/react'
 import { Button as ReactButton, InputField as ReactInputField, Select as ReactSelect, palette, type Accent, type Palette, type ThemeMode } from '@argui/widgets/react'
-import { ReactAnimationLab } from './react-animation-lab'
-import { ReactOverlayPage, ReactPopoverPage } from './react-overlay'
-import { ReactDamageControl } from './react-damage-control'
-import { ReactAccessibilityPage } from './react-accessibility-page'
-import { ReactInputsPage } from './react-inputs'
-import { ReactWgslLab } from './react-wgsl-lab'
-import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
-import { mediaAssets } from './assets.generated'
-import { ReactI18nPage } from './react-i18n-page'
-import { ReactServicesPage } from './react-services-page'
-import { ReactThemingPage } from './react-theming-page'
-import { ReactDialogPage } from './react-dialog-page'
+import { ReactAnimationLab } from './animation-lab'
+import { ReactOverlayPage, ReactPopoverPage } from './overlay'
+import { ReactDamageControl } from './damage-control'
+import { ReactAccessibilityPage } from './accessibility-page'
+import { ReactInputsPage } from './inputs'
+import { ReactWgslLab } from './wgsl-lab'
+import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from '../gallery-pages'
+import { mediaAssets } from '../assets.generated'
+import { ReactI18nPage } from './i18n-page'
+import { ReactServicesPage } from './services-page'
+import { ReactThemingPage } from './theming-page'
+import { ReactDialogPage } from './dialog-page'
 import type { ApplicationServices } from '@argui/host'
 
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
@@ -23,6 +23,7 @@ const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === tru
 /** Renders the same native gallery shell and pages through the React adapter. */
 export function ReactGallery(props: { services: ApplicationServices }): ReactElement {
   const [page, setPage] = useState<Page>('Button')
+  const [visited, setVisited] = useState<ReadonlySet<Page>>(() => new Set<Page>(['Button']))
   const [mode, setMode] = useState<ThemeMode>('light')
   const [accent, setAccent] = useState<Accent>('blue')
   const [menuOpen, setMenuOpen] = useState(true)
@@ -31,12 +32,16 @@ export function ReactGallery(props: { services: ApplicationServices }): ReactEle
   const [lastUsed, setLastUsed] = useState('None')
   const [starActive, setStarActive] = useState(false)
   const [choice, setChoice] = useState<string>(choices[0])
+  const selectPage = useCallback((item: Page) => {
+    setVisited((previous) => new Set(previous).add(item))
+    setPage(item)
+  }, [])
   useEffect(() => props.services.onEvent((event) => {
     if ((event.type === 'menu' && event.id === 'open-services')
       || (event.type === 'shortcut' && event.id === 'wake' && event.state === 'pressed')) {
-      setPage('Services')
+      selectPage('Services')
     }
-  }), [props.services])
+  }), [props.services, selectPage])
   const theme = useMemo(() => palette(mode, accent), [mode, accent])
   const navigationItems = useMemo(() => filteredNavigation(search), [search])
   const activate = useCallback((label: string) => {
@@ -74,17 +79,17 @@ export function ReactGallery(props: { services: ApplicationServices }): ReactEle
               justify_content="center"><text text={item.label} color={theme.muted} font_size={11} /></column>
             return <ReactButton id={navigationKey(item)} label={item.page} theme={theme}
               kind="ghost" selected={page === item.page}
-              current={page === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
+              current={page === item.page ? 'page' : undefined} onClick={() => selectPage(item.page)} />
           }} />
         {navigationItems.length === 0 ? <text text="No pages found" color={theme.muted} font_size={12} /> : null}
       </column>
     </focusScope>
   ) : null
-  // Preserve page subtrees across tab changes; invisible native branches do not animate.
+  // Preserve visited page state without mounting every unseen destination.
   const panes = pages.map((item) => (
     <column key={`scroll-${item}`} nativeKey={`scroll-${item}`} visible={page === item}
       width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
-      <ReactPageContent item={item} theme={theme}
+      {visited.has(item) ? <ReactPageContent item={item} theme={theme}
         services={props.services}
         selected={page === item}
         clicks={item === 'Button' ? clicks : undefined}
@@ -93,7 +98,7 @@ export function ReactGallery(props: { services: ApplicationServices }): ReactEle
         activate={activate}
         choice={item === 'Select' ? choice : undefined}
         onChoiceChange={setChoice}
-        active={item === 'Damage Control' || item === 'WGSL Lab' ? page === item : undefined} />
+        active={item === 'Damage Control' || item === 'WGSL Lab' ? page === item : undefined} /> : null}
     </column>
   ))
 

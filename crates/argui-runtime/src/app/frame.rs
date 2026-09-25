@@ -6,6 +6,16 @@ use argui_ui::{FocusRequest, InteractionUpdate, TextSelectionRequest, TreeUpdate
 use crate::{RuntimeEvent, ScrollRequest, app::Application};
 
 impl Application {
+    /// Queues an immediately applied native size for the next frame.
+    /// `width` and `height` are the current drawable dimensions in pixels.
+    /// The pending slot keeps only the latest size before redraw.
+    pub(crate) fn queue_window_resize(&mut self, width: u32, height: u32) {
+        self.pending_window_frame.resize(width, height);
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
     pub(crate) fn redraw(&mut self, event_loop: &dyn crate::host::LoopControl) {
         self.sync_host_visibility();
         if !self.presentation_visible {

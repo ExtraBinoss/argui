@@ -318,16 +318,17 @@ fn build_native(cwd: &Path, release: bool, automation: bool) -> Result<(), Strin
     }
     let root = find_root(cwd)?;
     ensure_js_dependencies(cwd)?;
+    if !root.join("apps/gallery/dist/gallery-core.mjs").is_file() {
+        command("bun", &["run", "build:gallery"], &root)?;
+    }
     status(
         Command::new("bun")
             .arg(root.join("node_modules/vite/bin/vite.js"))
             .args(["build", "--config", "vite.config.ts"])
+            .env("ARGUI_CLI_BUILD", "1")
             .current_dir(cwd),
         "vite build",
     )?;
-    if !root.join("apps/gallery/dist/gallery-core.mjs").is_file() {
-        command("bun", &["run", "build:gallery"], &root)?;
-    }
     let manifest = root.join("apps/gallery/quickjs-host/Cargo.toml");
     let mut cargo = Command::new("cargo");
     cargo

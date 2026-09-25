@@ -7,7 +7,7 @@ pub(crate) mod gtk;
 use argui_core::Insets;
 #[cfg(target_os = "ios")]
 use argui_core::{Point, Rect, Size};
-use argui_platform::WindowCapabilities;
+use argui_platform::{WindowBackend, WindowCapabilities};
 use winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
     window::{CursorIcon, Window},
@@ -38,8 +38,20 @@ pub(crate) trait WindowHost {
     fn set_decorations(&self, decorations: bool);
     /// Returns the drawable client size in logical pixels.
     fn logical_size(&self) -> (f64, f64);
-    /// Requests a client size; compositors may apply the change later.
-    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String>;
+    /// Returns the outer top-left position in logical screen pixels when known.
+    fn outer_position(&self) -> Option<(f64, f64)>;
+    /// Requests client `width` and `height` in logical pixels.
+    /// Returns the physical size when it is applied immediately, or `None`
+    /// when the compositor will report the result in a later resize event.
+    ///
+    /// # Errors
+    /// Returns an error when the backend rejects the request.
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String>;
+    /// Requests outer top-left coordinates `x` and `y` in logical screen pixels.
+    ///
+    /// # Errors
+    /// Returns an error when the backend cannot set absolute position.
+    fn set_outer_position(&self, x: f64, y: f64) -> Result<(), String>;
     fn set_minimized(&self, minimized: bool);
     fn is_minimized(&self) -> Option<bool>;
     fn set_window_level(&self, level: winit::window::WindowLevel);
@@ -109,10 +121,28 @@ impl WindowHost for Arc<Window> {
             .to_logical(self.as_ref().scale_factor());
         (size.width, size.height)
     }
-    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String> {
-        let _ = self
+    fn outer_position(&self) -> Option<(f64, f64)> {
+        let position: LogicalPosition<f64> = self
             .as_ref()
-            .request_inner_size(LogicalSize::new(width, height));
+            .outer_position()
+            .ok()?
+            .to_logical(self.as_ref().scale_factor());
+        Some((position.x, position.y))
+    }
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String> {
+        Ok(self
+            .as_ref()
+            .request_inner_size(LogicalSize::new(width, height))
+            .map(|size| (size.width, size.height)))
+    }
+    fn set_outer_position(&self, x: f64, y: f64) -> Result<(), String> {
+        if !matches!(
+            self.capabilities().backend,
+            WindowBackend::Windows | WindowBackend::MacOs | WindowBackend::X11
+        ) {
+            return Err("absolute window positioning is unsupported on this backend".into());
+        }
+        self.as_ref().set_outer_position(LogicalPosition::new(x, y));
         Ok(())
     }
     fn set_minimized(&self, minimized: bool) {
@@ -230,8 +260,14 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     fn logical_size(&self) -> (f64, f64) {
         self.as_ref().logical_size()
     }
-    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String> {
+    fn outer_position(&self) -> Option<(f64, f64)> {
+        self.as_ref().outer_position()
+    }
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String> {
         self.as_ref().request_inner_size(width, height)
+    }
+    fn set_outer_position(&self, x: f64, y: f64) -> Result<(), String> {
+        self.as_ref().set_outer_position(x, y)
     }
     fn set_minimized(&self, minimized: bool) {
         self.as_ref().set_minimized(minimized);

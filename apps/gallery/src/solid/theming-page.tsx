@@ -2,7 +2,7 @@ import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { Button, InputEditController, type Palette } from '@argui/widgets/solid'
 import { numberVariable, parseThemeVariables, stringVariable, themeJson, themePresets,
-  validateExampleTheme, type ThemeVariables } from './theme-variables'
+  validateExampleTheme, type ThemeVariables } from '../theme-variables'
 
 /** Demonstrates that app-owned variables can drive any type-compatible TSX property. */
 export function ThemingPage(props: { theme: Palette }): JSX.Element {

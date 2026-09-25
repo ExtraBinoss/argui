@@ -83,11 +83,14 @@ impl MultiApplication {
                     .and_then(|entry| entry.runtime.window().map(|window| (entry, window)))
                     .map(|(entry, window)| {
                         let (width, height) = window.logical_size();
+                        let position = window.outer_position();
                         NativeWindowInfo {
                             window: key.clone(),
                             title: entry.spec.window.title.clone(),
                             width,
                             height,
+                            x: position.map(|point| point.0),
+                            y: position.map(|point| point.1),
                             visible: window.is_visible(),
                             decorations: entry.spec.window.decorations,
                             transparent: entry.spec.window.transparent,
@@ -126,11 +129,31 @@ impl MultiApplication {
                             let window = entry.runtime.window().ok_or_else(|| {
                                 format!("window '{}' is unavailable", key.as_str())
                             })?;
-                            window.request_inner_size(width, height)?;
+                            if let Some((width, height)) =
+                                window.request_inner_size(width, height)?
+                            {
+                                entry.runtime.queue_window_resize(width, height);
+                            }
                             entry.spec.window.width = width;
                             entry.spec.window.height = height;
                             Ok(())
                         })
+                };
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::SetWindowPosition(key, x, y, reply) => {
+                let result = if !x.is_finite()
+                    || !y.is_finite()
+                    || !(-1_000_000.0..=1_000_000.0).contains(&x)
+                    || !(-1_000_000.0..=1_000_000.0).contains(&y)
+                {
+                    Err("window coordinates must be finite values from -1000000 to 1000000".into())
+                } else {
+                    self.windows
+                        .get(&key)
+                        .and_then(|entry| entry.runtime.window())
+                        .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                        .and_then(|window| window.set_outer_position(x, y))
                 };
                 let _ = reply.send(result);
             }

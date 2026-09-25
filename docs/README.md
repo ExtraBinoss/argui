@@ -33,6 +33,7 @@ Start with:
 ## Maintainer guides
 
 - [Performance](performance/optimizations.md): contracts and measurements.
+- [Native automation](automation.md): deterministic captures and performance reports.
 - [Linux graphical testing](contributing/linux-testing.md): private displays and
   capture-based checks.
 - [Releases](contributing/releases.md): packaging, crates.io, and GitHub automation.

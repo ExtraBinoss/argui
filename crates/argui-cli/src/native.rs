@@ -82,6 +82,7 @@ fn watch_tsx(root: &Path, app: &Path, stopped: &AtomicBool) {
         let result = Command::new("bun")
             .arg(root.join("node_modules/vite/bin/vite.js"))
             .args(["build", "--config", "vite.config.ts"])
+            .env("ARGUI_CLI_BUILD", "1")
             .current_dir(app)
             .status();
         match result {
