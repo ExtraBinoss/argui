@@ -428,3 +428,80 @@ fn scrolled_caret_stops_keep_their_source_lines() {
         );
     }
 }
+
+#[test]
+fn million_character_input_burst_shapes_a_bounded_source_window() {
+    let mut value = "a".repeat(1_000_000);
+    let mut text = engine();
+    let style = TextStyle {
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    };
+    let viewport = Size::new(400.0, 40.0);
+    let start_content = TextContent::plain(value.as_str());
+    let at_start = text.input_layout_content(
+        &start_content,
+        &style,
+        viewport,
+        pos(0),
+        None,
+        reveal(Point::default()),
+    );
+    assert!(at_start.content_size.width > viewport.width * 1_000.0);
+    for _ in 0..32 {
+        let content = TextContent::plain(value.as_str());
+        let layout = text.input_layout_content(
+            &content,
+            &style,
+            viewport,
+            pos(value.len()),
+            None,
+            reveal(Point::default()),
+        );
+        let window = text
+            .input_window(&content, &style, viewport, layout.scroll_y)
+            .unwrap();
+        assert!(window.byte_range.end - window.byte_range.start < 1_000);
+        assert!(window.x > 0.0);
+        assert!(
+            layout
+                .stops
+                .iter()
+                .any(|stop| stop.position.index == value.len())
+        );
+        assert!(layout.caret.origin.x >= 0.0 && layout.caret.origin.x <= viewport.width);
+        value.push('x');
+    }
+}
+
+#[test]
+fn million_byte_unicode_window_preserves_character_boundaries() {
+    let value = "é".repeat(500_000);
+    let content = TextContent::plain(&value);
+    let style = TextStyle {
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    };
+    let viewport = Size::new(400.0, 40.0);
+    let mut text = engine();
+    let layout = text.input_layout_content(
+        &content,
+        &style,
+        viewport,
+        pos(value.len()),
+        None,
+        reveal(Point::default()),
+    );
+    let window = text
+        .input_window(&content, &style, viewport, layout.scroll_y)
+        .unwrap();
+    assert!(value.is_char_boundary(window.byte_range.start));
+    assert!(value.is_char_boundary(window.byte_range.end));
+    assert!(window.byte_range.end - window.byte_range.start < 1_000);
+    assert!(
+        layout
+            .stops
+            .iter()
+            .any(|stop| stop.position.index == value.len())
+    );
+}

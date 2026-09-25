@@ -8,13 +8,14 @@ import contract from '../../../packages/host/src/contract.generated.json' with {
 
 function capture(mount) {
   const batches = []
+  const inputValues = new Map()
   let deliver = () => {}
   const dispose = mount({
     contract: () => contract,
     commit: (operations) => batches.push([...operations]),
     subscribe: (callback) => { deliver = callback; return () => { deliver = () => {} } },
   }, contract.abiHash)
-  return { batches, dispose, deliver: (event) => deliver(event) }
+  return { batches, inputValues, dispose, deliver: (event) => deliver(event) }
 }
 
 function replay(batches) {
@@ -94,12 +95,19 @@ function edit(capture, key, eventName, text) {
   const target = [...nodes].find(([, node]) => node.properties.get(1)?.value === key)
   assert.ok(target, `native key ${key} must exist`)
   const [identity, node] = target
-  const event = node.type.events.find((entry) => entry.name === eventName)
+  const nativeEvent = eventName === 'input' ? 'edit' : eventName
+  const event = node.type.events.find((entry) => entry.name === nativeEvent)
   assert.ok(event, `${key} must support ${eventName}`)
   const callback = node.listeners.get(event.id)
   assert.ok(callback, `${key} must have a ${eventName} listener`)
   const [slot, generation] = identity.split(':').map(Number)
-  capture.deliver({ node: { slot, generation }, callback, payload: { kind: eventName, text } })
+  const valueProperty = node.type.properties.find((property) => property.name === 'value')
+  const previous = capture.inputValues.get(key) ?? node.properties.get(valueProperty?.id)?.value ?? ''
+  const payload = eventName === 'input'
+    ? { kind: 'edit', start: 0, end: Buffer.byteLength(previous, 'utf8'), text }
+    : { kind: eventName, text }
+  capture.deliver({ node: { slot, generation }, callback, payload })
+  if (eventName === 'input') capture.inputValues.set(key, text)
 }
 
 function nativeIdentity(capture, key) {
@@ -342,7 +350,9 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       const navigation = nodes.find((node) => node.type === 'VirtualWindow'
         && node.properties.key?.value === 'gallery-navigation')
       assert.ok(navigation, 'gallery navigation must use the native virtual list')
-      assert.ok(navigation.children.length <= 12, 'only a bounded navigation range mounts')
+      assert.equal(navigation.children.length, 16, 'all small-list gallery destinations remain mounted')
+      assert.ok(nodes.some((node) => node.properties.key?.value === 'page-animation-lab'))
+      assert.ok(nodes.some((node) => node.properties.key?.value === 'page-damage-control'))
       assert.ok(nodes.some((node) => node.type === 'Text' && node.properties.text?.value === 'EXAMPLES'))
       const overlayPane = nodes.find((node) => node.properties.key?.value === 'scroll-Overlay')
       assert.ok(overlayPane)

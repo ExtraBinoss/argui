@@ -42,6 +42,14 @@ undo history, and accessibility value export. `selectionColor` overrides its
 selection highlight; otherwise the theme accent uses the native selection's
 38% opacity.
 
+To compare native blur algorithms in the gallery, set `ARGUI_GALLERY_BLUR` to
+`gaussian` or `dual` before launching. The default is `auto`:
+
+```sh
+ARGUI_GALLERY_BLUR=gaussian ./scripts/gallery-hot-reload.sh desktop solid
+ARGUI_GALLERY_BLUR=dual ./scripts/gallery-hot-reload.sh desktop solid
+```
+
 ## Native internationalization
 
 The gallery imports its English and French Fluent catalogs from

@@ -199,6 +199,59 @@ fn repeated_host_hide_and_show_do_not_duplicate_view_rebuilds() {
     assert_eq!(model.read(|view| view.renders), 2);
 }
 
+/// A parent close during panic keeps the original failure despite a child cleanup panic.
+#[test]
+fn closing_parent_during_unwind_suppresses_child_cleanup_panic() {
+    struct PanicOnDrop;
+    impl Drop for PanicOnDrop {
+        fn drop(&mut self) {
+            panic!("child handler cleanup");
+        }
+    }
+    struct Child;
+    impl Render for Child {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            let panic_on_drop = PanicOnDrop;
+            Element::text("child").on(cx.listener(EventType::Click, move |_, _, _| {
+                let _ = &panic_on_drop;
+            }))
+        }
+    }
+    struct Parent(Entity<Child>);
+    impl Render for Parent {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            cx.entity(&self.0)
+        }
+    }
+    struct CloseWhenDropped(argui_runtime::AnyEntity);
+    impl Drop for CloseWhenDropped {
+        fn drop(&mut self) {
+            self.0.close_presentation();
+        }
+    }
+
+    let child = Entity::new(Child);
+    let parent = Entity::new(Parent(child.clone()));
+    let mount = parent.mount().unwrap();
+    mount.render(Default::default()).unwrap();
+    let parent_scope = parent.resources().clone();
+    let child_scope = child.resources().clone();
+    let host = mount.erase();
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _close = CloseWhenDropped(host);
+        panic!("original failure");
+    }));
+
+    assert_eq!(
+        result.unwrap_err().downcast_ref::<&str>(),
+        Some(&"original failure")
+    );
+    assert_eq!(parent_scope.resource_count(), 0);
+    assert_eq!(child_scope.resource_count(), 0);
+    assert!(mount.resources().is_closed());
+}
+
 #[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
 #[test]
 fn hiding_keeps_view_tasks_alive_until_unmount() {

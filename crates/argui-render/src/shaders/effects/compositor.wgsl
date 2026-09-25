@@ -116,28 +116,6 @@ fn composite(source: vec4<f32>, backdrop: vec4<f32>, pixel: vec2<f32>) -> vec4<f
     );
 }
 
-fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
-    let source_size = vec2<f32>(textureDimensions(source_texture));
-    let sigma = max(params.data.x, 0.01);
-    let step = axis / source_size;
-    let uv = allocated_uv(pixel, params.source, params.source_uv);
-    let half_texel = vec2<f32>(0.5) / source_size;
-    let min_uv = params.source_uv.xy + half_texel;
-    let max_uv = params.source_uv.xy + params.source_uv.zw - half_texel;
-    let taps = min(u32(ceil(sigma * 3.0)), 12u);
-    var color = textureSampleLevel(source_texture, linear_sampler, clamp(uv, min_uv, max_uv), 0.0);
-    var total_weight = 1.0;
-    for (var tap = 1u; tap <= taps; tap += 1u) {
-        let distance = f32(tap) / sigma;
-        let weight = exp(-0.5 * distance * distance);
-        let offset = step * f32(tap);
-        color += textureSampleLevel(source_texture, linear_sampler, clamp(uv + offset, min_uv, max_uv), 0.0) * weight;
-        color += textureSampleLevel(source_texture, linear_sampler, clamp(uv - offset, min_uv, max_uv), 0.0) * weight;
-        total_weight += 2.0 * weight;
-    }
-    return color / total_weight;
-}
-
 @fragment
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let pixel = global_pixel(input.uv);
@@ -149,8 +127,6 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     var source = original;
     let backdrop = sample_backdrop(pixel);
     if params.mode == 0u { return composite(source, backdrop, source_pixel); }
-    if params.mode == 1u { source = sample_blur(pixel, vec2<f32>(1.0, 0.0)); }
-    if params.mode == 2u { source = sample_blur(pixel, vec2<f32>(0.0, 1.0)); }
     if params.mode == 8u {
         let straight = vec4<f32>(source.rgb / max(source.a, 0.00001), source.a);
         let transformed = vec4<f32>(

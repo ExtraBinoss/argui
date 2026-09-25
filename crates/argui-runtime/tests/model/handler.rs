@@ -177,6 +177,44 @@ fn removed_handler_identity_ignores_stale_event_delivery() {
     assert_eq!(entity.read(|model| model.hits), 0);
 }
 
+/// A parent mount routes a live child-owned event to the retained child model.
+#[test]
+fn parent_dispatches_child_owned_handler_events_to_the_child_mount() {
+    struct Child(usize);
+    impl Render for Child {
+        /// Renders the child's click target and registers its retained handler.
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            Element::text("child").on(cx
+                .callback(|model| model.0 += 1)
+                .direct_listener(EventType::Click))
+        }
+    }
+    struct Parent(Entity<Child>);
+    impl Render for Parent {
+        /// Renders the retained child into the parent's event-routing tree.
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            cx.entity(&self.0)
+        }
+    }
+
+    let child = Entity::new(Child(0));
+    let parent = Entity::new(Parent(child.clone()));
+    let mount = parent.mount().unwrap();
+    let mut tree = UiTree::new(mount.render(Default::default()).unwrap());
+    let event = tree
+        .event_deliveries(
+            tree.node_ids()[0],
+            UiEventKind::Click(ClickEvent::accessibility()),
+        )
+        .into_iter()
+        .find(|event| event.should_dispatch())
+        .unwrap();
+
+    mount.dispatch_event(&event).unwrap();
+
+    assert_eq!(child.read(|model| model.0), 1);
+}
+
 #[derive(Default)]
 struct InputProbe {
     text: String,

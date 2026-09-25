@@ -211,12 +211,10 @@ impl TextInputState {
         self.reveal_cursor = true;
     }
 
-    /// Records a native edit awaiting acknowledgement from controlled properties.
-    ///
-    /// * `value` — full value emitted by the input event.
-    pub(crate) fn note_emitted_value(&mut self, value: &str) {
+    /// Records the current native value awaiting acknowledgement from controlled properties.
+    pub(crate) fn note_current_value(&mut self) {
         const MAX_PENDING_VALUES: usize = 128;
-        self.pending_values.push_back(value_stamp(value));
+        self.pending_values.push_back(value_stamp(&self.value));
         if self.pending_values.len() > MAX_PENDING_VALUES {
             self.pending_values.pop_front();
         }

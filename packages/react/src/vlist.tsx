@@ -15,7 +15,9 @@ export function VirtualList(props: VirtualListProps): ReactElement {
   const [window, setWindow] = useState<NativeWindowRange>({
     start: 0, end: Math.min(props.count, 12), offset: 0, viewportExtent: 0,
   })
-  const current = boundedWindow(window, props.count)
+  const current = props.count <= 32
+    ? { ...boundedWindow(window, props.count), start: 0, end: props.count }
+    : boundedWindow(window, props.count)
   const axis = props.axis ?? 'vertical'
   const rows = Array.from({ length: current.end - current.start }, (_, position) => {
     const index = current.start + position

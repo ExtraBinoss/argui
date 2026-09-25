@@ -101,3 +101,38 @@ fn requested_layout_or_asset_refresh_cannot_reuse_compositor_scene() {
         false
     ));
 }
+
+/// Layout and asset changes require a fresh scene even when the frame is composite-only.
+#[test]
+fn compositor_frame_retention_requires_all_reuse_conditions() {
+    for update in [
+        TreeUpdate::None,
+        TreeUpdate::Semantics,
+        TreeUpdate::Composite,
+        TreeUpdate::Paint,
+        TreeUpdate::Scroll,
+    ] {
+        assert!(implementation::retain_compositor_frame(
+            true, update, false, false
+        ));
+        assert!(!implementation::retain_compositor_frame(
+            false, update, false, false
+        ));
+        assert!(!implementation::retain_compositor_frame(
+            true, update, true, false
+        ));
+        assert!(!implementation::retain_compositor_frame(
+            true, update, false, true
+        ));
+    }
+    for pending_layout in [false, true] {
+        for assets_changed in [false, true] {
+            assert!(!implementation::retain_compositor_frame(
+                true,
+                TreeUpdate::Layout,
+                pending_layout,
+                assets_changed,
+            ));
+        }
+    }
+}

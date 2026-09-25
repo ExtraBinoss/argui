@@ -51,6 +51,7 @@ pub(crate) struct InputPlacement {
 
 pub(crate) struct InputPaint {
     content: argui_text::TextContent,
+    x: f32,
     y: f32,
     height: f32,
 }
@@ -244,6 +245,7 @@ pub(crate) fn prepare(
         });
     let paint = window.as_ref().map(|window| InputPaint {
         content: content.slice(window.byte_range.clone()),
+        x: window.x,
         y: window.y,
         height: window.height,
     });
@@ -389,6 +391,7 @@ pub(crate) fn position_input_block(
     block.bounds.origin.x = text_bounds.origin.x - scroll.x;
     if let Some(paint) = paint {
         block.content = paint.content;
+        block.bounds.origin.x += paint.x;
         block.bounds.origin.y = text_bounds.origin.y + paint.y - scroll.y;
         block.bounds.size.height = paint.height;
     } else {

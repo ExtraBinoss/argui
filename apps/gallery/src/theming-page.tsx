@@ -1,6 +1,6 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Button, inputText, type Palette } from '@argui/widgets/solid'
+import { Button, InputEditController, type Palette } from '@argui/widgets/solid'
 import { numberVariable, parseThemeVariables, stringVariable, themeJson, themePresets,
   validateExampleTheme, type ThemeVariables } from './theme-variables'
 
@@ -8,6 +8,7 @@ import { numberVariable, parseThemeVariables, stringVariable, themeJson, themePr
 export function ThemingPage(props: { theme: Palette }): JSX.Element {
   const [variables, setVariables] = createSignal<ThemeVariables>({ ...themePresets.Aurora })
   const [draft, setDraft] = createSignal(themeJson(themePresets.Aurora))
+  const edits = new InputEditController(draft())
   const [status, setStatus] = createSignal('Edit the JSON or choose a preset.')
   const useVariables = (next: ThemeVariables, message: string) => {
     setVariables(next)
@@ -71,7 +72,7 @@ export function ThemingPage(props: { theme: Palette }): JSX.Element {
     <textInput key="theme-json" width="fill" height={190} multiline={true} value={draft()}
       label="Theme JSON" background={props.theme.surface} text_color={props.theme.foreground}
       caret_color={props.theme.accent} selection_color={props.theme.accent}
-      onInput={(payload) => { const value = inputText(payload); if (value !== undefined) setDraft(value) }} />
+      onEdit={(payload) => { edits.apply(payload, draft(), setDraft) }} />
     <row wrap={true} gap={8}>
       <Button id="theme-load-json" label="Apply JSON" theme={props.theme} onClick={loadJson} />
       <Button id="theme-export-json" label="Show current JSON" theme={props.theme}

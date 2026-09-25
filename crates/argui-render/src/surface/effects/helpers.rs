@@ -63,23 +63,13 @@ pub(super) fn clear_view(
     }));
 }
 
-/// Returns a blur downsample divisor selected from `radius` and quality `bias`.
-pub(super) fn blur_downsample(radius: f32, bias: u32) -> u32 {
-    let base = if radius >= 12.0 {
-        4
-    } else if radius >= 6.0 {
-        2
-    } else {
-        1
-    };
-    base * bias.max(1)
-}
-
 /// Returns the profiler label for built-in effect `mode`.
 pub(super) const fn built_in_label(mode: u32) -> &'static str {
     match mode {
         1 => "effect.blur-horizontal",
         2 => "effect.blur-vertical",
+        3 => "effect.blur-dual-downsample",
+        4 => "effect.blur-dual-upsample",
         8 => "effect.color-matrix",
         9 => "effect.refraction",
         10 => "composite.drop-shadow",

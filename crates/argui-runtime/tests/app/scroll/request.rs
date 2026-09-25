@@ -157,3 +157,19 @@ fn retained_identity_selects_one_of_two_same_key_scroll_views() {
         .is_empty()
     );
 }
+
+/// Checks every axis alignment and both out-of-viewport `Nearest` cases.
+#[test]
+fn axis_alignment_covers_explicit_modes_and_nearest_edges() {
+    use argui_ui::ScrollAlignment;
+
+    let aligned = |start, end, alignment| {
+        implementation::align_axis(10.0, 100.0, 200.0, start, end, alignment)
+    };
+    assert_eq!(aligned(130.0, 150.0, ScrollAlignment::Start), 40.0);
+    assert_eq!(aligned(130.0, 150.0, ScrollAlignment::Center), 0.0);
+    assert_eq!(aligned(130.0, 150.0, ScrollAlignment::End), -40.0);
+    assert_eq!(aligned(130.0, 150.0, ScrollAlignment::Nearest), 10.0);
+    assert_eq!(aligned(80.0, 90.0, ScrollAlignment::Nearest), -10.0);
+    assert_eq!(aligned(220.0, 230.0, ScrollAlignment::Nearest), 40.0);
+}

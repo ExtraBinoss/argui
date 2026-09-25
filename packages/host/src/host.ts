@@ -10,6 +10,22 @@ import type {
   Operation,
   WireValue,
 } from './protocol'
+import { applyInputEdit, inputEdit } from './text-edit'
+
+interface TextValueStamp { length: number; first: number; second: number }
+interface TextValueHistory { entries: { value?: string; stamp?: TextValueStamp }[]; bytes: number }
+
+/** Keeps a bounded fingerprint for delayed controlled-value acknowledgements. */
+function textValueStamp(value: string): TextValueStamp {
+  let first = 2166136261
+  let second = 0x9e3779b9
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index)
+    first = Math.imul(first ^ code, 16777619)
+    second = Math.imul(second ^ code, 2246822519)
+  }
+  return { length: value.length, first, second }
+}
 
 /** A presentation node used only for framework navigation and pending mutations. */
 export interface NativeNode {
@@ -27,7 +43,9 @@ export class NativeHost {
   private readonly types = new Map<string, NativeType>()
   private readonly properties = new Map<string, NativeProperty>()
   private readonly events = new Map<string, NativeEvent>()
-  private readonly callbacks = new Map<number, (payload: unknown) => void>()
+  private readonly callbacks = new Map<number, { node: NativeNode, event: string, handler: (payload: unknown) => void }>()
+  private readonly textAscii = new WeakMap<NativeNode, boolean>()
+  private readonly textHistory = new WeakMap<NativeNode, TextValueHistory>()
   private readonly pending: Operation[] = []
   private readonly unsubscribe: () => void
   private nextSlot = 1
@@ -55,6 +73,7 @@ export class NativeHost {
       values: new Map(), listeners: new Map(),
     }
     this.enqueue({ kind: 'create', id: node.id, nativeType: type.id })
+    if (type.name === 'TextInput') this.textAscii.set(node, true)
     return node
   }
 
@@ -89,8 +108,30 @@ export class NativeHost {
     if (!property) throw new Error(`${node.type.name} has no property ${name}`)
     if (property.readOnly) throw new Error(`${node.type.name}.${name} is read-only`)
     const wire = value == null ? null : encodeValue(property, value)
+    if (node.type.name === 'TextInput' && property.name === 'value') {
+      const history = this.textHistory.get(node)
+      if (history && wire?.type === 'String' && typeof wire.value === 'string') {
+        const nextValue = wire.value
+        let stamp: TextValueStamp | undefined
+        const acknowledged = history.entries.findIndex((entry) => entry.value !== undefined
+          ? entry.value === nextValue
+          : entry.stamp!.length === nextValue.length
+            && entry.stamp!.first === (stamp ??= textValueStamp(nextValue)).first
+            && entry.stamp!.second === stamp.second)
+        if (acknowledged >= 0) {
+          for (const entry of history.entries.splice(0, acknowledged + 1)) {
+            if (entry.value !== undefined) history.bytes -= entry.value.length * 2
+          }
+          return
+        }
+      }
+      this.textHistory.delete(node)
+    }
     if (wire && equalValue(node.values.get(property.id), wire)) return
     if (!wire && !node.values.has(property.id)) return
+    if (node.type.name === 'TextInput' && property.name === 'value') {
+      this.textAscii.set(node, !wire || typeof wire.value === 'string' && /^[\x00-\x7f]*$/.test(wire.value))
+    }
     if (wire) node.values.set(property.id, wire)
     else node.values.delete(property.id)
     this.enqueue({ kind: 'setProperty', id: node.id, property: property.id, value: wire })
@@ -187,11 +228,11 @@ export class NativeHost {
       return
     }
     if (old !== undefined) {
-      this.callbacks.set(old, value as (payload: unknown) => void)
+      this.callbacks.set(old, { node, event: name, handler: value as (payload: unknown) => void })
       return
     }
     const callback = this.nextCallback++
-    this.callbacks.set(callback, value as (payload: unknown) => void)
+    this.callbacks.set(callback, { node, event: name, handler: value as (payload: unknown) => void })
     node.listeners.set(event.id, callback)
     this.enqueue({ kind: 'setListener', id: node.id, event: event.id, callback })
   }
@@ -208,7 +249,44 @@ export class NativeHost {
   }
 
   private deliver(event: NativeDelivery): void {
-    this.callbacks.get(event.callback)?.(event.payload)
+    const listener = this.callbacks.get(event.callback)
+    if (!listener || listener.node.id.slot !== event.node.slot
+      || listener.node.id.generation !== event.node.generation) return
+    if (listener.event === 'edit') this.mirrorTextEdit(listener.node, event.payload)
+    listener.handler(event.payload)
+  }
+
+  /** Mirrors a native edit into the property cache so an unchanged controlled value needs no echo. */
+  private mirrorTextEdit(node: NativeNode, payload: unknown): void {
+    if (node.type.name !== 'TextInput') return
+    const edit = inputEdit(payload)
+    if (!edit) return
+    const property = node.type.properties.find((entry) => entry.name === 'value')
+    if (!property) return
+    const wire = node.values.get(property.id)
+    const current = wire?.type === 'String' && typeof wire.value === 'string' ? wire.value : ''
+    const next = applyInputEdit(current, edit, this.textAscii.get(node))
+    if (next === undefined) return
+    let history = this.textHistory.get(node)
+    if (!history || history.entries.length === 0) {
+      history = { entries: [{ value: current }], bytes: current.length * 2 }
+      this.textHistory.set(node, history)
+    }
+    history.entries.push({ value: next })
+    history.bytes += next.length * 2
+    while (history.bytes > 8 * 1024 * 1024 && history.entries.length > 1) {
+      const old = history.entries.find((entry) => entry.value !== undefined)
+      if (!old) break
+      old.stamp = textValueStamp(old.value!)
+      history.bytes -= old.value!.length * 2
+      delete old.value
+    }
+    if (history.entries.length > 128) {
+      const dropped = history.entries.shift()!
+      if (dropped.value !== undefined) history.bytes -= dropped.value.length * 2
+    }
+    node.values.set(property.id, { type: 'String', value: next })
+    this.textAscii.set(node, this.textAscii.get(node) === true && /^[\x00-\x7f]*$/.test(edit.text))
   }
 
   private forgetCallbacks(node: NativeNode): void {

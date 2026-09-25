@@ -1,5 +1,6 @@
 /** @jsxImportSource @argui/react */
-import { useState, type ReactElement } from 'react'
+import { useRef, useState, type ReactElement } from 'react'
+import { InputEditController } from '../shared/input-edit'
 import { inputText } from '../shared/input-text'
 import { selectionTint } from '../shared/theme'
 import type { InputFieldProps } from '../shared/types'
@@ -8,6 +9,8 @@ import { ReactButton } from './button'
 
 /** Renders the same themed native input through the React adapter. */
 export function ReactInputField(props: InputFieldProps): ReactElement {
+  const edits = useRef<InputEditController | null>(null)
+  edits.current ??= new InputEditController(props.value)
   const [focused, setFocused] = useState(false)
   const [revealed, setRevealed] = useState(false)
   const icons = useWidgetIcons()
@@ -27,10 +30,8 @@ export function ReactInputField(props: InputFieldProps): ReactElement {
             text_color={props.disabled ? props.theme.muted : props.theme.foreground}
             placeholder_color={props.theme.muted} caret_color={props.theme.accent}
             selection_color={props.selectionColor ?? selectionTint(props.theme.accent)}
-            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onInput={(payload) => {
-              const value = inputText(payload)
-              if (value !== undefined) props.onChange(value)
-            }} onSubmit={(payload) => {
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            onEdit={(payload) => { edits.current!.apply(payload, props.value, props.onChange) }} onSubmit={(payload) => {
               const value = inputText(payload)
               props.onSubmit?.(value ?? props.value)
             }} />
