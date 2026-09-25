@@ -31,7 +31,7 @@ use argui_host::Host;
 #[cfg(target_os = "android")]
 use argui_platform::WindowConfig;
 use argui_platform::WindowKey;
-use argui_render::{EffectRegistry, RendererConfig};
+use argui_render::{BlurAlgorithm, EffectRegistry, RendererConfig};
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 use argui_runtime::{NativeHostApplicationChannels, run_native_host_application};
 use argui_runtime::{
@@ -43,6 +43,18 @@ use serde_json::Value;
 
 #[cfg(target_os = "android")]
 const NOTO_SANS: &[u8] = include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf");
+
+/// Returns the gallery blur mode selected by `ARGUI_GALLERY_BLUR`.
+///
+/// The default and unrecognized values select automatic mode. This setting
+/// lets native gallery runs compare fixed Gaussian and dual-filter rendering.
+fn gallery_blur_algorithm() -> BlurAlgorithm {
+    match std::env::var("ARGUI_GALLERY_BLUR").as_deref() {
+        Ok("gaussian") => BlurAlgorithm::Gaussian,
+        Ok("dual") => BlurAlgorithm::DualKawase,
+        _ => BlurAlgorithm::Auto,
+    }
+}
 
 /// Runs the embedded Solid gallery in a desktop native window.
 ///
@@ -76,7 +88,9 @@ pub fn run_desktop_with_services(
         register_application_services(&services, application_sender, config.tray.clone());
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
     let observed = Arc::clone(&profiles);
-    let bundle_path = std::env::var_os("ARGUI_APP_BUNDLE").map(PathBuf::from).or_else(dev_bundle_path);
+    let bundle_path = std::env::var_os("ARGUI_APP_BUNDLE")
+        .map(PathBuf::from)
+        .or_else(dev_bundle_path);
     let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
@@ -94,6 +108,7 @@ pub fn run_desktop_with_services(
                 config,
                 RendererConfig::default()
                     .profiling(true)
+                    .blur_algorithm(gallery_blur_algorithm())
                     .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 host,
@@ -165,6 +180,7 @@ pub fn run_android(
                 },
                 RendererConfig::default()
                     .profiling(true)
+                    .blur_algorithm(gallery_blur_algorithm())
                     .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 text_engine,

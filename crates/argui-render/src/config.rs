@@ -84,6 +84,36 @@ pub enum EffectQuality {
     Custom(EffectQualitySettings),
 }
 
+/// Selects the filter used for CSS-style blur and blurred shadows.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlurAlgorithm {
+    /// Selects dual filtering for medium radii, Gaussian otherwise.
+    #[default]
+    Auto,
+    /// Uses two separable Gaussian render passes, with bilinear-paired taps.
+    Gaussian,
+    /// Uses the SIGGRAPH 2015 downsample and upsample filter pyramid.
+    DualKawase,
+}
+
+impl BlurAlgorithm {
+    /// Resolves automatic selection for physical `radius` and input `extent`.
+    ///
+    /// Returns the selected fixed algorithm. The current crossover favors the
+    /// dual filter for medium radii, where it avoids Gaussian's full-resolution
+    /// samples or extra downsample copy. Explicit selections are preserved.
+    #[must_use]
+    pub fn resolve(self, radius: f32, extent: [u32; 2]) -> Self {
+        match self {
+            Self::Auto if (3.0..7.0).contains(&radius) && extent[0].min(extent[1]) >= 16 => {
+                Self::DualKawase
+            }
+            Self::Auto => Self::Gaussian,
+            fixed => fixed,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EffectQualitySettings {
     pub blur_downsample_bias: u32,
@@ -132,6 +162,8 @@ pub struct RendererConfig {
     /// Immutable factories and device requirements available to GPU canvases.
     pub gpu_canvases: GpuCanvasRegistry,
     pub effect_quality: EffectQuality,
+    /// Blur algorithm used for backdrop, foreground, and shadow filters.
+    pub blur_algorithm: BlurAlgorithm,
     /// Adaptive retained-surface damage rendering configuration.
     pub damage_tracking: DamageTracking,
 }
@@ -153,6 +185,7 @@ impl Default for RendererConfig {
             effects: EffectRegistry::default(),
             gpu_canvases: GpuCanvasRegistry::default(),
             effect_quality: EffectQuality::Normal,
+            blur_algorithm: BlurAlgorithm::Auto,
             damage_tracking: DamageTracking::default(),
         }
     }
@@ -260,6 +293,17 @@ impl RendererConfig {
     #[must_use]
     pub fn effect_quality(mut self, quality: EffectQuality) -> Self {
         self.effect_quality = quality;
+        self
+    }
+
+    /// Selects the blur algorithm for all filtered layers and shadows.
+    ///
+    /// * `algorithm` — automatic selection or a fixed algorithm for comparison.
+    ///
+    /// Returns the updated renderer configuration.
+    #[must_use]
+    pub fn blur_algorithm(mut self, algorithm: BlurAlgorithm) -> Self {
+        self.blur_algorithm = algorithm;
         self
     }
 

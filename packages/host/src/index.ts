@@ -1,5 +1,6 @@
 export * from './protocol'
 export * from './host'
+export * from './text-edit'
 export * from './virtual-list'
 export * from './accessibility'
 export * from './services'

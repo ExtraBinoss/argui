@@ -1,5 +1,6 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
+import { InputEditController } from '../shared/input-edit'
 import { inputText } from '../shared/input-text'
 import { selectionTint } from '../shared/theme'
 import type { InputFieldProps } from '../shared/types'
@@ -10,6 +11,7 @@ export { inputText } from '../shared/input-text'
 
 /** Renders a themed native text input with an optional embedded search icon. */
 export function InputField(props: InputFieldProps): JSX.Element {
+  const edits = new InputEditController(props.value)
   const [focused, setFocused] = createSignal(false)
   const [revealed, setRevealed] = createSignal(false)
   const icons = useWidgetIcons()
@@ -29,10 +31,8 @@ export function InputField(props: InputFieldProps): JSX.Element {
             text_color={props.disabled ? props.theme.muted : props.theme.foreground}
             placeholder_color={props.theme.muted} caret_color={props.theme.accent}
             selection_color={props.selectionColor ?? selectionTint(props.theme.accent)}
-            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onInput={(payload) => {
-              const value = inputText(payload)
-              if (value !== undefined) props.onChange(value)
-            }} onSubmit={(payload) => {
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            onEdit={(payload) => { edits.apply(payload, props.value, props.onChange) }} onSubmit={(payload) => {
               const value = inputText(payload)
               props.onSubmit?.(value ?? props.value)
             }} />

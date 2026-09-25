@@ -22,7 +22,8 @@ mod upload;
 mod vector;
 
 pub use config::{
-    DamageTracking, EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode,
+    BlurAlgorithm, DamageTracking, EffectQuality, EffectQualitySettings, RendererConfig,
+    SurfaceAlphaMode,
 };
 pub use damage::{DamageMode, DamagePlan, DamageProfile, DamageRegion, DamageSnapshot};
 pub use effect_graph::{EffectGraphAnalysis, EffectGraphStats, analyze_display_list};

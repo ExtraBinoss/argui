@@ -1,6 +1,6 @@
 /** @jsxImportSource @argui/react */
-import { useState, type ReactElement } from 'react'
-import { Button, inputText, type Palette } from '@argui/widgets/react'
+import { useRef, useState, type ReactElement } from 'react'
+import { Button, InputEditController, type Palette } from '@argui/widgets/react'
 import { numberVariable, parseThemeVariables, stringVariable, themeJson, themePresets,
   validateExampleTheme, type ThemeVariables } from './theme-variables'
 
@@ -8,6 +8,8 @@ import { numberVariable, parseThemeVariables, stringVariable, themeJson, themePr
 export function ReactThemingPage(props: { theme: Palette }): ReactElement {
   const [variables, setVariables] = useState<ThemeVariables>({ ...themePresets.Aurora })
   const [draft, setDraft] = useState(themeJson(themePresets.Aurora))
+  const edits = useRef<InputEditController | null>(null)
+  edits.current ??= new InputEditController(draft)
   const [status, setStatus] = useState('Edit the JSON or choose a preset.')
   const useVariables = (next: ThemeVariables, message: string) => {
     setVariables(next)
@@ -70,7 +72,7 @@ export function ReactThemingPage(props: { theme: Palette }): ReactElement {
     <textInput nativeKey="theme-json" width="fill" height={190} multiline={true} value={draft}
       label="Theme JSON" background={props.theme.surface} text_color={props.theme.foreground}
       caret_color={props.theme.accent} selection_color={props.theme.accent}
-      onInput={(payload) => { const value = inputText(payload); if (value !== undefined) setDraft(value) }} />
+      onEdit={(payload) => { edits.current!.apply(payload, draft, setDraft) }} />
     <row wrap={true} gap={8}>
       <Button id="theme-load-json" label="Apply JSON" theme={props.theme} onClick={loadJson} />
       <Button id="theme-export-json" label="Show current JSON" theme={props.theme}

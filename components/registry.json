@@ -20,6 +20,7 @@
         "solid/input-field.tsx",
         "solid/button.tsx",
         "solid/assets.tsx",
+        "shared/input-edit.ts",
         "shared/input-text.ts",
         "shared/types.ts",
         "shared/theme.ts"
@@ -28,6 +29,7 @@
         "react/input-field.tsx",
         "react/button.tsx",
         "react/assets.tsx",
+        "shared/input-edit.ts",
         "shared/input-text.ts",
         "shared/types.ts",
         "shared/theme.ts"

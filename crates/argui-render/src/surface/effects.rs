@@ -15,8 +15,7 @@ use super::SurfaceRenderer;
 mod draw;
 mod helpers;
 use helpers::{
-    blur_downsample, built_in_label, clear_view, clipped_output_region, same_layer_content,
-    skipped_layer,
+    built_in_label, clear_view, clipped_output_region, same_layer_content, skipped_layer,
 };
 
 #[derive(Clone, Debug)]
@@ -32,17 +31,17 @@ pub(super) struct CacheFrameStats {
     pub(super) used: std::collections::HashSet<argui_paint::RenderObjectId>,
 }
 
-struct EffectPass {
-    mode: u32,
-    data: [f32; 4],
+pub(super) struct EffectPass {
+    pub(super) mode: u32,
+    pub(super) data: [f32; 4],
     matrix: Option<[f32; 20]>,
     bounds: Rect,
     shader: Option<(EffectId, u64, usize)>,
     parameters: Vec<u32>,
-    extent: Option<[u32; 2]>,
+    pub(super) extent: Option<[u32; 2]>,
     radii: [f32; 4],
     label: String,
-    object: Option<argui_paint::RenderObjectId>,
+    pub(super) object: Option<argui_paint::RenderObjectId>,
 }
 
 #[derive(Clone, Copy)]
@@ -52,7 +51,11 @@ pub(super) struct EffectSources {
 }
 
 impl EffectPass {
-    fn new(mode: u32, data: [f32; 4], bounds: Rect) -> Self {
+    /// Creates a built-in pass for shader `mode`, scalar `data`, and layer `bounds`.
+    ///
+    /// Returns a pass at the source extent; callers may set an alternate output
+    /// extent or attribution fields before encoding it.
+    pub(super) fn new(mode: u32, data: [f32; 4], bounds: Rect) -> Self {
         Self {
             mode,
             data,
@@ -370,51 +373,12 @@ impl SurfaceRenderer {
         current
     }
 
-    pub(super) fn apply_blur(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        mut current: TextureTarget,
-        radius: f32,
-        viewport: [f32; 2],
-        bounds: Rect,
-        profiler: Option<&GpuFrameCapture>,
-        object: Option<argui_paint::RenderObjectId>,
-    ) -> TextureTarget {
-        if radius <= 0.01 {
-            return current;
-        }
-        let downsample = blur_downsample(
-            radius,
-            self.renderer_config
-                .effect_quality
-                .settings()
-                .blur_downsample_bias,
-        );
-        if downsample > 1 {
-            let mut pass = EffectPass::new(99, [0.0; 4], bounds);
-            pass.extent = Some([
-                (current.region.size[0] / downsample).max(1),
-                (current.region.size[1] / downsample).max(1),
-            ]);
-            pass.object = object;
-            current = self.effect_pass(encoder, current, viewport, pass, profiler);
-        }
-        let sample_radius = radius / downsample as f32 * 0.35;
-        for mode in [1, 2] {
-            let mut pass = EffectPass::new(mode, [sample_radius, 0.0, 0.0, 0.0], bounds);
-            pass.extent = Some(current.extent);
-            pass.object = object;
-            current = self.effect_pass(encoder, current, viewport, pass, profiler);
-        }
-        if downsample > 1 {
-            let mut pass = EffectPass::new(99, [0.0; 4], bounds);
-            pass.object = object;
-            current = self.effect_pass(encoder, current, viewport, pass, profiler);
-        }
-        current
-    }
-
-    fn effect_pass(
+    /// Encodes one full-region filter pass and returns its offscreen target.
+    ///
+    /// `encoder` receives the render commands, `source` supplies sampled pixels,
+    /// `viewport` sets physical coordinates, `pass` selects the shader and output
+    /// extent, and `profiler` records optional GPU timing.
+    pub(super) fn effect_pass(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         source: TextureTarget,
@@ -424,7 +388,9 @@ impl SurfaceRenderer {
     ) -> TextureTarget {
         let extent = pass.extent.unwrap_or(source.region.size);
         let target = self.acquire_target(source.region, extent);
-        self.clear_target(encoder, target, wgpu::Color::TRANSPARENT);
+        if !(1..=4).contains(&pass.mode) {
+            self.clear_target(encoder, target, wgpu::Color::TRANSPARENT);
+        }
         let mut params = uniform(viewport, target.region, source, source, pass.bounds);
         params.mode = pass.mode;
         params.data = pass.data;

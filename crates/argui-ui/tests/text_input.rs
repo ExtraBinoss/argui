@@ -223,19 +223,13 @@ fn editing_respects_graphemes_selection_and_clipboard_requests() {
 
 #[test]
 fn incremental_listener_receives_a_delta_without_a_full_value_event() {
-    let input = text_editor(
-        "field",
-        "hello world",
-        "placeholder",
-        false,
-        false,
-        TextInputFilter::Any,
-    )
-    .on(EventListener::new(
-        EventType::TextEdit,
-        EventHandlerId::new(EventOwnerId(1), 0),
-    ));
-    let (mut tree, region) = with_region(UiTree::new(input));
+    let input = |value: &str| {
+        field(value, TextInputFilter::Any).on(EventListener::new(
+            EventType::TextEdit,
+            EventHandlerId::new(EventOwnerId(1), 0),
+        ))
+    };
+    let (mut tree, region) = with_region(UiTree::new(input("hello world")));
     focus(&mut tree, &region);
 
     let update = tree.edit_text_input(&key(
@@ -250,6 +244,24 @@ fn incremental_listener_receives_a_delta_without_a_full_value_event() {
         UiEventKind::TextEdited(edit)
             if edit.range == (11..11) && edit.replacement == "!"
     ));
+    let node = region.node;
+    tree.update(input("hello world!"));
+    let next = tree.replace_text_input(node, "hello world!!");
+    assert!(
+        next.events
+            .iter()
+            .any(|event| matches!(event.kind, UiEventKind::TextEdited(_)))
+    );
+    assert!(
+        !next
+            .events
+            .iter()
+            .any(|event| matches!(event.kind, UiEventKind::TextChanged(_)))
+    );
+    tree.update(input("hello world!"));
+    assert_eq!(tree.text_input_value(node), Some("hello world!!"));
+    tree.update(input("external reset"));
+    assert_eq!(tree.text_input_value(node), Some("external reset"));
 }
 
 #[test]

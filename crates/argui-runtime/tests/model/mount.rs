@@ -212,6 +212,44 @@ impl Render for Parent {
     }
 }
 
+/// A retained child slot must follow the current model when its identity changes.
+#[test]
+fn replacing_a_retained_child_releases_the_old_mount_and_renders_the_new_model() {
+    let first = Entity::new(View::default());
+    let second = Entity::new(View::default());
+    let parent = Entity::new(Parent {
+        child: first.clone(),
+        visible: true,
+    });
+    let mount = parent.mount().unwrap();
+    let environment = WindowEnvironment::default();
+
+    let initial = mount.render(environment.clone()).unwrap();
+    assert_eq!(first.read(|view| view.renders), 1);
+    assert_eq!(first.resources().resource_count(), 1);
+    assert_eq!(second.resources().resource_count(), 0);
+
+    parent.update(|parent, cx| {
+        parent.child = second.clone();
+        cx.notify();
+    });
+    let replacement = mount.render(environment.clone()).unwrap();
+    assert!(!replacement.ptr_eq(&initial));
+    assert_eq!(first.resources().resource_count(), 0);
+    assert_eq!(second.resources().resource_count(), 1);
+    assert_eq!(first.read(|view| view.renders), 1);
+    assert_eq!(second.read(|view| view.renders), 1);
+
+    parent.update(|parent, cx| {
+        parent.child = first.clone();
+        cx.notify();
+    });
+    let _ = mount.render(environment).unwrap();
+    assert_eq!(first.resources().resource_count(), 1);
+    assert_eq!(second.resources().resource_count(), 0);
+    assert_eq!(first.read(|view| view.renders), 2);
+}
+
 #[test]
 fn nested_mounts_are_distinct_reused_and_released_without_destroying_child_data() {
     let child = Entity::new(View::default());

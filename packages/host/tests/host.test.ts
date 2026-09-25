@@ -8,6 +8,7 @@ const contract: NativeContract = {
     { id: 4, name: 'Text', properties: [{ id: 9, name: 'text', valueType: 'String', readOnly: false }], events: [] },
     { id: 14, name: 'FocusScope', properties: [], events: [{ id: 1, name: 'click' }] },
     { id: 15, name: 'Image', properties: [{ id: 2, name: 'source', valueType: 'Asset', readOnly: false }], events: [] },
+    { id: 16, name: 'TextInput', properties: [{ id: 10, name: 'value', valueType: 'String', readOnly: false }], events: [{ id: 23, name: 'edit' }] },
   ],
 }
 
@@ -56,6 +57,55 @@ test('event callbacks are released with removed native subtrees', () => {
   host.flush()
   deliver({ node: control.id, callback: 1 })
   expect(clicks).toBe(1)
+})
+
+test('native UTF-8 edits update the value cache while external resets still commit', () => {
+  const { bridge, batches, deliver } = recorder()
+  const host = new NativeHost(bridge, '42')
+  const input = host.createElement('textInput')
+  host.setProperty(input, 'value', 'aé😊b')
+  let received = 0
+  host.setProperty(input, 'onEdit', () => {
+    received++
+    host.setProperty(input, 'value', 'aé🙂b')
+  })
+  host.setRoot(input)
+  deliver({ node: input.id, callback: 1, payload: { kind: 'edit', start: 3, end: 7, text: '🙂' } })
+  host.flush()
+  expect(received).toBe(1)
+  expect(batches).toHaveLength(1)
+  expect(input.values.get(10)).toEqual({ type: 'String', value: 'aé🙂b' })
+  deliver({ node: input.id, callback: 1, payload: { kind: 'edit', start: 4, end: 7, text: 'x' } })
+  expect(input.values.get(10)).toEqual({ type: 'String', value: 'aé🙂b' })
+  host.setProperty(input, 'value', 'external reset')
+  host.flush()
+  expect(batches.at(-1)).toEqual([{ kind: 'setProperty', id: input.id, property: 10,
+    value: { type: 'String', value: 'external reset' } }])
+})
+
+test('delayed controlled acknowledgements do not echo old million-character values', () => {
+  const { bridge, batches, deliver } = recorder()
+  const host = new NativeHost(bridge, '42')
+  const input = host.createElement('textInput')
+  const initial = 'a'.repeat(1_000_000)
+  host.setProperty(input, 'value', initial)
+  host.setProperty(input, 'onEdit', () => {})
+  host.setRoot(input)
+
+  for (const [offset, text] of Array.from('bcdefghi').entries()) {
+    deliver({ node: input.id, callback: 1, payload: {
+      kind: 'edit', start: 1_000_000 + offset, end: 1_000_000 + offset, text,
+    } })
+  }
+  host.setProperty(input, 'value', initial + 'b')
+  host.flush()
+  expect(batches).toHaveLength(1)
+
+  deliver({ node: input.id, callback: 1, payload: { kind: 'edit', start: 1_000_008, end: 1_000_008, text: 'j' } })
+  host.setProperty(input, 'value', initial + 'bcdefghij')
+  host.flush()
+  expect(batches).toHaveLength(1)
+  expect(input.values.get(10)).toEqual({ type: 'String', value: initial + 'bcdefghij' })
 })
 
 test('repeated schema lookups keep property and event mutations distinct', () => {

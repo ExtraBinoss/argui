@@ -46,8 +46,8 @@ pub fn event_json(delivery: &NativeHostDelivery) -> Value {
 
 /// Encodes the public fields of `kind` for a JavaScript event handler.
 ///
-/// Returns a JSON payload with a stable `kind` string; scroll events include
-/// the native absolute offset in logical pixels.
+/// Returns a JSON payload with a stable `kind` string. Text edits carry UTF-8
+/// byte range endpoints and replacement text; scroll events carry logical pixels.
 pub fn ui_event_payload(kind: &UiEventKind) -> Value {
     match kind {
         UiEventKind::KeyInput(input) => json!({
@@ -59,6 +59,10 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             "repeat": input.repeat,
         }),
         UiEventKind::TextChanged(text) => json!({"kind": "input", "text": text}),
+        UiEventKind::TextEdited(edit) => json!({
+            "kind": "edit", "start": edit.range.start, "end": edit.range.end,
+            "text": edit.replacement,
+        }),
         UiEventKind::Submitted(text) => json!({"kind": "submit", "text": text}),
         UiEventKind::Focused => json!({"kind": "focus"}),
         UiEventKind::Blurred => json!({"kind": "blur"}),

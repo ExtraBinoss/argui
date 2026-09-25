@@ -237,3 +237,192 @@ fn absolute_overlays_do_not_participate_in_flex_flow() {
     assert_eq!(output.nodes[1].bounds.origin, Point::default());
     assert_eq!(output.nodes[2].bounds.origin, Point::new(143.0, 5.0));
 }
+
+mod input_latency {
+    use web_time::Instant;
+
+    use argui_core::{Color, Key, KeyInput, KeyState, Modifiers, Size};
+    use argui_layout::LayoutEngine;
+    use argui_text::{FontFamily, TextEngine, TextStyle, TextWrap};
+    use argui_ui::{
+        CaretStyle, Element, FocusPolicy, FocusRequest, Interaction, TextEditorSpec,
+        TextInputFilter, UiTree, length,
+    };
+
+    const FONT: &[u8] = include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf");
+
+    fn editor(value: &str, monospace: bool, multiline: bool) -> Element {
+        Element::text_editor(TextEditorSpec {
+            value: value.to_owned(),
+            placeholder: String::new(),
+            multiline,
+            read_only: false,
+            filter: TextInputFilter::Any,
+            text: TextStyle {
+                family: if monospace {
+                    FontFamily::Monospace
+                } else {
+                    FontFamily::SansSerif
+                },
+                wrap: TextWrap::None,
+                ..TextStyle::default()
+            },
+            placeholder_text: TextStyle::default(),
+            selection: Color::WHITE,
+            caret: CaretStyle::default(),
+        })
+        .width(length(420.0))
+        .height(length(100.0))
+        .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))
+    }
+
+    fn burst(value: &str, count: usize, monospace: bool, multiline: bool) -> (f64, f64) {
+        let mut ui = UiTree::new(editor(value, monospace, multiline));
+        let node = ui.node_ids()[0];
+        let mut layout = LayoutEngine::new();
+        let mut text =
+            TextEngine::from_embedded_fonts([FONT], "Noto Sans", "Noto Sans", "Noto Sans");
+        let size = Size::new(420.0, 100.0);
+        let initial = Instant::now();
+        let mut output = layout.compute(&mut ui, &mut text, size).unwrap();
+        let initial_ms = initial.elapsed().as_secs_f64() * 1_000.0;
+        ui.sync_focus(&output.hit_regions, Some(FocusRequest::Focus(node.into())));
+        ui.place_text_cursor(node, value.len(), false);
+        let mut slowest = 0.0_f64;
+        let mut slowest_edit = 0.0_f64;
+        let mut slowest_layout = 0.0_f64;
+        let mut slowest_prepare = 0.0_f64;
+        for _ in 0..count {
+            let started = Instant::now();
+            let update = ui.edit_text_input(&KeyInput {
+                key: Key::Character("x".into()),
+                state: KeyState::Pressed,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: Some("x".into()),
+            });
+            let edited = started.elapsed().as_secs_f64() * 1_000.0;
+            assert!(update.text_input_changed);
+            layout.update_text_inputs(&mut ui, &mut text, &mut output);
+            let laid_out = started.elapsed().as_secs_f64() * 1_000.0;
+            let prepared = text.prepare(&output.text, 1.0);
+            let prepared_at = started.elapsed().as_secs_f64() * 1_000.0;
+            assert!(!prepared.glyphs.is_empty());
+            slowest_edit = slowest_edit.max(edited);
+            slowest_layout = slowest_layout.max(laid_out - edited);
+            slowest_prepare = slowest_prepare.max(prepared_at - laid_out);
+            slowest = slowest.max(prepared_at);
+        }
+        assert_eq!(
+            ui.text_input_value(node).unwrap().len(),
+            value.len() + count
+        );
+        assert_eq!(
+            output.text.blocks()[0].content.as_str().chars().last(),
+            Some('x')
+        );
+        let region = &output.text_inputs[0];
+        let caret = region.caret.unwrap();
+        assert!(
+            caret.origin.x >= region.viewport.origin.x - 1.0
+                && caret.origin.x <= region.viewport.origin.x + region.viewport.size.width + 1.0
+        );
+        assert!(
+            caret.origin.y >= region.viewport.origin.y - 1.0
+                && caret.origin.y <= region.viewport.origin.y + region.viewport.size.height + 1.0
+        );
+        assert!(
+            region
+                .stops
+                .iter()
+                .any(|stop| stop.position.index == value.len() + count)
+        );
+        eprintln!(
+            "phases (ms): edit {slowest_edit:.2}, layout {slowest_layout:.2}, prepare {slowest_prepare:.2}"
+        );
+        (initial_ms, slowest)
+    }
+
+    #[test]
+    fn burst_typing_reaches_visible_text_for_small_and_million_character_editors() {
+        let (small_initial, small_slowest) = burst("hello", 32, false, false);
+        eprintln!(
+            "small input-to-prepared-text initial {small_initial:.2} ms, slowest edit {small_slowest:.2} ms"
+        );
+        let value = format!("{}\n", "a".repeat(99)).repeat(10_000);
+        assert_eq!(value.len(), 1_000_000);
+        let (large_initial, large_slowest) = burst(&value, 8, false, true);
+        eprintln!(
+            "input-to-prepared-text latency (ms): small initial {small_initial:.2}, slowest edit {small_slowest:.2}; million initial {large_initial:.2}, slowest edit {large_slowest:.2}"
+        );
+    }
+
+    #[test]
+    fn burst_typing_reaches_visible_text_in_a_million_character_line() {
+        let value = "a".repeat(1_000_000);
+        let (initial, slowest) = burst(&value, 8, false, false);
+        eprintln!(
+            "single-line million field input-to-prepared-text latency (ms): initial {initial:.2}, slowest edit {slowest:.2}"
+        );
+        let (initial, slowest) = burst(&value, 8, true, false);
+        eprintln!(
+            "single-line million monospace input-to-prepared-text latency (ms): initial {initial:.2}, slowest edit {slowest:.2}"
+        );
+    }
+
+    #[test]
+    fn burst_typing_reaches_visible_text_in_a_million_byte_unicode_line() {
+        let value = "é".repeat(500_000);
+        assert_eq!(value.len(), 1_000_000);
+        let (initial, slowest) = burst(&value, 4, false, false);
+        eprintln!(
+            "single-line million-byte Unicode field latency (ms): initial {initial:.2}, slowest edit {slowest:.2}"
+        );
+    }
+
+    #[test]
+    fn middle_of_million_character_editor_updates_its_visible_window() {
+        let value = format!("{}\n", "a".repeat(99)).repeat(10_000);
+        let mut ui = UiTree::new(editor(&value, false, true));
+        let node = ui.node_ids()[0];
+        let mut layout = LayoutEngine::new();
+        let mut text =
+            TextEngine::from_embedded_fonts([FONT], "Noto Sans", "Noto Sans", "Noto Sans");
+        let mut output = layout
+            .compute(&mut ui, &mut text, Size::new(420.0, 100.0))
+            .unwrap();
+        ui.sync_focus(&output.hit_regions, Some(FocusRequest::Focus(node.into())));
+        ui.place_text_cursor(node, value.len() / 2, false);
+        let mut slowest = 0.0_f64;
+        for sample in 0..4 {
+            let started = Instant::now();
+            ui.edit_text_input(&KeyInput {
+                key: Key::Character("x".into()),
+                state: KeyState::Pressed,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: Some("x".into()),
+            });
+            let edited_ms = started.elapsed().as_secs_f64() * 1_000.0;
+            layout.update_text_inputs(&mut ui, &mut text, &mut output);
+            let laid_out_ms = started.elapsed().as_secs_f64() * 1_000.0;
+            assert!(!text.prepare(&output.text, 1.0).glyphs.is_empty());
+            let prepared_ms = started.elapsed().as_secs_f64() * 1_000.0;
+            slowest = slowest.max(prepared_ms);
+            eprintln!(
+                "million-character middle edit sample={sample} edit_ms={edited_ms:.2} layout_ms={:.2} prepare_ms={:.2}",
+                laid_out_ms - edited_ms,
+                prepared_ms - laid_out_ms,
+            );
+        }
+        let region = &output.text_inputs[0];
+        assert!(
+            region
+                .stops
+                .iter()
+                .any(|stop| stop.position.index == value.len() / 2 + 4)
+        );
+        assert!(output.text.blocks()[0].content.as_str().contains("xxxx"));
+        eprintln!("million-character middle edit input-to-prepared-text slowest {slowest:.2} ms");
+    }
+}

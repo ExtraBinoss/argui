@@ -1,24 +1,21 @@
 use wgpu::util::DeviceExt;
 
-/// A wide blur must fill neighboring pixels smoothly instead of leaving sampled gaps.
-#[test]
-fn wide_blur_has_no_periodic_holes() {
+/// Renders an impulse through one blur shader mode and returns RGBA pixels.
+///
+/// `mode` selects Gaussian horizontal, dual downsample, or dual upsample.
+/// Returns an empty vector when no headless GPU adapter is available.
+fn render_impulse(mode: u32) -> Vec<u8> {
     const WIDTH: u32 = 64;
     let instance = wgpu::Instance::default();
     let Ok(adapter) = pollster::block_on(instance.request_adapter(&Default::default())) else {
         eprintln!("No headless GPU adapter; skipping blur pixel check");
-        return;
+        return Vec::new();
     };
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("blur-regression-shader"),
         source: wgpu::ShaderSource::Wgsl(
-            format!(
-                "{}\n{}",
-                include_str!("../../src/shaders/effects/compositor.wgsl"),
-                include_str!("../../src/shaders/effects/refraction.wgsl")
-            )
-            .into(),
+            include_str!("../../src/shaders/effects/blur.wgsl").into(),
         ),
     });
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -83,7 +80,7 @@ fn wide_blur_has_no_periodic_holes() {
     let mut params = [0_u32; 60];
     params[0] = (WIDTH as f32).to_bits();
     params[1] = 1.0_f32.to_bits();
-    params[2] = 1; // Horizontal blur.
+    params[2] = mode;
     for index in [4, 8, 12, 24] {
         params[index + 2] = (WIDTH as f32).to_bits();
         params[index + 3] = 1.0_f32.to_bits();
@@ -93,7 +90,7 @@ fn wide_blur_has_no_periodic_holes() {
         params[index + 3] = 1.0_f32.to_bits();
     }
     params[28..32].fill((-1.0_f32).to_bits());
-    params[36] = 3.5_f32.to_bits(); // Blur 40px at the normal 4x downsample level.
+    params[36] = if mode == 1 { 3.5_f32 } else { 1.5_f32 }.to_bits();
     let uniforms = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("blur-regression-uniforms"),
         contents: bytemuck::cast_slice(&params),
@@ -112,10 +109,6 @@ fn wide_blur_has_no_periodic_holes() {
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::TextureView(&source_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
                 resource: wgpu::BindingResource::TextureView(&source_view),
             },
             wgpu::BindGroupEntry {
@@ -174,7 +167,22 @@ fn wide_blur_has_no_periodic_holes() {
         });
     device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
     receiver.recv().unwrap().unwrap();
-    let pixels = readback.slice(..).get_mapped_range().unwrap();
+    let pixels = readback.slice(..).get_mapped_range().unwrap().to_vec();
+    if let Ok(directory) = std::env::var("ARGUI_BLUR_CAPTURE_DIR") {
+        let directory = std::path::Path::new(&directory);
+        std::fs::create_dir_all(directory).unwrap();
+        std::fs::write(directory.join(format!("mode-{mode}.rgba")), &pixels).unwrap();
+    }
+    pixels
+}
+
+/// A wide Gaussian blur must fill neighboring pixels smoothly instead of leaving sampled gaps.
+#[test]
+fn wide_blur_has_no_periodic_holes() {
+    let pixels = render_impulse(1);
+    if pixels.is_empty() {
+        return;
+    }
     let red = |offset: usize| pixels[(32 + offset) * 4];
     assert!(red(0) > 20, "blur erased the source pixel");
     for offset in 1..=8 {
@@ -183,5 +191,20 @@ fn wide_blur_has_no_periodic_holes() {
             red(offset - 1) >= red(offset),
             "blur has a repeated band at offset {offset}"
         );
+    }
+}
+
+/// Each dual-filter kernel must preserve neighboring pixels and an impulse's center.
+#[test]
+fn dual_filter_kernels_spread_an_impulse() {
+    for mode in [3, 4] {
+        let pixels = render_impulse(mode);
+        if pixels.is_empty() {
+            return;
+        }
+        let red = |offset: usize| pixels[(32 + offset) * 4];
+        assert!(red(0) > 0, "mode {mode} erased the source pixel");
+        assert!(red(1) > 0, "mode {mode} left a gap beside the source");
+        assert_eq!(pixels[31 * 4], pixels[33 * 4], "mode {mode} is asymmetric");
     }
 }

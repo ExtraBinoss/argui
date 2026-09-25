@@ -79,6 +79,7 @@ impl EffectUniform {
 
 pub(crate) struct EffectGpu {
     pipeline: wgpu::RenderPipeline,
+    blur_pipeline: wgpu::RenderPipeline,
     custom: HashMap<(EffectId, u64, usize), wgpu::RenderPipeline>,
     layout: wgpu::BindGroupLayout,
     format: wgpu::TextureFormat,
@@ -154,6 +155,11 @@ impl EffectGpu {
             source: wgpu::ShaderSource::Wgsl(built_in_source().into()),
         });
         let pipeline = create_pipeline(device, format, &layout, &shader);
+        let blur_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("argui-blur-shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/effects/blur.wgsl").into()),
+        });
+        let blur_pipeline = create_pipeline(device, format, &layout, &blur_shader);
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("argui-effect-sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -173,6 +179,7 @@ impl EffectGpu {
         });
         Self {
             pipeline,
+            blur_pipeline,
             custom: HashMap::new(),
             layout,
             format,
@@ -278,12 +285,17 @@ impl EffectGpu {
                 },
             ],
         });
+        let load = if (1..=4).contains(&draw.uniform.mode) {
+            wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
+        } else {
+            wgpu::LoadOp::Load
+        };
         let attachment = Some(wgpu::RenderPassColorAttachment {
             view: draw.target,
             depth_slice: None,
             resolve_target: None,
             ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
+                load,
                 store: wgpu::StoreOp::Store,
             },
         });
@@ -309,11 +321,14 @@ impl EffectGpu {
             viewport[2].round().max(1.0) as u32,
             viewport[3].round().max(1.0) as u32,
         );
-        pass.set_pipeline(
-            draw.shader
-                .and_then(|id| self.custom.get(&id))
-                .unwrap_or(&self.pipeline),
+        let pipeline = draw.shader.and_then(|id| self.custom.get(&id)).unwrap_or(
+            if (1..=4).contains(&draw.uniform.mode) {
+                &self.blur_pipeline
+            } else {
+                &self.pipeline
+            },
         );
+        pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[offset as u32, parameter_offset as u32]);
         pass.draw(0..3, 0..1);
     }

@@ -382,15 +382,18 @@ impl UiTree {
         } = result;
         let mut events = Vec::with_capacity(2);
         if let Some(edit) = edit {
+            if (self.has_event_listener(node, crate::EventType::Input)
+                || self.has_event_listener(node, crate::EventType::TextEdit))
+                && let Some(state) = self.text_inputs.get_mut(node)
+            {
+                state.note_current_value();
+            }
             events.extend(self.event_deliveries(node, UiEventKind::TextEdited(edit.edit)));
             if self.has_event_listener(node, crate::EventType::Input) {
                 let value = self
                     .text_inputs
                     .get(node)
                     .map_or_else(String::new, |state| state.value().to_owned());
-                if let Some(state) = self.text_inputs.get_mut(node) {
-                    state.note_emitted_value(&value);
-                }
                 events.extend(self.event_deliveries(node, UiEventKind::TextChanged(value)));
             }
         }

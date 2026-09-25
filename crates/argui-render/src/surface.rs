@@ -28,6 +28,7 @@ use crate::{
 };
 
 mod api;
+mod blur;
 mod composite;
 mod effect_damage;
 mod effects;

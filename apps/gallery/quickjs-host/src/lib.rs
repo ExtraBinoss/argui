@@ -10,10 +10,10 @@ mod hot_reload;
 mod i18n;
 mod native_metrics;
 mod runner;
-#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
-mod validate;
 mod services;
 mod telemetry;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+mod validate;
 mod wire;
 
 pub use delivery::{coalesce_virtual_windows, ui_event_payload};

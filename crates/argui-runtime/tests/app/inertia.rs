@@ -274,6 +274,49 @@ fn changing_scroll_target_resets_velocity_without_losing_the_new_target() {
     assert!(!inertia.needs_frame());
 }
 
+/// High-rate pointer input cannot exceed configured velocity or produce non-finite motion.
+#[test]
+fn high_frequency_scroll_samples_remain_bounded() {
+    let mut inertia = ScrollInertia::default();
+    let physics = ScrollPhysics::Inertial(InertialScroll {
+        velocity_limit: 180.0,
+        sample_weight: 0.5,
+        decay: 12.0,
+        stop_velocity: 0.0,
+        ..InertialScroll::default()
+    });
+    let tree = UiTree::new(Element::container([]));
+    let target = tree.node_ids()[0];
+
+    for sample_index in 0..10_000_u64 {
+        let mut input = sample(
+            Point::new(1.0, -0.5),
+            if sample_index == 0 {
+                TouchPhase::Started
+            } else {
+                TouchPhase::Moved
+            },
+            Duration::from_micros(sample_index * 100),
+        );
+        input.physics = physics;
+        input.target = Some(target);
+        inertia.observe(input);
+    }
+
+    let mut release = sample(
+        Point::default(),
+        TouchPhase::Ended,
+        Duration::from_micros(1_000_000),
+    );
+    release.physics = physics;
+    inertia.observe(release);
+
+    let (delta, _, _) = inertia.advance(Duration::from_millis(1_100)).unwrap();
+    assert!(delta.x.is_finite() && delta.y.is_finite());
+    assert!(delta.x.abs() <= 6.0 && delta.y.abs() <= 6.0);
+    assert!(inertia.needs_frame());
+}
+
 /// A zero-weight sample cannot introduce velocity, even when input continues.
 #[test]
 fn zero_sample_weight_ignores_motion_until_a_new_config_accepts_it() {

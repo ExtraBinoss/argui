@@ -300,8 +300,13 @@ impl Measurement<'_> {
                         .width
                         .or_else(|| inputs.available_space.width.into_option());
                     Some(
-                        self.text_engine
-                            .measure_content(&content, &text_style, width),
+                        if matches!(self.elements[index].kind, ElementKind::TextEditor { .. }) {
+                            self.text_engine
+                                .measure_editor_content(&content, &text_style, width)
+                        } else {
+                            self.text_engine
+                                .measure_content(&content, &text_style, width)
+                        },
                     )
                 });
                 if index.is_some_and(|index| {

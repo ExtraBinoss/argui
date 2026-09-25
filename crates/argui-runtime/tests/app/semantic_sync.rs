@@ -89,3 +89,26 @@ fn semantic_bounds_are_compared_in_physical_pixels() {
         true,
     ));
 }
+
+/// Missing semantic bounds use an empty rectangle, and empty trees remain unchanged.
+#[test]
+fn missing_bounds_and_empty_semantic_snapshots_are_handled() {
+    let tree = snapshot();
+    assert!(implementation::needs_semantic_sync(
+        &tree,
+        [],
+        1.0,
+        true,
+        true
+    ));
+
+    let mut empty = snapshot();
+    empty.nodes.clear();
+    assert!(!implementation::needs_semantic_sync(
+        &empty,
+        [],
+        1.0,
+        true,
+        true,
+    ));
+}

@@ -93,10 +93,10 @@ export function ReactAnimationLab(props: { theme: Palette }): ReactElement {
             background={props.theme.accent} transition_ms={520} loop_ms={1000}
             loop_scale={1.25} loop_playing={playing} />
         </MotionCard>
-        <MotionCard title="Rounded corners" detail="Native radius loop; Change target reverses it" theme={props.theme}>
+        <MotionCard title="Rounded corners" detail="Change target animates radius; native opacity keeps pulsing" theme={props.theme}>
           <rectangle x={82} y={20} width={68} height={68} radius={active() ? 34 : 7}
             background={props.theme.accent} transition_ms={380} loop_ms={1100}
-            loop_radius={active() ? 7 : 34} loop_playing={playing} />
+            loop_opacity={0.65} loop_playing={playing} />
         </MotionCard>
         <MotionCard title="Rotation" detail="Continuous compositor transform" theme={props.theme}>
           <rectangle x={89} y={24} width={58} height={58} radius={11}

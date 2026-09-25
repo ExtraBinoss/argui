@@ -116,6 +116,39 @@ fn drain_task(runtime: &TaskRuntime, wake: &mpsc::Receiver<()>) {
     runtime.drain();
 }
 
+/// A retained child inherits the parent's executor before spawning work.
+#[test]
+fn newly_mounted_child_inherits_its_parent_task_runtime() {
+    struct Parent(Entity<ContextTaskModel>);
+    impl Render for Parent {
+        /// Renders the child through its retained presentation context.
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            cx.entity(&self.0)
+        }
+    }
+
+    let (runtime, wake) = context_task_runtime();
+    let child = Entity::new(ContextTaskModel::default());
+    let parent = Entity::new(Parent(child.clone()));
+    parent.set_task_runtime(runtime.clone());
+    let mount = parent.mount().unwrap();
+    mount.render(Default::default()).unwrap();
+
+    let task = child
+        .update(|_, cx| {
+            cx.spawn(async { 31 }, |model, result, _| {
+                model.value = result.unwrap()
+            })
+        })
+        .unwrap();
+    while runtime.pending() > 0 {
+        drain_task(&runtime, &wake);
+    }
+
+    assert!(task.is_finished());
+    assert_eq!(child.read(|model| model.value), 31);
+}
+
 /// Detached contexts and closed models cannot create work on an attached executor.
 #[test]
 fn detached_context_and_closed_model_reject_new_tasks() {

@@ -176,6 +176,26 @@ fn typed_events_are_ordered_and_delivered_after_all_model_borrows_end() {
     assert_eq!(runtime.pending_events(), 0);
 }
 
+/// Emitting a declared event with no matching listeners does not queue delivery work.
+#[test]
+fn events_without_matching_listeners_are_ignored_without_queueing() {
+    let runtime = ModelRuntime::default();
+    let source = runtime.entity(Source);
+    let receiver = runtime.entity(Vec::<String>::new());
+    let subscription = receiver.update(|_, cx| {
+        cx.subscribe(&source, |events, event: &String, _| {
+            events.push(event.clone())
+        })
+        .unwrap()
+    });
+
+    source.update(|_, cx| cx.emit(7_u32).unwrap());
+
+    assert!(subscription.is_active());
+    assert_eq!(runtime.pending_events(), 0);
+    assert!(receiver.read(Vec::is_empty));
+}
+
 #[test]
 fn listener_can_update_the_source_without_a_reentrant_mutable_borrow() {
     let runtime = ModelRuntime::default();

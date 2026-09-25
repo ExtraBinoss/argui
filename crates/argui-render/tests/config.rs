@@ -1,5 +1,6 @@
 use argui_render::{
-    DamageTracking, EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode,
+    BlurAlgorithm, DamageTracking, EffectQuality, EffectQualitySettings, RendererConfig,
+    SurfaceAlphaMode,
 };
 
 #[test]
@@ -27,6 +28,7 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
     );
     assert_eq!(config.surface_alpha, SurfaceAlphaMode::Opaque);
     assert!(!config.profiling);
+    assert_eq!(config.blur_algorithm, BlurAlgorithm::Auto);
     assert!(config.clone().profiling(true).profiling);
     assert_eq!(
         config
@@ -109,9 +111,65 @@ fn effect_quality_and_configuration_builders_are_composable() {
     assert_eq!(config.gpu_canvas_cache_bytes, 8192);
     assert_eq!(config.gradient_stop_capacity, 32);
     assert_eq!(config.effect_quality, EffectQuality::Performance);
+    assert_eq!(
+        config
+            .clone()
+            .blur_algorithm(BlurAlgorithm::Gaussian)
+            .blur_algorithm,
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        config
+            .clone()
+            .blur_algorithm(BlurAlgorithm::DualKawase)
+            .blur_algorithm,
+        BlurAlgorithm::DualKawase
+    );
     assert_eq!(config.damage_tracking.max_regions, 3);
     assert_eq!(config.damage_tracking.max_area_ratio, 0.25);
     assert!(!DamageTracking::disabled().enabled);
+}
+
+/// Automatic blur selection follows the measured medium-radius crossover.
+#[test]
+fn automatic_blur_selection_preserves_explicit_modes() {
+    let area = [512, 512];
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(2.0, area),
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(3.0, area),
+        BlurAlgorithm::DualKawase
+    );
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(6.0, area),
+        BlurAlgorithm::DualKawase
+    );
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(7.0, area),
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(24.0, area),
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(64.0, area),
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        BlurAlgorithm::Auto.resolve(4.0, [8, 512]),
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        BlurAlgorithm::Gaussian.resolve(4.0, area),
+        BlurAlgorithm::Gaussian
+    );
+    assert_eq!(
+        BlurAlgorithm::DualKawase.resolve(24.0, area),
+        BlurAlgorithm::DualKawase
+    );
 }
 
 #[test]

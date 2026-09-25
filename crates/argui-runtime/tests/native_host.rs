@@ -45,6 +45,37 @@ fn canvas_ids_must_be_registered_before_a_native_commit() {
     }
 }
 
+/// Canvas validation ignores unrelated updates but rejects a malformed canvas value.
+#[test]
+fn canvas_validation_only_checks_present_canvas_properties() {
+    let registry = GpuCanvasRegistry::new([]).unwrap();
+    let id = HostId::new(1, 1);
+    let unrelated = [
+        HostOperation::SetRoot { id: None },
+        HostOperation::SetProperty {
+            id,
+            property: PropertyId::from_raw(1),
+            value: Some(SchemaValue::Int(-1)),
+        },
+        HostOperation::SetProperty {
+            id,
+            property: builtin::CANVAS_ID,
+            value: None,
+        },
+    ];
+    assert!(validate_native_host_canvases(&unrelated, &registry).is_ok());
+
+    let malformed = HostOperation::SetProperty {
+        id,
+        property: builtin::CANVAS_ID,
+        value: Some(SchemaValue::String("canvas".into())),
+    };
+    assert_eq!(
+        validate_native_host_canvases(&[malformed], &registry),
+        Err("invalid native canvas identity".into())
+    );
+}
+
 #[test]
 fn registered_image_and_vector_handles_are_required_before_commit() {
     let images = [ImageAsset::rgba8(ImageId(17), 1, 1, vec![1, 2, 3, 255]).unwrap()];

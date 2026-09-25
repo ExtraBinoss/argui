@@ -7,6 +7,9 @@ use argui_gallery_quickjs::{QuickJsGallery, decode_wire_operations};
 use argui_runtime::WireOperation;
 use serde_json::{Value, json};
 
+#[path = "engine/controlled_input.rs"]
+mod controlled_input;
+
 /// Covers every compact operation shape and rejects malformed transport fields.
 #[test]
 fn compact_bridge_batch_validates_operations() {
