@@ -177,9 +177,6 @@ impl QuickJsGallery {
                 .set("__arguiMobile", cfg!(target_os = "android"))
                 .map_err(|error| js_context_error(&ctx, error))?;
             globals
-                .set("__arguiLinuxWindow", cfg!(target_os = "linux"))
-                .map_err(|error| js_context_error(&ctx, error))?;
-            globals
                 .set("__arguiContractJson", contract_json)
                 .map_err(|error| js_context_error(&ctx, error))?;
             globals

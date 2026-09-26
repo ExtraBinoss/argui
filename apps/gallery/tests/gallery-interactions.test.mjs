@@ -313,15 +313,23 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       assert(view.all('Text').some((node) => node.properties.text === 'Examples'))
       const navigation = view.find('ScrollView', (node) => node.properties.id === 'gallery-navigation')
       assert(navigation)
+      assert.equal(navigation.properties.width, '100%', 'scrollbar reaches the left edge of the sidebar')
+      assert.equal(navigation.properties.scrollbarSide, 'left')
+      assert.equal(navigation.properties.scrollbarEndInset, 0, 'scrollbar track reaches the bottom window corner')
+      assert.equal(navigation.properties.shadowWidth, 18, 'native edge fade uses the theme size')
+      assert.equal(navigation.properties.scrollY, true)
+      assert.equal(navigation.properties.scrollX, false)
+      assert.equal(navigation.listeners.has('scroll'), false, 'native scrolling does not rerender the gallery')
+      assert.deepEqual(descendant(navigation, 'Column')?.properties.padding, { start: 16, end: 16 },
+        'navigation labels retain their inset while the scrollbar stays at the edge')
       const navigationFrame = view.find('Rectangle', (node) => node.properties.id === 'gallery-navigation-frame')
       assert.equal(navigationFrame?.properties.grow, 1, 'navigation fills the remaining sidebar height')
       assert.equal(navigationFrame?.properties.minHeight, 0)
-      for (const side of ['top', 'bottom']) {
-        const shade = view.find('Rectangle', (node) => node.properties.id === `gallery-nav-shade-${side}`)
-        assert.equal(shade?.properties.height, 28)
-        assert.match(shade?.properties.background.stops[0].color, /^oklch\([\d.]+ [\d.]+ [\d.]+ \/ \d+%\)$/,
-          `${side} shadow keeps the sidebar hue and darkens it`)
-      }
+      assert.equal(navigationFrame?.properties.width, '100%', 'edge shades span the full sidebar width')
+      const sidebar = view.find('Column', (node) => node.properties.id === 'gallery-sidebar')
+      assert.deepEqual(sidebar?.properties.padding, { top: 16 }, 'navigation reaches the window bottom')
+      assert.equal(view.find('Rectangle', (node) => node.properties.id?.startsWith('gallery-nav-shade-')), undefined,
+        'navigation has no painted overlay rectangles')
       assert.equal(descendant(navigation, 'Svg'), undefined, 'sidebar navigation does not mount icons')
       const inputNavigationId = view.find('FocusScope', (node) => node.properties.id === 'page-input-field')?.id
       view.dispatch(findButton(view, 'Layouting'), 'click')

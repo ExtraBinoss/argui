@@ -63,6 +63,7 @@ export interface WidgetTheme extends ThemeValues, NeutralColors {
   selectRowHeight: number
   selectCompactRowHeight: number
   selectMaxPopupHeight: number
+  scrollShadowSize: number
   overlaySurface: string
   overlayBlur: number
   overlayRadius: number
@@ -131,6 +132,7 @@ const light: WidgetTheme = {
   inputHeight: 40, inputGroupHeight: 38, inputLineHeight: 20, fieldLabelSize: 12,
   selectWidth: 240, selectCompactHeight: 32, selectRowHeight: 36,
   selectCompactRowHeight: 28, selectMaxPopupHeight: 256,
+  scrollShadowSize: 18,
   overlaySurface: 'oklch(1 0 0 / 92%)', overlayBlur: 10,
   overlayRadius: 10, overlayPadding: 16, overlayWidth: 280,
   overlayBorderWidth: 1, overlayShadowColor: 'oklch(0 0 0 / 12%)',
@@ -154,6 +156,7 @@ const dark: WidgetTheme = {
   inputHeight: 40, inputGroupHeight: 38, inputLineHeight: 20, fieldLabelSize: 12,
   selectWidth: 240, selectCompactHeight: 32, selectRowHeight: 36,
   selectCompactRowHeight: 28, selectMaxPopupHeight: 256,
+  scrollShadowSize: 18,
   overlaySurface: 'oklch(0.205 0 0 / 92%)', overlayBlur: 10,
   overlayRadius: 10, overlayPadding: 16, overlayWidth: 280,
   overlayBorderWidth: 1, overlayShadowColor: 'oklch(0 0 0 / 50%)',

@@ -1,5 +1,5 @@
 {
-  "abiHash": "8113770748628963310",
+  "abiHash": "13915789742453721320",
   "natives": [
     {
       "id": 1,
@@ -10685,6 +10685,15 @@
           "allowedValues": []
         },
         {
+          "id": 264,
+          "name": "scrollbarEndInset",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
           "id": 261,
           "name": "scrollbarVisible",
           "valueType": "Bool",
@@ -10741,6 +10750,24 @@
         {
           "id": 258,
           "name": "scrollMomentum",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 262,
+          "name": "shadowWidth",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 263,
+          "name": "shadowIntensity",
           "valueType": "Float",
           "readOnly": false,
           "required": false,

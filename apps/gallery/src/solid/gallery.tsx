@@ -1,7 +1,7 @@
 import { For, createSignal, onCleanup } from 'solid-js'
 import type { ThemeRuntime } from '@argui/host'
 import { ThemeScope, useTheme, useThemeSnapshot } from '@argui/solid'
-import { Button, ButtonGroup, ButtonGroupSeparator, InputField, Popover, type WidgetTheme } from '@argui/widgets/solid'
+import { Button, ButtonGroup, ButtonGroupSeparator, InputField, Popover, ScrollShadow, type WidgetTheme } from '@argui/widgets/solid'
 import { ButtonPage } from './button-page'
 import { ButtonGroupPage } from './button-group-page'
 import { CheckboxPage } from './checkbox-page'
@@ -18,9 +18,7 @@ import { LayoutScenarios } from './layout-scenarios'
 import { AnimationPage } from './animation-page'
 import { ExpressivePage } from './expressive-page'
 import { mediaAssets } from '../../assets.generated'
-import { applyGalleryTheme, colorFamilies, familySwatch, navigationEdgeShadow, watchSystemFamily, type ColorFamily } from '../theme-colors'
-
-const roundedLinuxWindow = Boolean((globalThis as { __arguiLinuxWindow?: boolean }).__arguiLinuxWindow)
+import { applyGalleryTheme, colorFamilies, familySwatch, watchSystemFamily, type ColorFamily } from '../theme-colors'
 
 const pages = [
   { id: 'button', label: 'Button', category: 'Widgets' },
@@ -73,19 +71,18 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }) {
     : page() === 'expressive' ? <ExpressivePage />
     : <AnimationPage />
 
-  return <row width="100%" height="100%" background={theme().surface} clip={roundedLinuxWindow}
-    radii={roundedLinuxWindow ? { bottomLeft: 10, bottomRight: 10 } : 0}>
-    <column id="gallery-sidebar" width={256} height="100%" shrink={0} padding={16} gap={16} background={theme().sidebar}>
-      <container padding={{ start: 8 }}><text color={theme().text} fontSize={20}>Argui</text></container>
-      <InputField id="gallery-search" accessibleName="Search gallery" type="search"
+  return <row width="100%" height="100%" background={theme().surface}>
+    <column id="gallery-sidebar" width={256} height="100%" shrink={0} padding={{ top: 16 }} gap={16} background={theme().sidebar}>
+      <container padding={{ start: 24, end: 16 }}><text color={theme().text} fontSize={20}>Argui</text></container>
+      <container padding={{ start: 16, end: 16 }}><InputField id="gallery-search" accessibleName="Search gallery" type="search"
         placeholder="Search gallery" value={search()} onValueChange={setSearch}
-        leading={<svg source={mediaAssets['tabler/search.svg']} width={16} height={16} color={theme().textMuted} />} />
+        leading={<svg source={mediaAssets['tabler/search.svg']} width={16} height={16} color={theme().textMuted} />} /></container>
       <ThemeScope<WidgetTheme> overrides={{ ghostHover: theme().sidebarAccent }}>
         <rectangle id="gallery-navigation-frame" width="100%" grow={1} minHeight={0} background={theme().sidebar} clip={true}>
-          <scrollView id="gallery-navigation" role="navigation" accessibleName="Gallery pages"
-            width="100%" height="100%" scrollY={true}
-            scrollbarSide="left" scrollbarWidth={3} scrollbarThumbColor={theme().border} scrollbarHoverColor={theme().textMuted}>
-            <column width="100%" gap={12}>
+          <ScrollShadow id="gallery-navigation" role="navigation" accessibleName="Gallery pages"
+            width="100%" height="100%"
+            scrollbarSide="left" scrollbarWidth={3} scrollbarEndInset={0} scrollbarThumbColor={theme().border} scrollbarHoverColor={theme().textMuted}>
+            <column width="100%" padding={{ start: 16, end: 16 }} gap={12}>
               <For each={['Widgets', 'Examples'] as const}>{(category) => visiblePages(category).length > 0 && <column width="100%" gap={4}>
                 <container padding={{ start: 8, bottom: 4 }}><text color={theme().textMuted} fontSize={12}>{category}</text></container>
                 <For each={visiblePages(category)}>{(entry) => <Button
@@ -98,11 +95,7 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }) {
                 ><text color={page() === entry.id ? theme().sidebarPrimary : theme().sidebarForeground}>{entry.label}</text></Button>}</For>
               </column>}</For>
             </column>
-          </scrollView>
-          <rectangle id="gallery-nav-shade-top" position="absolute" inset={{ left: 0, right: 0, top: 0 }}
-            height={28} background={navigationEdgeShadow(theme().sidebar, 'top')} />
-          <rectangle id="gallery-nav-shade-bottom" position="absolute" inset={{ left: 0, right: 0, bottom: 0 }}
-            height={28} background={navigationEdgeShadow(theme().sidebar, 'bottom')} />
+          </ScrollShadow>
         </rectangle>
       </ThemeScope>
     </column>

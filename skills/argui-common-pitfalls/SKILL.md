@@ -30,6 +30,17 @@ adapter too.
   side, width and hover style; keep scroll, dragging and transitions native.
   Check that content actually overflows and the thumb is reachable. Do not
   place a decorative bar over a separate invisible scrollbar.
+- For an edge shadow, use `ScrollShadow` and let native scroll metrics reveal
+  each edge only while content remains hidden there. Give the viewport the
+  full width of the surface and put content padding inside it; otherwise the
+  fade and scrollbar stop short of the edge. Use `scrollbarEndInset={0}` when
+  the scrollbar must reach the viewport ends. Inspect both scroll limits in a
+  native capture; a static gradient can leave a visible band with no overflow.
+- A radius on the TSX root clips GPU content, not the native window decoration.
+  On Wayland, inspect the actual title bar and bottom border before rounding
+  the client surface: an independently drawn square decoration can leave dark
+  corner wedges. Check the result at multiple UI zoom factors because TSX
+  pixel radii scale with the content.
 - Use `start`/`end` insets for RTL; do not mix logical and physical horizontal
   sides in one TSX value. An absent positioned inset means `auto`, unlike zero
   padding.

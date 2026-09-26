@@ -1,4 +1,4 @@
-import type { BrushValue, ThemeRuntime } from '@argui/host'
+import type { ThemeRuntime } from '@argui/host'
 import type { WidgetTheme } from '@argui/widgets/solid'
 
 // Tailwind v4 color-700 and color-400 values. Neutral keeps shadcn's own tokens.
@@ -40,25 +40,6 @@ export const colorFamilies: ColorFamily[] = ['Neutral', ...Object.keys(tailwindF
 export function familySwatch(family: ColorFamily, dark: boolean): string {
   if (family === 'Neutral') return dark ? 'oklch(0.922 0 0)' : 'oklch(0.205 0 0)'
   return tailwindFamilies[family][dark ? 1 : 0]
-}
-
-/** Darkens the sidebar's own hue for a soft scroll-edge shadow. */
-export function navigationShadowColor(sidebar: string): string {
-  const match = /^oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/.exec(sidebar)
-  if (!match) return 'oklch(0 0 0 / 35%)'
-  const lightness = Number(match[1])
-  const darker = lightness * (lightness > 0.5 ? 0.72 : 0.45)
-  const opacity = lightness > 0.5 ? 35 : 55
-  return `oklch(${darker.toFixed(3)} ${match[2]} ${match[3]} / ${opacity}%)`
-}
-
-/** Fades the sidebar's darker shadow color across a viewport edge. */
-export function navigationEdgeShadow(sidebar: string, edge: 'top' | 'bottom'): BrushValue {
-  const shadow = navigationShadowColor(sidebar)
-  return { kind: 'linear', angle: edge === 'top' ? 90 : 270, space: 'srgb', stops: [
-    { offset: 0, color: shadow },
-    { offset: 1, color: shadow.replace(/\/ \d+%\)$/, '/ 0%)') },
-  ] }
 }
 
 /** Resolves a Tailwind family's semantic color tokens with readable light and dark foreground pairs. */

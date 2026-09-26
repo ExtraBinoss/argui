@@ -33,7 +33,7 @@ export default defineConfig({
     rollupOptions: { input: resolve(import.meta.dirname, react ? 'react.html' : 'index.html') } } : {
     ssr: react ? 'src/react/main.tsx' : 'src/solid/main.tsx',
     outDir: 'dist',
-    emptyOutDir: !react && !cliBuild,
+    emptyOutDir: !react && !cliBuild && process.env.ARGUI_GALLERY_DEV !== '1',
     target: 'es2022',
     rollupOptions: { output: { entryFileNames: cliBuild ? 'app.mjs'
       : react ? 'gallery-react-core.mjs' : 'gallery-core.mjs' } },

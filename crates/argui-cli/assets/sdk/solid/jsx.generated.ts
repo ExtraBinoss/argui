@@ -1098,6 +1098,7 @@ export namespace JSX {
       scrollY?: boolean
       scrollbarSide?: "left" | "right"
       scrollbarWidth?: number
+      scrollbarEndInset?: number
       scrollbarVisible?: boolean
       scrollbarThumbColor?: string
       scrollbarTrackColor?: string
@@ -1105,6 +1106,8 @@ export namespace JSX {
       scrollbarHoverWidth?: number
       scrollbarPressedColor?: string
       scrollMomentum?: number
+      shadowWidth?: number
+      shadowIntensity?: number
       grow?: number
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string

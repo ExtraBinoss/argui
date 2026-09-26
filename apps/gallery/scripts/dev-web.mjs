@@ -45,18 +45,12 @@ const useInstalledBindgen = bindgenVersion !== undefined
   && installedBindgen.stdout.trim() === `wasm-bindgen ${bindgenVersion}`
 
 async function buildWebHost() {
-  await run('Generating the JSX contract and CLI SDK', 'bun', ['run', 'generate:jsx'], {
-    ...process.env,
-    CARGO_TARGET_DIR: resolve(root, 'target/dev'),
-  })
+  await run('Generating the JSX contract and CLI SDK', 'bun', ['run', 'generate:jsx'])
   console.log(`${prefix} ${useInstalledBindgen
     ? `Reusing installed wasm-bindgen ${bindgenVersion}.`
     : `wasm-pack will obtain wasm-bindgen ${bindgenVersion ?? 'required by the Web host'}.`}`)
   await run('Compiling the Rust WebAssembly host', 'wasm-pack', ['build', host, '--target', 'web', '--out-dir', 'pkg', '--dev',
-    ...(useInstalledBindgen ? ['--mode', 'no-install'] : [])], {
-    ...process.env,
-    CARGO_TARGET_DIR: resolve(host, 'target/dev'),
-  })
+    ...(useInstalledBindgen ? ['--mode', 'no-install'] : [])])
 }
 
 console.log(`${prefix} Starting the Web gallery.`)

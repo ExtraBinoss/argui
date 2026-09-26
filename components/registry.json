@@ -6,17 +6,19 @@
     "react/button.tsx": "fe45a0d836c75cc2580aa6cff4b995d39df191915fbb06ff5a4869ab4c9116ab",
     "react/input-field.tsx": "ffd08ecfecef30127fcdcd39911c31177e973f7b75daa7653aefbe82f730a530",
     "react/popover.tsx": "9afdbf46be008da76ed621d4081f0ebcaf1654d589891409b021dc50c5dff86f",
+    "react/scroll-shadow.tsx": "1182c0d9b6cf6b8b26f0916ea8969b8940cf418377caec054672cc36bc1c2908",
     "react/select.tsx": "43ce130f5366cd1bda968ccfacec1a68b6cabe634abce42c000b285afbb9c6da",
     "react/virtual-list.tsx": "ea1967150227a7b0193263aa31806e3fdcb87a2127e730ed6dee4ef3f4e3ab9c",
     "shared/button-paint.ts": "68bb9e4471ff01dd125297fd5da22b112716f1c8c797b88c799815bd21067a23",
     "shared/input-edit.ts": "9cb10aef7e6aba6e4fd7e7c4e696be2894a4ed38f2ee6b02e55f8253d78c06d9",
     "shared/input-offset-index.ts": "78035279d593f4512c34a038c6d204ee99cf11cbaea92d30620a2be565556138",
-    "shared/theme.ts": "22bad0fa9ec6984c2f04e9a672de3a2fdae57a4d90bf341b06bff375b10192d4",
+    "shared/theme.ts": "60618ecd6cedd903512bc8d41cadac4982d35a9c6ba5a5b163cee0e222643e59",
     "shared/types.ts": "60c38f51df08ce6c9700b508dbd66e78f77e3a6f222bb9168bb884bcf4716316",
     "solid/button-group.tsx": "2119fe35f01281224f82a9713f89dcb2979c48bcf3e262fecaeb5e4501225b76",
     "solid/button.tsx": "42298bf1ee21695e88046f1a359a79b059f0f1c2faba0f8f4743c2e2da613bb0",
     "solid/input-field.tsx": "e987963ea02bc889db3651070e0f173f31d1e8727dc32dd30628b2f4908699ae",
     "solid/popover.tsx": "00ea1d317c41314982b6cf5eac0ea96d2619ab89c377174291dcf2f64e3f6591",
+    "solid/scroll-shadow.tsx": "bb711490da926b58ab9592e539f6e80d2f607659dfa8b1f3d7f2cf30e6b6b0c3",
     "solid/select.tsx": "ec6c1eefe3ad22d5772e7a9ae5d5cd6855394197ac9b4d254514e8c86b770050",
     "solid/virtual-list.tsx": "d1de471ed90b4d7f5e009a017051bb7b8a0cc2e3f7650ebd3bb83ed5a8403861"
   },
@@ -107,6 +109,21 @@
         "shared/button-paint.ts",
         "shared/theme.ts",
         "shared/types.ts"
+      ]
+    },
+    "scroll-shadow": {
+      "version": "0.4.0",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.4.0/packages/widgets/src/solid/scroll-shadow.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.4.0/packages/widgets/src/react/scroll-shadow.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/scroll-shadow.tsx"
+      ],
+      "react": [
+        "react/scroll-shadow.tsx",
+        "shared/theme.ts"
       ]
     },
     "select": {

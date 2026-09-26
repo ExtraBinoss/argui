@@ -1,6 +1,7 @@
 //! Native scroll viewport with an overflow-aware scrollbar.
 
 use argui_animation::{Duration, Tween};
+use argui_effects::EdgeFade;
 use argui_paint::{CornerRadii, QuadStyle};
 use argui_ui::{
     Axes, Color, Element, EventType, InertialScroll, Overflow, ScrollAxes, ScrollConfig,
@@ -10,7 +11,8 @@ use argui_ui::{
 
 use super::{
     CHILDREN, CONTENT_HEIGHT, CONTENT_WIDTH, CommonProperty, ENABLED, FLICK_VIEWPORT_HEIGHT,
-    FLICK_VIEWPORT_WIDTH, GROW, OFFSET_X, OFFSET_Y, SCROLL, SCROLL_MOMENTUM, SCROLL_X, SCROLL_Y,
+    FLICK_VIEWPORT_WIDTH, GROW, OFFSET_X, OFFSET_Y, SCROLL, SCROLL_MOMENTUM,
+    SCROLL_SHADOW_INTENSITY, SCROLL_SHADOW_WIDTH, SCROLL_X, SCROLL_Y, SCROLLBAR_END_INSET,
     SCROLLBAR_HOVER_COLOR, SCROLLBAR_HOVER_WIDTH, SCROLLBAR_PRESSED_COLOR, SCROLLBAR_SIDE,
     SCROLLBAR_THUMB_COLOR, SCROLLBAR_TRACK_COLOR, SCROLLBAR_VISIBLE, SCROLLBAR_WIDTH, apply_common,
     common_property, optional_bool,
@@ -86,6 +88,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         ValueType::Float,
         "Resting width of the native scrollbar in logical pixels.",
     ))
+    .property(PropertySchema::new(
+        SCROLLBAR_END_INSET,
+        "scrollbarEndInset",
+        ValueType::Float,
+        "Inset at the top and bottom of the vertical scrollbar track in logical pixels.",
+    ))
     .property(
         PropertySchema::new(
             SCROLLBAR_VISIBLE,
@@ -130,6 +138,18 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "scrollMomentum",
         ValueType::Float,
         "Scroll glide strength from zero (direct) to one (longest glide).",
+    ))
+    .property(PropertySchema::new(
+        SCROLL_SHADOW_WIDTH,
+        "shadowWidth",
+        ValueType::Float,
+        "Native edge-fade width in logical pixels; zero disables the effect.",
+    ))
+    .property(PropertySchema::new(
+        SCROLL_SHADOW_INTENSITY,
+        "shadowIntensity",
+        ValueType::Float,
+        "Native edge-fade strength from zero to one.",
     ))
     .property(PropertySchema::new(
         GROW,
@@ -220,6 +240,39 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         if let Some(physics) = scroll_momentum(input, SCROLL_MOMENTUM)? {
             config = config.physics(physics);
         }
+        let shadow_width = match input.get(SCROLL_SHADOW_WIDTH) {
+            Some(SchemaValue::Float(value)) if value.is_finite() && *value >= 0.0 => *value,
+            Some(_) => {
+                return Err(SchemaError::Adapter(
+                    "shadowWidth must be nonnegative and finite".into(),
+                ));
+            }
+            None => 0.0,
+        };
+        let shadow_intensity = match input.get(SCROLL_SHADOW_INTENSITY) {
+            Some(SchemaValue::Float(value)) if value.is_finite() && (0.0..=1.0).contains(value) => {
+                *value
+            }
+            Some(_) => {
+                return Err(SchemaError::Adapter(
+                    "shadowIntensity must be in [0, 1]".into(),
+                ));
+            }
+            None => 1.0,
+        };
+        if shadow_width > 0.0 {
+            let strengths = match axes {
+                ScrollAxes::Horizontal => [1.0, 0.0, 1.0, 0.0],
+                ScrollAxes::Vertical => [0.0, 1.0, 0.0, 1.0],
+                ScrollAxes::Both => [1.0; 4],
+            };
+            config = config.effect(
+                EdgeFade::new(shadow_width)
+                    .intensity(shadow_intensity)
+                    .strengths(strengths)
+                    .scroll(),
+            );
+        }
         if optional_bool(input, SCROLLBAR_VISIBLE).unwrap_or(true) {
             let side = match input.get(SCROLLBAR_SIDE) {
                 Some(SchemaValue::String(value)) if value == "left" => ScrollbarSide::Left,
@@ -230,6 +283,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 Some(_) => {
                     return Err(SchemaError::Adapter(
                         "scrollbarWidth must be a positive finite number".into(),
+                    ));
+                }
+                None => 4.0,
+            };
+            let end_inset = match input.get(SCROLLBAR_END_INSET) {
+                Some(SchemaValue::Float(value)) if value.is_finite() && *value >= 0.0 => *value,
+                Some(_) => {
+                    return Err(SchemaError::Adapter(
+                        "scrollbarEndInset must be nonnegative and finite".into(),
                     ));
                 }
                 None => 4.0,
@@ -281,8 +343,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             .insets(Sides {
                 left: 0.0,
                 right: 0.0,
-                top: 4.0,
-                bottom: 4.0,
+                top: end_inset,
+                bottom: end_inset,
             })
             .visibility(ScrollbarVisibility::Always);
             config = config.scrollbar(scrollbar.hover_width(hover_width));

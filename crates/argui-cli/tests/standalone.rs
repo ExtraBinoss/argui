@@ -173,18 +173,18 @@ fn list_finds_every_component_pair_outside_checkout() {
     );
     let catalog: Value = serde_json::from_slice(&output.stdout).unwrap();
     let rows = catalog.as_array().unwrap();
-    assert_eq!(rows.len(), 12);
+    assert_eq!(rows.len(), 14);
     assert_eq!(
         rows.iter()
             .filter(|row| row["framework"] == "solid")
             .count(),
-        6
+        7
     );
     assert_eq!(
         rows.iter()
             .filter(|row| row["framework"] == "react")
             .count(),
-        6
+        7
     );
     assert!(
         rows.iter()

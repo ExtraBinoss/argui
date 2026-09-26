@@ -3,6 +3,7 @@
   "button-group",
   "input-field",
   "popover",
+  "scroll-shadow",
   "select",
   "virtual-list"
 ]
