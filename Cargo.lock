@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "argui-accessibility"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -229,14 +229,14 @@ dependencies = [
 
 [[package]]
 name = "argui-animation"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-automation"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -255,26 +255,32 @@ dependencies = [
 
 [[package]]
 name = "argui-cli"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-automation",
+ "flate2",
  "image",
+ "reqwest",
+ "self-replace",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
+ "tar",
  "tempfile",
+ "zip",
 ]
 
 [[package]]
 name = "argui-core"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "web-time",
 ]
 
 [[package]]
 name = "argui-effects"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-paint",
  "argui-render",
@@ -285,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "argui-host"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -297,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "argui-i18n"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-ui",
  "fluent-bundle",
@@ -309,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "argui-inspect"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
  "serde",
@@ -318,7 +324,7 @@ dependencies = [
 
 [[package]]
 name = "argui-layout"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -331,7 +337,7 @@ dependencies = [
 
 [[package]]
 name = "argui-media"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -342,14 +348,14 @@ dependencies = [
 
 [[package]]
 name = "argui-paint"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-platform"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "android-activity",
  "arboard",
@@ -391,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "argui-render"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -408,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "argui-runtime"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -442,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "argui-schema"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -459,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "argui-text"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
  "cosmic-text",
@@ -469,7 +475,7 @@ dependencies = [
 
 [[package]]
 name = "argui-theme"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -477,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "argui-ui"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "argui-accessibility",
  "argui-animation",
@@ -491,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "argui-updater"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "flate2",
  "minisign-verify",
@@ -507,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "argui-webview"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "ammonia",
  "argui-core",
@@ -882,6 +888,12 @@ dependencies = [
  "quote",
  "syn 3.0.4",
 ]
+
+[[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "byteorder-lite"
@@ -6030,7 +6042,6 @@ dependencies = [
  "thiserror 2.0.20",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
- "wgpu-core-deps-wasm",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
  "wgpu-naga-bridge",
@@ -6051,15 +6062,6 @@ name = "wgpu-core-deps-emscripten"
 version = "30.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98b86cf4abf524a902dd35f18ca6a3f08fc2ae9847c8f10b48e30491b1f0b86"
-dependencies = [
- "wgpu-hal",
-]
-
-[[package]]
-name = "wgpu-core-deps-wasm"
-version = "30.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d260ca2ca8adc654f513a869bf3cac0b47f5b8d3f87803d6942015f8de597aae"
 dependencies = [
  "wgpu-hal",
 ]
@@ -7072,6 +7074,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.4",
+]
+
+[[package]]
+name = "zip"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
+dependencies = [
+ "byteorder",
+ "crc32fast",
+ "crossbeam-utils",
+ "flate2",
 ]
 
 [[package]]

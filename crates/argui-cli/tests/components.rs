@@ -4,7 +4,15 @@ use argui_cli::{Framework, Project, catalog, component_files, install, run_in};
 use sha2::{Digest, Sha256};
 use std::{fs, path::Path};
 
-const REGISTRY: &str = include_str!("fixtures/registry.json");
+/// Returns the pinned fixture registry at the crate version under test.
+fn fixture_registry() -> &'static str {
+    static REGISTRY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    REGISTRY
+        .get_or_init(|| {
+            include_str!("fixtures/registry.json").replace("0.3.3", env!("CARGO_PKG_VERSION"))
+        })
+        .as_str()
+}
 
 /// Builds one release-pinned registry fixture with an exact source checksum.
 fn versioned_registry(body: &str) -> String {
@@ -24,12 +32,45 @@ fn versioned_registry(body: &str) -> String {
     }).to_string()
 }
 
+/// Builds one v2 button registry with a selected source path and checksum.
+fn button_registry(path: &str, body: &str) -> String {
+    let release = env!("CARGO_PKG_VERSION");
+    serde_json::json!({
+        "version": 2,
+        "arguiVersion": release,
+        "files": { path: format!("{:x}", Sha256::digest(body.as_bytes())) },
+        "components": {
+            "button": {
+                "version": release,
+                "source": {
+                    "solid": format!("https://github.com/ExtraBinoss/argui/blob/v{release}/packages/widgets/src/solid/button.tsx"),
+                    "react": format!("https://github.com/ExtraBinoss/argui/blob/v{release}/packages/widgets/src/react/button.tsx")
+                },
+                "solid": [path],
+                "react": []
+            }
+        }
+    }).to_string()
+}
+
 #[test]
 /// Versioned installs validate source bytes before mutation and protect edited local files.
 fn versioned_install_rejects_checksum_mismatch_and_local_edits() {
     let temp = tempfile::tempdir().unwrap();
     project(temp.path(), "solid");
     let registry = versioned_registry("trusted source");
+    let mismatched = registry.replace(env!("CARGO_PKG_VERSION"), "0.0.0");
+    assert!(
+        install(
+            temp.path(),
+            Framework::Solid,
+            &["badge".into()],
+            &mismatched,
+            |_| Ok("trusted source".into())
+        )
+        .unwrap_err()
+        .contains("registry version does not match")
+    );
     assert!(
         install(
             temp.path(),
@@ -41,7 +82,7 @@ fn versioned_install_rejects_checksum_mismatch_and_local_edits() {
         .unwrap_err()
         .contains("checksum mismatch")
     );
-    assert!(!temp.path().join("src/argui-ui/solid/badge.tsx").exists());
+    assert!(!temp.path().join("ui/solid-components/badge.tsx").exists());
     install(
         temp.path(),
         Framework::Solid,
@@ -50,7 +91,7 @@ fn versioned_install_rejects_checksum_mismatch_and_local_edits() {
         |_| Ok("trusted source".into()),
     )
     .unwrap();
-    let installed = temp.path().join("src/argui-ui/solid/badge.tsx");
+    let installed = temp.path().join("ui/solid-components/badge.tsx");
     let manifest: Project =
         serde_json::from_slice(&fs::read(temp.path().join("argui.json")).unwrap()).unwrap();
     assert!(manifest.component_checksums.contains_key("solid/badge.tsx"));
@@ -132,7 +173,7 @@ fn versioned_registry_rejects_incomplete_release_metadata() {
                 value["components"]["badge"] =
                     serde_json::json!({"solid":["solid/badge.tsx"],"react":[]})
             }),
-            "lacks versioned metadata",
+            "missing field",
         ),
     ];
     for (change, expected) in changes {
@@ -147,98 +188,20 @@ fn versioned_registry_rejects_incomplete_release_metadata() {
     assert!(!filtered.contains("react"));
 }
 
-#[test]
-/// `argui add` accepts flags around names and installs both adapters in one batch.
-fn add_accepts_mixed_frameworks_and_an_explicit_project() {
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let app = root.join("apps/demo");
-    project(&app, "react");
-    fs::write(
-        app.join("package.json"),
-        r#"{"dependencies":{"@argui/react":"workspace:*","react":"19.2.0"}}"#,
-    )
-    .unwrap();
-    fs::create_dir_all(root.join("packages/host")).unwrap();
-    fs::create_dir_all(root.join("apps/gallery/quickjs-host")).unwrap();
-    fs::create_dir_all(root.join("components")).unwrap();
-    fs::write(root.join("packages/host/package.json"), "{}").unwrap();
-    fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
-    fs::write(root.join("components/registry.json"), REGISTRY).unwrap();
-    for (framework, name) in [(Framework::Solid, "button"), (Framework::React, "popover")] {
-        for path in component_files(REGISTRY, framework, &[name.into()]).unwrap() {
-            let source = root.join("packages/widgets/src").join(&path);
-            fs::create_dir_all(source.parent().unwrap()).unwrap();
-            fs::write(source, format!("fixture source: {path}")).unwrap();
-        }
-    }
-    run_in(
-        root,
-        &[
-            "add".into(),
-            "--solid".into(),
-            "button".into(),
-            "--react".into(),
-            "popover".into(),
-            "--project".into(),
-            "apps/demo".into(),
-        ],
-    )
-    .unwrap();
-    let manifest: Project =
-        serde_json::from_slice(&fs::read(app.join("argui.json")).unwrap()).unwrap();
-    assert_eq!(manifest.components, ["react/popover", "solid/button"]);
-    let package: serde_json::Value =
-        serde_json::from_slice(&fs::read(app.join("package.json")).unwrap()).unwrap();
-    assert_eq!(package["dependencies"]["@argui/solid"], "workspace:*");
-    assert_eq!(package["dependencies"]["solid-js"], "1.9.15");
-
-    let app_with_trailing_flag = root.join("apps/trailing-flag");
-    project(&app_with_trailing_flag, "react");
-    fs::write(
-        app_with_trailing_flag.join("package.json"),
-        "{\"dependencies\":{}}",
-    )
-    .unwrap();
-    run_in(
-        root,
-        &[
-            "add".into(),
-            "button".into(),
-            "--solid".into(),
-            "--project".into(),
-            "apps/trailing-flag".into(),
-        ],
-    )
-    .unwrap();
-    let manifest: Project =
-        serde_json::from_slice(&fs::read(app_with_trailing_flag.join("argui.json")).unwrap())
-            .unwrap();
-    assert_eq!(manifest.components, ["solid/button"]);
-    assert!(
-        run_in(
-            root,
-            &[
-                "add".into(),
-                "button".into(),
-                "--solid".into(),
-                "--react".into(),
-                "popover".into(),
-                "--project".into(),
-                "apps/trailing-flag".into(),
-            ],
-        )
-        .unwrap_err()
-        .contains("between framework selectors")
-    );
-}
-
-/// Writes a minimal project manifest for an offline component install.
+/// Creates a standalone v2 app for offline component installation tests.
 fn project(path: &Path, framework: &str) {
-    fs::create_dir_all(path.join("src")).unwrap();
-    fs::write(
-        path.join("argui.json"),
-        format!(r#"{{"name":"demo","framework":"{framework}"}}"#),
+    run_in(
+        path,
+        &[
+            "init".into(),
+            framework.into(),
+            "--dir".into(),
+            path.to_string_lossy().into_owned(),
+            "--name".into(),
+            "demo".into(),
+            "--yes".into(),
+            "--no-install".into(),
+        ],
     )
     .unwrap();
 }
@@ -247,7 +210,7 @@ fn project(path: &Path, framework: &str) {
 /// Shared component dependencies are only downloaded once per install.
 fn resolves_component_dependencies_once() {
     let paths = component_files(
-        REGISTRY,
+        fixture_registry(),
         Framework::Solid,
         &["button".into(), "popover".into()],
     )
@@ -256,23 +219,48 @@ fn resolves_component_dependencies_once() {
     assert!(paths.contains(&"solid/button.tsx".into()));
     assert!(paths.contains(&"solid/popover.tsx".into()));
     assert!(
-        component_files(REGISTRY, Framework::React, &["input-field".into()])
-            .unwrap()
-            .contains(&"shared/input-text.ts".into())
+        component_files(
+            fixture_registry(),
+            Framework::React,
+            &["input-field".into()]
+        )
+        .unwrap()
+        .contains(&"shared/input-text.ts".into())
     );
 }
 
 #[test]
 /// Registry input cannot select unknown names or escape the source tree.
 fn rejects_unknown_components_and_unsafe_registry_paths() {
-    assert!(component_files(REGISTRY, Framework::Solid, &["missing".into()]).is_err());
-    assert!(component_files(REGISTRY, Framework::Solid, &["../bad".into()]).is_err());
-    let unsafe_registry = r#"{"version":1,"components":{"button":{"solid":["../escape.tsx"]}}}"#;
-    assert!(component_files(unsafe_registry, Framework::Solid, &["button".into()]).is_err());
-    let missing_variant = r#"{"version":1,"components":{"button":{"react":["react/button.tsx"]}}}"#;
-    assert!(component_files(missing_variant, Framework::Solid, &["button".into()]).is_err());
-    let newer_version = r#"{"version":2,"components":{}}"#;
-    assert!(component_files(newer_version, Framework::Solid, &["button".into()]).is_err());
+    assert!(component_files(fixture_registry(), Framework::Solid, &["missing".into()]).is_err());
+    assert!(component_files(fixture_registry(), Framework::Solid, &["../bad".into()]).is_err());
+    let unsafe_registry = button_registry("../escape.tsx", "x");
+    assert!(component_files(&unsafe_registry, Framework::Solid, &["button".into()]).is_err());
+    let mut missing_variant: serde_json::Value =
+        serde_json::from_str(&button_registry("solid/button.tsx", "x")).unwrap();
+    missing_variant["components"]["button"]
+        .as_object_mut()
+        .unwrap()
+        .remove("solid");
+    assert!(
+        component_files(
+            &missing_variant.to_string(),
+            Framework::Solid,
+            &["button".into()]
+        )
+        .is_err()
+    );
+    let mut old_version: serde_json::Value =
+        serde_json::from_str(&button_registry("solid/button.tsx", "x")).unwrap();
+    old_version["version"] = 1.into();
+    assert!(
+        component_files(
+            &old_version.to_string(),
+            Framework::Solid,
+            &["button".into()]
+        )
+        .is_err()
+    );
     assert!(component_files("not JSON", Framework::Solid, &["button".into()]).is_err());
     for path in [
         "",
@@ -281,13 +269,11 @@ fn rejects_unknown_components_and_unsafe_registry_paths() {
         "/tmp/a.ts",
         "solid/../a.ts",
     ] {
-        let registry =
-            format!(r#"{{"version":1,"components":{{"button":{{"solid":["{path}"]}}}}}}"#);
+        let registry = button_registry(path, "x");
         assert!(component_files(&registry, Framework::Solid, &["button".into()]).is_err());
     }
     let long_path = format!("solid/{}.tsx", "a".repeat(180));
-    let registry =
-        format!(r#"{{"version":1,"components":{{"button":{{"solid":["{long_path}"]}}}}}}"#);
+    let registry = button_registry(&long_path, "x");
     assert!(component_files(&registry, Framework::Solid, &["button".into()]).is_err());
 }
 
@@ -301,7 +287,7 @@ fn install_tracks_and_reuses_dependencies() {
         temp.path(),
         Framework::Solid,
         &["button".into()],
-        REGISTRY,
+        fixture_registry(),
         source,
     )
     .unwrap();
@@ -309,12 +295,12 @@ fn install_tracks_and_reuses_dependencies() {
         serde_json::from_slice(&fs::read(temp.path().join("argui.json")).unwrap()).unwrap();
     assert_eq!(manifest.components, ["solid/button"]);
     assert_eq!(manifest.component_files.len(), 4);
-    assert!(temp.path().join("src/argui-ui/solid/button.tsx").is_file());
+    assert!(temp.path().join("ui/solid-components/button.tsx").is_file());
     install(
         temp.path(),
         Framework::Solid,
         &["button".into(), "popover".into()],
-        REGISTRY,
+        fixture_registry(),
         |path| Ok(format!("fixture source: {path}")),
     )
     .unwrap();
@@ -333,12 +319,12 @@ fn install_rejects_conflicts_and_download_failures() {
             temp.path(),
             Framework::Solid,
             &["button".into()],
-            REGISTRY,
+            fixture_registry(),
             |_| Ok(String::new())
         )
         .is_err()
     );
-    let target = temp.path().join("src/argui-ui/react/button.tsx");
+    let target = temp.path().join("ui/react-components/button.tsx");
     fs::create_dir_all(target.parent().unwrap()).unwrap();
     fs::write(&target, "my version").unwrap();
     assert!(
@@ -346,7 +332,7 @@ fn install_rejects_conflicts_and_download_failures() {
             temp.path(),
             Framework::React,
             &["button".into()],
-            REGISTRY,
+            fixture_registry(),
             |_| Ok(String::new())
         )
         .unwrap_err()
@@ -358,12 +344,12 @@ fn install_rejects_conflicts_and_download_failures() {
             temp.path(),
             Framework::React,
             &["button".into()],
-            REGISTRY,
+            fixture_registry(),
             |_| Err("offline".into())
         )
         .is_err()
     );
-    assert!(!temp.path().join("src/argui-ui/shared/types.ts").exists());
+    assert!(!temp.path().join("ui/shared/types.ts").exists());
 }
 
 #[test]
@@ -371,13 +357,13 @@ fn install_rejects_conflicts_and_download_failures() {
 fn install_rejects_a_new_output_during_staging() {
     let temp = tempfile::tempdir().unwrap();
     project(temp.path(), "solid");
-    let registry = r#"{"version":1,"components":{"button":{"solid":["solid/button.tsx"]}}}"#;
-    let output = temp.path().join("src/argui-ui/solid/button.tsx");
+    let registry = button_registry("solid/button.tsx", "downloaded content");
+    let output = temp.path().join("ui/solid-components/button.tsx");
     let error = install(
         temp.path(),
         Framework::Solid,
         &["button".into()],
-        registry,
+        &registry,
         |_| {
             fs::create_dir_all(output.parent().unwrap()).unwrap();
             fs::write(&output, "user content").unwrap();
@@ -387,138 +373,6 @@ fn install_rejects_a_new_output_during_staging() {
     .unwrap_err();
     assert!(error.contains("appeared while reading sources"));
     assert_eq!(fs::read_to_string(output).unwrap(), "user content");
-}
-
-#[cfg(unix)]
-#[test]
-/// Symlinked destinations and source escapes cannot redirect component files.
-fn add_and_install_reject_symlink_redirects() {
-    use std::os::unix::fs::symlink;
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let app = root.join("apps/demo");
-    project(&app, "solid");
-    let registry = r#"{"version":1,"components":{"button":{"solid":["solid/button.tsx"]}}}"#;
-    let outside = root.join("outside");
-    fs::create_dir_all(&outside).unwrap();
-    fs::create_dir_all(app.join("src/argui-ui")).unwrap();
-    symlink(&outside, app.join("src/argui-ui/solid")).unwrap();
-    let error = install(&app, Framework::Solid, &["button".into()], registry, |_| {
-        Ok("x".into())
-    })
-    .unwrap_err();
-    assert!(error.contains("symlink conflict"));
-    fs::remove_file(app.join("src/argui-ui/solid")).unwrap();
-    fs::create_dir_all(root.join("packages/host")).unwrap();
-    fs::create_dir_all(root.join("apps/gallery/quickjs-host")).unwrap();
-    fs::create_dir_all(root.join("components")).unwrap();
-    fs::create_dir_all(root.join("packages/widgets/src/solid")).unwrap();
-    fs::write(root.join("packages/host/package.json"), "{}").unwrap();
-    fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
-    fs::write(root.join("components/registry.json"), registry).unwrap();
-    fs::write(outside.join("button.tsx"), "private").unwrap();
-    symlink(
-        outside.join("button.tsx"),
-        root.join("packages/widgets/src/solid/button.tsx"),
-    )
-    .unwrap();
-    let error = run_in(&app, &["add".into(), "solid".into(), "button".into()]).unwrap_err();
-    assert!(error.contains("escapes widget directory"));
-}
-
-#[test]
-/// The command copies only the declared files from its versioned checkout.
-fn add_reads_the_local_registry_and_component_sources() {
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let app = root.join("apps/demo");
-    project(&app, "solid");
-    fs::create_dir_all(root.join("packages/host")).unwrap();
-    fs::create_dir_all(root.join("apps/gallery/quickjs-host")).unwrap();
-    fs::create_dir_all(root.join("components")).unwrap();
-    fs::write(root.join("packages/host/package.json"), "{}").unwrap();
-    fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
-    fs::write(root.join("components/registry.json"), REGISTRY).unwrap();
-    for path in component_files(REGISTRY, Framework::Solid, &["input-field".into()]).unwrap() {
-        let source = root.join("packages/widgets/src").join(&path);
-        fs::create_dir_all(source.parent().unwrap()).unwrap();
-        fs::write(source, format!("fixture source: {path}")).unwrap();
-    }
-    run_in(&app, &["add".into(), "solid".into(), "input-field".into()]).unwrap();
-    assert!(app.join("src/argui-ui/solid/input-field.tsx").is_file());
-    assert!(app.join("src/argui-ui/solid/button.tsx").is_file());
-    assert!(!app.join("src/argui-ui/solid/popover.tsx").exists());
-    assert!(!app.join("src/argui-ui/react/button.tsx").exists());
-}
-
-#[test]
-/// Oversized checkout sources never reach the application directory.
-fn add_rejects_oversized_sources() {
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let app = root.join("apps/demo");
-    project(&app, "solid");
-    fs::create_dir_all(root.join("packages/host")).unwrap();
-    fs::create_dir_all(root.join("apps/gallery/quickjs-host")).unwrap();
-    fs::create_dir_all(root.join("components")).unwrap();
-    fs::create_dir_all(root.join("packages/widgets/src/solid")).unwrap();
-    fs::write(root.join("packages/host/package.json"), "{}").unwrap();
-    fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
-    fs::write(
-        root.join("components/registry.json"),
-        r#"{"version":1,"components":{"button":{"solid":["solid/button.tsx"]}}}"#,
-    )
-    .unwrap();
-    fs::write(
-        root.join("packages/widgets/src/solid/button.tsx"),
-        vec![b'x'; 256 * 1024 + 1],
-    )
-    .unwrap();
-    let error = run_in(&app, &["add".into(), "solid".into(), "button".into()]).unwrap_err();
-    assert!(error.contains("exceeds 262144 bytes"));
-    assert!(!app.join("src/argui-ui/solid/button.tsx").exists());
-}
-
-#[test]
-/// Missing or malformed checkout files fail before an app receives components.
-fn add_explains_incomplete_checkout_sources() {
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let app = root.join("apps/demo");
-    project(&app, "solid");
-    fs::create_dir_all(root.join("packages/host")).unwrap();
-    fs::create_dir_all(root.join("apps/gallery/quickjs-host")).unwrap();
-    fs::create_dir_all(root.join("components")).unwrap();
-    fs::write(root.join("packages/host/package.json"), "{}").unwrap();
-    fs::write(root.join("apps/gallery/quickjs-host/Cargo.toml"), "").unwrap();
-    let args = ["add".into(), "solid".into(), "button".into()];
-    assert!(run_in(&app, &args).unwrap_err().contains("registry.json"));
-    fs::write(root.join("components/registry.json"), vec![0xff]).unwrap();
-    assert!(run_in(&app, &args).unwrap_err().contains("invalid UTF-8"));
-    fs::write(
-        root.join("components/registry.json"),
-        r#"{"version":1,"components":{"button":{"solid":["solid/button.tsx"]}}}"#,
-    )
-    .unwrap();
-    assert!(
-        run_in(&app, &args)
-            .unwrap_err()
-            .contains("widget source directory")
-    );
-    fs::create_dir_all(root.join("packages/widgets/src")).unwrap();
-    assert!(
-        run_in(&app, &args)
-            .unwrap_err()
-            .contains("solid/button.tsx")
-    );
-    fs::create_dir_all(root.join("packages/widgets/src/solid")).unwrap();
-    fs::write(
-        root.join("packages/widgets/src/solid/button.tsx"),
-        vec![0xff],
-    )
-    .unwrap();
-    assert!(run_in(&app, &args).unwrap_err().contains("invalid UTF-8"));
-    assert!(!app.join("src/argui-ui/solid/button.tsx").exists());
 }
 
 #[test]

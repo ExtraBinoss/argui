@@ -16,7 +16,7 @@ if [[ "$framework" == react ]]; then
 else
   bundle="$repo_root/apps/gallery/dist/gallery-core.mjs"
 fi
-ARGUI_GALLERY_ENTRY="$framework" bunx vite build --config apps/gallery/vite.config.ts --watch &
+ARGUI_GALLERY_DEV=1 ARGUI_GALLERY_ENTRY="$framework" bunx vite build --config apps/gallery/vite.config.ts --watch &
 builder_pid=$!
 sync_pid=
 cleanup() {
@@ -28,7 +28,8 @@ trap cleanup EXIT
 if [[ "$mode" == desktop ]]; then
   cargo_options=()
   if [[ "${ARGUI_GALLERY_ALL_TABLER:-0}" == 1 ]]; then cargo_options+=(--features dev-tabler-icons); fi
-  ARGUI_GALLERY_BUNDLE="$bundle" cargo run --manifest-path apps/gallery/quickjs-host/Cargo.toml --locked "${cargo_options[@]}"
+  CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$repo_root/target/dev}" ARGUI_GALLERY_BUNDLE="$bundle" \
+    cargo run --manifest-path apps/gallery/quickjs-host/Cargo.toml --locked "${cargo_options[@]}"
 else
   package=dev.argui.solidgallery.debug
   adb shell run-as "$package" mkdir -p files

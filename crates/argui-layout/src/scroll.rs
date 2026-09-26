@@ -2,7 +2,7 @@ use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{Border, ClipChain, ClipRegion, Color, DisplayList, Quad, QuadStyle};
 use argui_ui::{
     NodeId, ScrollAxes, ScrollConfig, ScrollRegion, ScrollbarGeometry, ScrollbarRegion,
-    ScrollbarVisibility,
+    ScrollbarSide, ScrollbarVisibility,
 };
 
 use crate::engine::NodeMap;
@@ -140,11 +140,12 @@ fn vertical_bar(
     if width == 0.0 || track_height == 0.0 {
         return None;
     }
+    let track_x = match style.side {
+        ScrollbarSide::Left => bounds.origin.x + insets.left,
+        ScrollbarSide::Right => bounds.origin.x + bounds.size.width - insets.right - width,
+    };
     let track = Rect::new(
-        Point::new(
-            bounds.origin.x + bounds.size.width - insets.right - width,
-            bounds.origin.y + insets.top,
-        ),
+        Point::new(track_x, bounds.origin.y + insets.top),
         Size::new(width, track_height),
     );
     let content_height = bounds.size.height + max_offset;

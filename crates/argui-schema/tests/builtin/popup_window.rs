@@ -18,11 +18,12 @@ fn anchored_popup_uses_portal_and_focus_policies_without_paint() {
             builtin::POPUP_WINDOW,
             &NativeElementInput::new()
                 .property(builtin::ANCHOR, SchemaValue::String("trigger".into()))
-                .property(builtin::PLACEMENT, SchemaValue::String("top_end".into()))
+                .property(builtin::PLACEMENT, SchemaValue::String("topEnd".into()))
+                .property(builtin::PLACEMENT_OFFSET, SchemaValue::Float(-18.0))
                 .property(builtin::WINDOW_LAYER, SchemaValue::String("modal".into()))
                 .property(
                     builtin::DISMISS_POLICY,
-                    SchemaValue::String("outside_pointer_or_escape".into()),
+                    SchemaValue::String("outsidePointerOrEscape".into()),
                 )
                 .property(
                     builtin::FOCUS_CONTAINMENT,
@@ -42,6 +43,7 @@ fn anchored_popup_uses_portal_and_focus_policies_without_paint() {
         &portal.target,
         PortalTarget::Anchor(anchor)
             if anchor.key == "trigger" && anchor.placement.preferred == Placement::TopEnd
+                && anchor.placement.offset == -18.0
     ));
     let focus = popup.focus_scope.as_ref().unwrap();
     assert_eq!(focus.containment, FocusContainment::Modal);
@@ -151,7 +153,7 @@ fn popup_rejects_unknown_placement_for_its_target_kind() {
         .construct(
             builtin::POPUP_WINDOW,
             &NativeElementInput::new()
-                .property(builtin::PLACEMENT, SchemaValue::String("right_end".into())),
+                .property(builtin::PLACEMENT, SchemaValue::String("rightEnd".into())),
         )
         .unwrap_err();
     assert!(matches!(error, SchemaError::Adapter(_)));
@@ -165,7 +167,7 @@ fn anchored_popup_fits_near_a_window_edge() {
             builtin::POPUP_WINDOW,
             &NativeElementInput::new()
                 .property(builtin::ANCHOR, SchemaValue::String("trigger".into()))
-                .property(builtin::PLACEMENT, SchemaValue::String("right_end".into())),
+                .property(builtin::PLACEMENT, SchemaValue::String("rightEnd".into())),
         )
         .unwrap();
     let PortalTarget::Anchor(anchor) = &popup.portal.as_ref().unwrap().target else {
@@ -187,8 +189,8 @@ fn anchored_popup_fits_near_a_window_edge() {
 fn popup_rejects_invalid_policies_and_preserves_manual_focus_choices() {
     let registry = builtin::registry().unwrap();
     for (property, value) in [
-        (builtin::WINDOW_LAYER, "above_all"),
-        (builtin::DISMISS_POLICY, "click_anywhere"),
+        (builtin::WINDOW_LAYER, "aboveAll"),
+        (builtin::DISMISS_POLICY, "clickAnywhere"),
         (builtin::FOCUS_CONTAINMENT, "locked"),
         (builtin::PLACEMENT, "outside"),
     ] {
@@ -198,7 +200,10 @@ fn popup_rejects_invalid_policies_and_preserves_manual_focus_choices() {
                 &NativeElementInput::new().property(property, SchemaValue::String(value.into())),
             )
             .unwrap_err();
-        assert!(matches!(error, SchemaError::Adapter(_)), "{value}");
+        assert!(
+            matches!(error, SchemaError::InvalidPropertyValue { .. }),
+            "{value}"
+        );
     }
     let manual = registry
         .construct(

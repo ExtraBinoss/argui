@@ -18,6 +18,7 @@ pub(super) fn check(directory: &Path, manifest: &Manifest, json: bool) -> Result
         return report(output, json, "Rust check failed");
     }
     js_dependencies(directory, manifest)?;
+    generate_assets(directory)?;
     if manifest.targets.iter().any(|target| target == "web") {
         web_host(directory, manifest, false)?;
     }
@@ -96,10 +97,12 @@ pub(super) fn native(
     let rust = manifest.framework == "rust";
     if !rust {
         js_dependencies(directory, manifest)?;
+        generate_assets(directory)?;
         status(
             Command::new("bun")
                 .arg(directory.join("node_modules/vite/bin/vite.js"))
                 .args(["build", "--mode", "native", "--config", "vite.config.ts"])
+                .env("ARGUI_APP_RELEASE", if release { "1" } else { "0" })
                 .current_dir(directory),
             "vite native build",
         )?;
@@ -143,14 +146,19 @@ pub(super) fn native(
 /// Returns an error for missing WASM tools, Cargo failure, or Vite failure.
 fn web(directory: &Path, manifest: &Manifest, release: bool) -> Result<(), String> {
     js_dependencies(directory, manifest)?;
+    generate_assets(directory)?;
     web_host(directory, manifest, release)?;
     status(
         Command::new("bun")
             .arg(directory.join("node_modules/vite/bin/vite.js"))
             .args(["build", "--mode", "web", "--config", "vite.config.ts"])
+            .env("ARGUI_APP_RELEASE", if release { "1" } else { "0" })
             .current_dir(directory),
         "vite web build",
     )?;
+    if release {
+        package_assets(directory, &directory.join("dist/web"))?;
+    }
     println!("Web app: {}", directory.join("dist/web").display());
     Ok(())
 }
@@ -254,6 +262,22 @@ fn js_dependencies(directory: &Path, manifest: &Manifest) -> Result<(), String> 
     Ok(())
 }
 
+/// Generates app-owned media references and release/debug manifests before TSX compilation.
+///
+/// `directory` is the application root containing its assets and source entries.
+///
+/// # Errors
+/// Returns a generator diagnostic for unsafe sources, missing references, or dynamic asset keys.
+fn generate_assets(directory: &Path) -> Result<(), String> {
+    status(
+        Command::new("bun")
+            .arg("scripts/generate-assets.mjs")
+            .arg("assets.config.json")
+            .current_dir(directory),
+        "app asset generation",
+    )
+}
+
 /// Copies a release executable, bundle, and launcher to `dist/desktop`.
 ///
 /// # Errors
@@ -271,6 +295,7 @@ fn package_native(directory: &Path, manifest: &Manifest) -> Result<(), String> {
         let bundle = directory.join("dist/native/app.mjs");
         fs::copy(&bundle, output.join("app.mjs"))
             .map_err(|error| format!("{}: {error}", bundle.display()))?;
+        package_assets(directory, &output)?;
     }
     #[cfg(windows)]
     {
@@ -278,7 +303,7 @@ fn package_native(directory: &Path, manifest: &Manifest) -> Result<(), String> {
             format!("@echo off\r\n\"%~dp0{binary}\"\r\n")
         } else {
             format!(
-                "@echo off\r\nset ARGUI_APP_BUNDLE=%~dp0app.mjs\r\nset ARGUI_APP_TITLE={}\r\n\"%~dp0{binary}\"\r\n",
+                "@echo off\r\nset ARGUI_APP_BUNDLE=%~dp0app.mjs\r\nset ARGUI_APP_ASSETS=%~dp0assets.generated.json\r\nset ARGUI_APP_TITLE={}\r\n\"%~dp0{binary}\"\r\n",
                 manifest.name
             )
         };
@@ -290,7 +315,7 @@ fn package_native(directory: &Path, manifest: &Manifest) -> Result<(), String> {
             String::new()
         } else {
             format!(
-                "ARGUI_APP_TITLE='{}' ARGUI_APP_BUNDLE=\"$DIR/app.mjs\" ",
+                "ARGUI_APP_TITLE='{}' ARGUI_APP_BUNDLE=\"$DIR/app.mjs\" ARGUI_APP_ASSETS=\"$DIR/assets.generated.json\" ",
                 manifest.name
             )
         };
@@ -307,6 +332,59 @@ fn package_native(directory: &Path, manifest: &Manifest) -> Result<(), String> {
         }
     }
     println!("Desktop package: {}", output.display());
+    Ok(())
+}
+
+/// Copies only the media files named by the generated release manifest.
+///
+/// `directory` is the app root and `output` is its portable desktop package.
+///
+/// # Errors
+/// Returns an error if the manifest is invalid, a source escapes `assets/`, or copying fails.
+fn package_assets(directory: &Path, output: &Path) -> Result<(), String> {
+    let manifest = directory.join("assets.generated.json");
+    let document: serde_json::Value = serde_json::from_slice(
+        &fs::read(&manifest).map_err(|error| format!("{}: {error}", manifest.display()))?,
+    )
+    .map_err(|error| format!("{}: {error}", manifest.display()))?;
+    let entries = document
+        .get("assets")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("asset manifest must contain an assets array")?;
+    let source_root =
+        fs::canonicalize(directory.join("assets")).map_err(|error| error.to_string())?;
+    let asset_output = output.join("assets");
+    if asset_output.exists() {
+        fs::remove_dir_all(&asset_output)
+            .map_err(|error| format!("{}: {error}", asset_output.display()))?;
+    }
+    fs::create_dir_all(&asset_output)
+        .map_err(|error| format!("{}: {error}", asset_output.display()))?;
+    for entry in entries {
+        let relative = entry
+            .get("path")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("asset manifest entry lacks path")?;
+        let path = Path::new(relative);
+        if !path
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err(format!("unsafe release asset path: {relative}"));
+        }
+        let source = fs::canonicalize(source_root.join(path))
+            .map_err(|error| format!("{relative}: {error}"))?;
+        if !source.starts_with(&source_root) {
+            return Err(format!("release asset escapes app root: {relative}"));
+        }
+        let destination = asset_output.join(path);
+        fs::create_dir_all(destination.parent().ok_or("asset output has no parent")?)
+            .map_err(|error| error.to_string())?;
+        fs::copy(&source, &destination)
+            .map_err(|error| format!("{}: {error}", destination.display()))?;
+    }
+    fs::copy(&manifest, output.join("assets.generated.json"))
+        .map_err(|error| format!("{}: {error}", manifest.display()))?;
     Ok(())
 }
 
@@ -359,6 +437,14 @@ pub(super) fn run(
     if manifest.framework != "rust" {
         command
             .env("ARGUI_APP_BUNDLE", directory.join("dist/native/app.mjs"))
+            .env(
+                "ARGUI_APP_ASSETS",
+                directory.join(if release {
+                    "assets.generated.json"
+                } else {
+                    "assets.dev.generated.json"
+                }),
+            )
             .env("ARGUI_APP_TITLE", &manifest.name);
     }
     status(command.current_dir(directory), "native app")

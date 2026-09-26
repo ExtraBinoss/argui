@@ -1,17 +1,17 @@
 import { createContext, type ReactNode } from 'react'
 export { VirtualList } from './vlist'
 export type { VirtualListProps } from './vlist'
-export { useTheme, useThemeSnapshot } from './theme'
+export { ThemeProvider, ThemeScope, useTheme, useThemeSnapshot } from './theme'
 import Reconciler from 'react-reconciler'
 import { ConcurrentRoot, DefaultEventPriority } from 'react-reconciler/constants'
-import type { NativeHost } from '@argui/host'
-import { commitWork, detach, markDirty, nativeInstance, place, updateProps, workNode, type WorkNode, type WorkRoot } from './tree'
+import type { NativeHandle, NativeHost } from '@argui/host'
+import { commitWork, detach, markDirty, place, updateProps, workNode, type WorkNode, type WorkRoot } from './tree'
 
 type Props = Record<string, unknown>
 type Timeout = ReturnType<typeof setTimeout>
 type Config = Reconciler.HostConfig<
   string, Props, WorkRoot, WorkNode, WorkNode, never, never, never,
-  WorkNode, object, never, Timeout, -1, null
+  NativeHandle, object, never, Timeout, -1, null
 >
 
 let updatePriority = DefaultEventPriority
@@ -29,12 +29,12 @@ const config: Config = {
   noTimeout: -1,
   getRootHostContext: () => hostContext,
   getChildHostContext: () => hostContext,
-  getPublicInstance: (instance) => instance,
+  getPublicInstance: (instance) => instance.handle,
   createInstance: (type, props, root) => workNode(root, type, props),
   createTextInstance: (text, root) => workNode(root, 'Text', {}, text),
   appendInitialChild: place,
   finalizeInitialChildren: () => false,
-  shouldSetTextContent: () => false,
+  shouldSetTextContent: (type) => type === 'text',
   prepareForCommit: () => null,
   resetAfterCommit: commitWork,
   preparePortalMount: () => {},
@@ -125,6 +125,3 @@ export function createRoot(host: NativeHost, nativeType = 'Container', rootPrope
     nativeRoot: () => native,
   }
 }
-
-export { nativeInstance }
-export type { WorkNode }

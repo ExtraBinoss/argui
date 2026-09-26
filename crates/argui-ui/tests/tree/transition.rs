@@ -2,8 +2,9 @@ use argui_animation::{Duration, Time, Transition, Tween};
 use argui_core::{Affine2D, Point, Rect, Size, Transform2D};
 use argui_paint::{ClipChain, Fill, GradientStop, LayerStyle, LinearGradient, Shadow};
 use argui_ui::{
-    Color, CursorIcon, Element, ElementKind, GestureSet, HitRegion, HitShape, Interaction,
-    StylePatch, StyleTransition, TreeUpdate, UiTree, VisualState, length, property,
+    Color, CursorIcon, Element, ElementKind, FocusPolicy, FocusRequest, GestureSet, HitRegion,
+    HitShape, Interaction, StylePatch, StyleTransition, TreeUpdate, UiTree, VisualState, length,
+    property,
 };
 
 fn transition() -> StyleTransition {
@@ -24,6 +25,30 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         gestures: GestureSet::EMPTY,
         window_drag: None,
     }
+}
+
+#[test]
+/// A focused descendant activates an ancestor's native visual style.
+fn focus_within_styles_ancestors_and_clears_on_blur() {
+    let root = Element::container([Element::container([])
+        .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))])
+    .when(
+        VisualState::FocusWithin,
+        StylePatch::new().set(property::Opacity, 0.5),
+    );
+    let mut tree = UiTree::new(root);
+    let parent = tree.node_ids()[0];
+    let child = tree.node_ids()[1];
+    let mut focus_region = region(child);
+    focus_region.focus_policy = FocusPolicy::TabStop;
+    assert_eq!(tree.resolved_quad(parent, tree.root()).opacity, 1.0);
+    tree.sync_focus(
+        &[focus_region.clone()],
+        Some(FocusRequest::Focus(child.into())),
+    );
+    assert_eq!(tree.resolved_quad(parent, tree.root()).opacity, 0.5);
+    tree.sync_focus(&[focus_region], Some(FocusRequest::Clear));
+    assert_eq!(tree.resolved_quad(parent, tree.root()).opacity, 1.0);
 }
 
 /// State transforms repaint at completion even while another binding remains active.

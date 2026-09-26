@@ -23,6 +23,7 @@ mod api;
 mod blur;
 mod composite;
 mod effect_damage;
+mod effect_registry;
 mod effects;
 mod filter_shadow;
 mod offscreen_api;

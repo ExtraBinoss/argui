@@ -71,6 +71,8 @@ pub struct PropertySchema {
     /// Engine observation supplying this output property's value, when applicable.
     pub observation: Option<ObservationKind>,
     pub default: Option<SchemaValue>,
+    /// Closed set of accepted string values; empty for an open value domain.
+    pub allowed_values: Vec<String>,
     pub change_event: Option<EventId>,
     /// Whether the property supports declarative visual interpolation.
     pub animatable: bool,
@@ -99,6 +101,7 @@ impl PropertySchema {
             read_only: false,
             observation: None,
             default: None,
+            allowed_values: Vec::new(),
             change_event: None,
             animatable: true,
             documentation: documentation.into(),
@@ -135,6 +138,17 @@ impl PropertySchema {
     #[must_use]
     pub fn default_value(mut self, value: SchemaValue) -> Self {
         self.default = Some(value);
+        self
+    }
+
+    /// Restricts a string property to the supplied public values.
+    ///
+    /// * `values` — accepted values in documentation and generated type order.
+    ///
+    /// Returns the property with its closed value domain.
+    #[must_use]
+    pub fn allowed_values(mut self, values: &[&str]) -> Self {
+        self.allowed_values = values.iter().map(|value| (*value).to_owned()).collect();
         self
     }
 

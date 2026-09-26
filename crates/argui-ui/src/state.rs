@@ -11,6 +11,7 @@ pub use transition::{StyleTransition, TransitionDirection, TransitionRule};
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisualState {
     Focused,
+    FocusWithin,
     FocusVisible,
     Hovered,
     Pressed,
@@ -251,6 +252,7 @@ impl VisualState {
     const fn bit(self) -> u8 {
         match self {
             Self::Focused => 1,
+            Self::FocusWithin => 32,
             Self::FocusVisible => 2,
             Self::Hovered => 4,
             Self::Pressed => 8,

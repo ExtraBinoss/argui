@@ -11,11 +11,13 @@ Install Rust and Bun, then run:
 
 ```sh
 bun install
-./scripts/gallery-hot-reload.sh desktop solid
+bun run gallery
 ```
 
-Use `react` in place of `solid` to run the React gallery. Reusable TSX controls
-live in `@argui/widgets/react` and `@argui/widgets/solid`.
+Use `bun run gallery:react` for the React gallery. Reusable TSX controls live
+in `@argui/widgets/react` and `@argui/widgets/solid`. The current gallery
+demonstrates Button, ButtonGroup, InputField, Select, Popover, VirtualList, and the layout
+primitives. Previous components are archived in `OLD_API/`.
 
 ## Install the CLI
 
@@ -36,41 +38,29 @@ and install `argui` for your user. CLI binaries are published with new Argui
 releases containing the CLI workflow. To build it from this checkout instead, run
 `cargo install --path crates/argui-cli`.
 
+Use `argui update --check` to see whether a newer CLI release is available,
+or `argui update` to download and install its SHA-256-verified binary.
+
 ## Create an app
 
 The [Argui CLI](crates/argui-cli/README.md) creates Solid or React desktop and
 browser apps, then checks, builds, and runs them on Linux, macOS, and Windows:
 
 ```sh
-argui init solid my-app
-bun install
-argui dev apps/my-app
+argui init solid --dir my-app --yes
+cd my-app
+argui format
+argui check
+argui dev --target native
 ```
 
-`argui init counter-web` creates a Solid WebAssembly canvas app;
-`argui init react counter-web` selects React. Run `argui doctor web` to check
-its prerequisites and `argui build release` to produce static files in
-`dist/web/`. The generated project README explains how to mount the canvas
-in an existing page.
-Use `argui dev apps/<name>` and `argui build apps/<name> release` from the
-checkout root when it contains several apps; inside an app, omit the path.
-Web dev rebuilds WASM when Rust sources change and reloads the page through Vite.
-Native dev rebuilds TSX when source files change and applies the new bundle in
-the running host.
-
-To try the same Solid counter on both targets from this checkout, run
-`argui init counter-web`, `argui init counter-native`, and `bun install` at
-the checkout root. Start `argui dev apps/counter-web` and
-`argui dev apps/counter-native` in separate terminals. Edit the heading in
-either app's `src/main.tsx` to verify its reload. The browser app also rebuilds
-WASM after a Rust source change under `crates/` or `apps/web-host/src/`.
-When `init` runs outside an Argui checkout, it clones the matching release
-into `my-app/`; run `bun install` there and use `my-app/apps/my-app` as the
-project directory.
-
-When run inside an existing Argui checkout, `init` creates the app in that
-checkout's `apps/` directory. From another directory it creates a versioned
-Argui checkout named `my-app`, then generates `apps/my-app` inside it.
+`init` puts Oxfmt in the new application's `package.json` and runs
+`bun install` when Bun is available. Use `--no-install` to defer installation.
+For a React Web-only app, run `argui init react --dir web-app --targets web --yes`,
+then `argui dev --target web` inside it. `argui build release --target web`
+produces `dist/web/`. Use `argui format --check` to verify TSX formatting
+without changing files. The [CLI guide](crates/argui-cli/README.md) covers
+target-specific builds, asset packs, and app paths.
 
 ## Engine
 

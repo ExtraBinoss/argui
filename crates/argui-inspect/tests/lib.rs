@@ -3,8 +3,8 @@ use std::time::Duration;
 use argui_core::{Point, Rect, Size};
 use argui_inspect::{
     AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, InspectNodeId, InspectorHandle,
-    Invalidation, NodeSnapshot, PropertySnapshot, StyleLength, StyleProperty, StyleUnit,
-    StyleValue, TreeSnapshot,
+    Invalidation, LayoutSnapshot, NodeSnapshot, PropertySnapshot, StyleLength, StyleProperty,
+    StyleUnit, StyleValue, TreeSnapshot,
 };
 
 fn node(id: u64, parent: Option<u64>, depth: usize, bounds: Rect, z_index: i32) -> NodeSnapshot {
@@ -16,6 +16,7 @@ fn node(id: u64, parent: Option<u64>, depth: usize, bounds: Rect, z_index: i32) 
         kind: "container".into(),
         summary: None,
         bounds,
+        layout: LayoutSnapshot::default(),
         clip: None,
         z_index,
         portal: None,
@@ -195,6 +196,7 @@ fn snapshots_and_render_metrics_share_one_bounded_record() {
             kind: "container".into(),
             summary: Some("one child".into()),
             bounds: Rect::new(Point::new(2.0, 3.0), Size::new(40.0, 50.0)),
+            layout: LayoutSnapshot::default(),
             clip: None,
             z_index: 7,
             portal: None,

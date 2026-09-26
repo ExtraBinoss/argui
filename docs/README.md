@@ -10,16 +10,18 @@ Start with:
 3. [Solid and React native gallery](solid-react-native.md) for the shared host, selected QuickJS runtime, and measured limits.
 4. [Development guide](contributing/development.md) and [code quality](contributing/code-quality.md) before opening a pull request.
 
+For applications using the previous TSX API, see [the v2 migration guide](migration-tsx-v2.md).
+
 ## Engine and application contracts
 
 | Area | Guide |
 | --- | --- |
 | Models and lifetime | [Models](runtime/models.md) · [Tasks](runtime/tasks.md) |
-| Layout and input | [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
+| Layout and input | [Layout](ui/layout.md) · [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
 | UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
 | Rendering | [Primitives](rendering/primitives.md) · [Text fidelity](rendering/text.md) · [Adaptive damage](rendering/damage.md) · [Compositor](rendering/compositor.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
 | Localization | [Internationalization](i18n.md) |
-| TSX widgets | [Gallery and framework adapters](../apps/gallery/README.md) |
+| TSX widgets and assets | [Gallery and framework adapters](../apps/gallery/README.md) · [Application icons](ui/icons.md) |
 
 ## Platform integration
 

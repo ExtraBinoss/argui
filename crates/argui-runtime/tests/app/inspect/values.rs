@@ -1,6 +1,6 @@
-use argui_core::{Color, Point};
+use argui_core::{Color, Point, Rect, Size};
 use argui_inspect::{StyleLength, StyleProperty, StyleUnit, StyleValue};
-use argui_layout::LayoutOutput;
+use argui_layout::{LayoutNode, LayoutOutput};
 use argui_paint::{
     BilinearGradient, ColorInterpolation, ConicGradient, Fill, GradientStop, RadialGradient,
 };
@@ -132,4 +132,53 @@ fn default_and_authored_style_snapshots_preserve_units_and_layer_identity() {
         &get(StyleProperty::Effects).value,
         StyleValue::Parameters(_)
     ));
+}
+
+#[test]
+/// Inspection reports authored sizing inputs alongside computed geometry and pitfalls.
+fn layout_inspection_explains_percent_constraints_and_unbounded_scroll() {
+    let tree = UiTree::new(
+        Element::container([])
+            .width(argui_ui::percent(1.0))
+            .min_width(argui_ui::length(200.0))
+            .max_width(argui_ui::length(100.0))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            }),
+    );
+    let bounds = Rect::new(Point::default(), Size::new(120.0, 80.0));
+    let mut output = LayoutOutput::default();
+    output.nodes.push(LayoutNode {
+        index: 0,
+        node: tree.node_ids()[0],
+        bounds,
+        layout_bounds: bounds,
+        clip: None,
+        text_index: None,
+    });
+    let snapshot = Inspection::snapshot(&tree, &output);
+    let layout = &snapshot.nodes[0].layout;
+    assert_eq!(layout.preferred_width, "100%");
+    assert_eq!(layout.min_width, "200px");
+    assert_eq!(layout.max_width, "100px");
+    assert_eq!(layout.computed, bounds);
+    assert!(
+        layout
+            .notes
+            .iter()
+            .any(|note| note.contains("remaining flex space"))
+    );
+    assert!(
+        layout
+            .notes
+            .iter()
+            .any(|note| note.contains("scroll viewport"))
+    );
+    assert!(
+        layout
+            .notes
+            .iter()
+            .any(|note| note.contains("minWidth exceeds maxWidth"))
+    );
 }

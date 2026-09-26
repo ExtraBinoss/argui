@@ -10,7 +10,7 @@ use argui_ui::{Element, ExpandedDimension, property};
 
 use super::{
     BACKGROUND, GAP, LOOP_BACKGROUND, LOOP_GAP, LOOP_HOLD, LOOP_MS, LOOP_OPACITY, LOOP_PLAYING,
-    LOOP_RADIUS, LOOP_SCALE, LOOP_TRANSLATE_X, LOOP_TRANSLATE_Y, LOOP_WIDTH, RADIUS, ROTATION,
+    LOOP_RADIUS, LOOP_SCALE, LOOP_TRANSLATE_X, LOOP_TRANSLATE_Y, LOOP_WIDTH, RADII, ROTATION,
     ROTATION_LOOP_MS, WIDTH,
 };
 use crate::{NativeElementInput, PropertyId, PropertySchema, SchemaError, SchemaValue, ValueType};
@@ -21,73 +21,73 @@ pub(super) fn properties() -> [PropertySchema; 12] {
     [
         control(
             ROTATION_LOOP_MS,
-            "rotation_loop_ms",
+            "rotationLoopMs",
             ValueType::Float,
             "Duration of one clockwise rotation in milliseconds.",
         ),
         control(
             LOOP_MS,
-            "loop_ms",
+            "loopMs",
             ValueType::Float,
             "Duration of one alternating native motion leg in milliseconds.",
         ),
         control(
             LOOP_PLAYING,
-            "loop_playing",
+            "loopPlaying",
             ValueType::Bool,
             "Whether native property loops advance or preserve their current phase.",
         ),
         control(
             LOOP_TRANSLATE_X,
-            "loop_translate_x",
+            "loopTranslateX",
             ValueType::Float,
             "Horizontal translation at the far end of the loop in logical pixels.",
         ),
         control(
             LOOP_TRANSLATE_Y,
-            "loop_translate_y",
+            "loopTranslateY",
             ValueType::Float,
             "Vertical translation at the far end of the loop in logical pixels.",
         ),
         control(
             LOOP_SCALE,
-            "loop_scale",
+            "loopScale",
             ValueType::Float,
             "Uniform transform scale at the far end of the loop.",
         ),
         control(
             LOOP_OPACITY,
-            "loop_opacity",
+            "loopOpacity",
             ValueType::Float,
             "Group opacity at the far end of the loop.",
         ),
         control(
             LOOP_BACKGROUND,
-            "loop_background",
+            "loopBackground",
             ValueType::Color,
             "Solid background color at the far end of the loop.",
         ),
         control(
             LOOP_HOLD,
-            "loop_hold",
+            "loopHold",
             ValueType::Bool,
             "Hold the transform target before returning to its start on each native loop.",
         ),
         control(
             LOOP_WIDTH,
-            "loop_width",
+            "loopWidth",
             ValueType::Float,
             "Width at the far end of a native layout loop in logical pixels.",
         ),
         control(
             LOOP_RADIUS,
-            "loop_radius",
+            "loopRadius",
             ValueType::Float,
             "Corner radius at the far end of a native paint loop in logical pixels.",
         ),
         control(
             LOOP_GAP,
-            "loop_gap",
+            "loopGap",
             ValueType::Float,
             "Child spacing at the far end of a native layout loop in logical pixels.",
         ),
@@ -115,17 +115,17 @@ pub(super) fn apply(
     mut element: Element,
     input: &NativeElementInput,
 ) -> Result<Element, SchemaError> {
-    let rotation_ms = duration(input, ROTATION_LOOP_MS, "rotation_loop_ms")?;
-    let loop_ms = duration(input, LOOP_MS, "loop_ms")?;
+    let rotation_ms = duration(input, ROTATION_LOOP_MS, "rotationLoopMs")?;
+    let loop_ms = duration(input, LOOP_MS, "loopMs")?;
     let playing = !matches!(input.get(LOOP_PLAYING), Some(SchemaValue::Bool(false)));
     let hold = matches!(input.get(LOOP_HOLD), Some(SchemaValue::Bool(true)));
-    let x = scalar(input, LOOP_TRANSLATE_X, "loop_translate_x")?;
-    let y = scalar(input, LOOP_TRANSLATE_Y, "loop_translate_y")?;
-    let scale = scalar(input, LOOP_SCALE, "loop_scale")?;
-    let opacity = scalar(input, LOOP_OPACITY, "loop_opacity")?;
-    let width = scalar(input, LOOP_WIDTH, "loop_width")?;
-    let radius = scalar(input, LOOP_RADIUS, "loop_radius")?;
-    let gap = scalar(input, LOOP_GAP, "loop_gap")?;
+    let x = scalar(input, LOOP_TRANSLATE_X, "loopTranslateX")?;
+    let y = scalar(input, LOOP_TRANSLATE_Y, "loopTranslateY")?;
+    let scale = scalar(input, LOOP_SCALE, "loopScale")?;
+    let opacity = scalar(input, LOOP_OPACITY, "loopOpacity")?;
+    let width = scalar(input, LOOP_WIDTH, "loopWidth")?;
+    let radius = scalar(input, LOOP_RADIUS, "loopRadius")?;
+    let gap = scalar(input, LOOP_GAP, "loopGap")?;
     let background = match input.get(LOOP_BACKGROUND) {
         Some(SchemaValue::Color(color)) => Some(*color),
         _ => None,
@@ -263,14 +263,14 @@ pub(super) fn apply(
         );
     }
     if let (Some(milliseconds), Some(target)) = (loop_ms, radius) {
-        let from = match input.get(RADIUS) {
-            Some(SchemaValue::Float(value)) => *value,
-            _ => return Err(SchemaError::Adapter("loop_radius requires radius".into())),
+        let from = match input.get(RADII) {
+            Some(SchemaValue::Radii(value)) => value.as_array(),
+            _ => return Err(SchemaError::Adapter("loopRadius requires radii".into())),
         };
         element = element.bind(
             property::CornerRadii,
             motion(
-                [from; 4],
+                from,
                 [target; 4],
                 milliseconds,
                 Direction::Alternate,

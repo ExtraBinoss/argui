@@ -1,4 +1,4 @@
-import type { NativeHost, NativeNode } from '@argui/host'
+import type { NativeHandle, NativeHost, NativeNode } from '@argui/host'
 
 /** A React work node, which is kept separate from the visible Rust tree. */
 export interface WorkNode {
@@ -8,6 +8,7 @@ export interface WorkNode {
   parent: WorkNode | WorkRoot | null
   children: WorkNode[]
   native: NativeNode | null
+  handle: NativeHandle
   appliedProps: Record<string, unknown>
   appliedText: string | null
   hidden: boolean
@@ -25,10 +26,13 @@ export interface WorkRoot {
 
 /** Creates a detached React work node without invoking the native bridge. */
 export function workNode(root: WorkRoot, name: string, props: Record<string, unknown>, text: string | null = null): WorkNode {
-  return {
+  const node: WorkNode = {
     name, props, text, parent: null, children: [], native: null,
+    handle: null as unknown as NativeHandle,
     appliedProps: {}, appliedText: null, hidden: false, dirty: true, root,
   }
+  node.handle = root.host.handle(() => node.native)
+  return node
 }
 
 /** Inserts or moves a work node within React's pending tree. */
@@ -66,7 +70,7 @@ export function updateProps(node: WorkNode, previous: Record<string, unknown>, n
   node.props = next
   let changed = false
   for (const key of Object.keys(previous)) {
-    if (key === 'children' || key === 'key' || key === 'ref') continue
+    if ((key === 'children' && node.name !== 'text') || key === 'key' || key === 'ref') continue
     const oldValue = previous[key]
     const newValue = next[key]
     if (Object.is(oldValue, newValue)) continue
@@ -78,7 +82,7 @@ export function updateProps(node: WorkNode, previous: Record<string, unknown>, n
     }
   }
   for (const key of Object.keys(next)) {
-    if (key === 'children' || key === 'key' || key === 'ref') continue
+    if ((key === 'children' && node.name !== 'text') || key === 'key' || key === 'ref') continue
     if (!(key in previous)) changed = true
   }
   if (changed || !node.native) markDirty(node)
@@ -100,9 +104,6 @@ export function commitWork(root: WorkRoot): void {
   root.dirty = false
   root.host.flush()
 }
-
-/** Returns whether a work node is mounted to the native host. */
-export function nativeInstance(node: WorkNode): NativeNode | null { return node.native }
 
 function isWorkNode(node: WorkNode | WorkRoot): node is WorkNode { return 'name' in node }
 
@@ -163,8 +164,17 @@ function syncChildren(host: NativeHost, parent: NativeNode, children: WorkNode[]
 function nativeProps(node: WorkNode): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(node.props)) {
-    if (key === 'nativeKey') result.key = value
-    else if (key !== 'children' && key !== 'key' && key !== 'ref') result[key] = value
+    if (key !== 'children' && key !== 'key' && key !== 'ref') result[key] = value
+  }
+  if (node.name === 'text') {
+    const content = node.props.children
+    if (content != null) {
+      if ('text' in result) throw new Error('<text> accepts either children or text, not both')
+      if (typeof content !== 'string' && typeof content !== 'number') {
+        throw new TypeError('<text> children must resolve to one string or number')
+      }
+      result.text = String(content)
+    }
   }
   if (node.hidden) result.visible = false
   return result

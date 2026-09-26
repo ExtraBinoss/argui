@@ -12,19 +12,19 @@ and `text`, accept the same semantic properties in Solid and React TSX.
 ```tsx
 <rectangle
   role="button"
-  accessible_name="Save"
-  accessible_description="Save the current document"
+  accessibleName="Save"
+  accessibleDescription="Save the current document"
   focusable
-  keyboard_activation="enter_or_space"
+  keyboardActivation="enterOrSpace"
   onClick={save}
 />
 ```
 
 The `role` and other keyword values are checked by the TypeScript types and
 validated by the native schema. `focusable` adds the primitive to sequential
-focus by default; `focus_on_tab_navigation={false}` keeps programmatic focus
-without adding a Tab stop. `keyboard_activation` routes Enter or Space through
-the same `onClick` listener as an accessibility click. `accessible_disabled`
+focus by default; `focusOnTabNavigation={false}` keeps programmatic focus
+without adding a Tab stop. `keyboardActivation` routes Enter or Space through
+the same `onClick` listener as an accessibility click. `accessibleDisabled`
 marks a custom control disabled and stops its interaction.
 
 `focusScope` remains useful when a control consists of several painted children
@@ -34,24 +34,25 @@ control has one accessible name and one focus target.
 
 ## Values, states and relations
 
-Use `accessible_value` for text values. For a slider or other numeric control,
-set `numeric_value` and optionally `minimum_value`, `maximum_value` and
-`value_step`. These fields are mutually exclusive with `accessible_value`.
-`selected`, `current`, `checked_state`, `pressed_state`, `expanded`, `busy`,
-`required`, `read_only`, `invalid` and `multiselectable` describe controlled
-state. `checked_state="mixed"` represents partial selection.
-`orientation`, `level`, `position_in_set`, `set_size`, `has_popup`, `sort` and
-`modal` provide structural context. `accessible_hidden` removes a decorative
+Use `accessibleValue` for text values. For a slider or other numeric control,
+set `numericValue` and optionally `minimumValue`, `maximumValue` and
+`valueStep`. These fields are mutually exclusive with `accessibleValue`.
+`selected`, `current`, `checkedState`, `pressedState`, `expanded`, `busy`,
+`required`, `readOnly`, `invalid` and `multiselectable` describe controlled
+state. `checkedState="mixed"` represents partial selection.
+`orientation`, `level`, `positionInSet`, `setSize`, `hasPopup`, `sort` and
+`modal` provide structural context. `accessibleHidden` removes a decorative
 subtree from the semantic tree.
 
-Relations use the target's native `key` in Solid or `nativeKey` in React:
+Relations use the target's native `id` in both Solid and React. `key` belongs
+to framework reconciliation and never names an accessibility target:
 
 ```tsx
 <column>
-  <text key="volume-label" text="Volume" />
-  <rectangle role="slider" labelled_by="volume-label"
-    numeric_value={42} minimum_value={0} maximum_value={100}
-    value_step={2} focusable can_increment can_decrement
+  <text id="volume-label">Volume</text>
+  <rectangle role="slider" labelledBy="volume-label"
+    numericValue={42} minimumValue={0} maximumValue={100}
+    valueStep={2} focusable canIncrement canDecrement
     onSemanticAction={({ action }) => {
       if (action === 'increment') increaseVolume()
       if (action === 'decrement') decreaseVolume()
@@ -59,13 +60,13 @@ Relations use the target's native `key` in Solid or `nativeKey` in React:
 </column>
 ```
 
-`labelled_by`, `described_by`, `controls` and `active_descendant` resolve in
-the retained semantic tree. The first three accept space-separated keys.
-Use stable keys and keep their targets mounted.
+`labelledBy`, `describedBy`, `controls` and `activeDescendant` resolve in
+the retained semantic tree. The first three accept space-separated IDs.
+Use stable IDs and keep their targets mounted.
 `live="polite"` or `live="assertive"` announces changes where appropriate.
 
-`can_increment`, `can_decrement`, `can_set_value`, `can_expand`, `can_collapse`
-and `can_scroll_into_view` advertise platform actions. Handle them with
+`canIncrement`, `canDecrement`, `canSetValue`, `canExpand`, `canCollapse`
+and `canScrollIntoView` advertise platform actions. Handle them with
 `onSemanticAction`; the callback receives `action` and an optional text or
 numeric `value`. The accessible state must be updated by the component after
 the action, just as it is after a pointer or keyboard event.

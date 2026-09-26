@@ -98,6 +98,37 @@ fn bridge_validates_before_mutation_and_tracks_metadata_only_changes() {
     assert!(bridge.snapshot(id, None).is_err());
 }
 
+#[test]
+fn theme_color_tokens_accept_hex_oklch_and_rgba_without_losing_alpha() {
+    let mut bridge = ThemeBridge::default();
+    let definition = json!({
+        "tokens": {"surface": {"type": "Color", "default": "#ffffff"}},
+        "variants": {"light": {"surface": "oklch(1 0 0 / 90%)"}},
+        "initialVariant": "light"
+    });
+    let created = parsed(&bridge.create(&definition.to_string()).unwrap());
+    let id = created["id"].as_u64().unwrap();
+    assert_eq!(created["snapshot"]["values"]["surface"], "#ffffffe6");
+    for literal in ["rgba(255, 0, 128, 0.5)", "rgb(255 0 128 / 50%)"] {
+        let next = parsed(
+            &bridge
+                .update(id, &json!({"overrides":{"surface":literal}}).to_string())
+                .unwrap(),
+        );
+        assert_eq!(next["values"]["surface"], "#ff008080");
+    }
+    let before = parsed(&bridge.snapshot(id, None).unwrap());
+    assert!(
+        bridge
+            .update(
+                id,
+                &json!({"overrides":{"surface":"rgb(300 0 0)"}}).to_string()
+            )
+            .is_err()
+    );
+    assert_eq!(parsed(&bridge.snapshot(id, None).unwrap()), before);
+}
+
 /// Separate themes do not share state, while one Rust app view receives its snapshot.
 #[test]
 fn one_rust_model_reads_its_window_theme_without_cross_window_state() {

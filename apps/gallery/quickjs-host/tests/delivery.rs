@@ -128,7 +128,28 @@ fn semantic_action_delivery_keeps_action_and_requested_value() {
             step: None,
         }),
     });
-    assert_eq!(payload["kind"], "semantic_action");
-    assert_eq!(payload["action"], "set_value");
+    assert_eq!(payload["kind"], "semanticAction");
+    assert_eq!(payload["action"], "setValue");
     assert_eq!(payload["value"], 55.0);
+}
+
+#[test]
+fn semantic_scroll_action_uses_camel_case_wire_name() {
+    let payload = ui_event_payload(&UiEventKind::SemanticAction {
+        action: SemanticAction::ScrollIntoView,
+        value: None,
+    });
+    assert_eq!(payload["kind"], "semanticAction");
+    assert_eq!(payload["action"], "scrollIntoView");
+}
+
+#[test]
+fn fallback_event_kind_uses_stable_lower_camel_wire_name() {
+    let payload = ui_event_payload(&UiEventKind::DocumentSelectionChanged {
+        text: None,
+        bounds: None,
+        touch: false,
+        dragging: false,
+    });
+    assert_eq!(payload["kind"], "selectionChange");
 }

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
-import { createElement } from 'react'
-import { NativeHost, type NativeBridge, type NativeContract, type NativeDelivery, type Operation } from '@argui/host'
+import { createElement, createRef } from 'react'
+import { NativeHost, type NativeBridge, type NativeContract, type NativeDelivery, type NativeHandle, type Operation } from '@argui/host'
 import { createRoot } from '../src'
 
 const contract: NativeContract = {
@@ -108,4 +108,25 @@ test('React refreshes a mounted event callback without resending its native list
   expect(first).toBe(0)
   expect(second).toBe(1)
   root.unmount()
+})
+
+test('React text children update the native text property and expose a stable public handle', () => {
+  const { host, batches } = recorder()
+  const root = createRoot(host)
+  const ref = createRef<NativeHandle>()
+  root.render(createElement('text', { ref }, 'Bonjour'))
+  const native = root.nativeRoot().children[0]!
+  expect(native.values.get(9)?.value).toBe('Bonjour')
+  expect(native.children).toHaveLength(0)
+  expect(ref.current?.mounted).toBe(true)
+  expect(ref.current?.hostId).toEqual(native.id)
+  const handle = ref.current
+  root.render(createElement('text', { ref }, 'Salut'))
+  expect(root.nativeRoot().children[0]).toBe(native)
+  expect(native.values.get(9)?.value).toBe('Salut')
+  expect(ref.current).toBe(handle)
+  expect(batches.at(-1)).toEqual([{ kind: 'setProperty', id: native.id, property: 9,
+    value: { type: 'String', value: 'Salut' } }])
+  root.unmount()
+  expect(handle?.mounted).toBe(false)
 })

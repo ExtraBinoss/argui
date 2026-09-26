@@ -1,42 +1,76 @@
 /** @jsxImportSource @argui/react */
-import { useState, type ReactElement, type ReactNode } from 'react'
-import type { PopoverProps as SharedPopoverProps } from '../shared/types'
-import { ReactButton } from './button'
-import { VirtualList } from '@argui/react'
+import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { useTheme } from '@argui/react'
+import { Button } from './button'
+import { ButtonGroupBoundary } from './button-group'
+import type { WidgetTheme } from '../shared/theme'
+import type { PopoverOptions } from '../shared/types'
 
-export type ReactPopoverProps = SharedPopoverProps<ReactNode>
+/** Props for the native React Popover. */
+export type PopoverProps = PopoverOptions & { children: ReactNode; leading?: ReactNode; trailing?: ReactNode }
 
-/** Presents arbitrary content in the same anchored native popover as Solid. */
-export function ReactPopover(props: ReactPopoverProps): ReactElement {
-  const [localExpanded, setLocalExpanded] = useState(false)
-  const expanded = props.open ?? localExpanded
-  const setExpanded = (open: boolean) => {
-    if (props.onOpenChange) props.onOpenChange(open)
-    else setLocalExpanded(open)
+/** Anchors arbitrary content to a simple trigger button and supports native dismissal. */
+export function Popover(props: PopoverProps): ReactElement {
+  const generatedId = `argui-popover-${useId().replaceAll(':', '')}`
+  const [id] = useState(() => props.id ?? generatedId)
+  const popupId = `${id}-popup`
+  const theme = useTheme<WidgetTheme>()
+  const [localOpen, setLocalOpen] = useState(props.defaultOpen ?? false)
+  const expanded = props.open ?? localOpen
+  const setOpen = (next: boolean) => {
+    if (next === expanded) return
+    if (props.open === undefined) setLocalOpen(next)
+    props.onOpenChange?.(next)
   }
-  const content = expanded ? <popupWindow nativeKey={`${props.id}-popup`} anchor={props.id} placement={props.placement ?? 'bottom_start'} width={props.width ?? 260}
-      window_layer="popover" dismiss_policy="outside_pointer_or_escape" containment="trap"
-      initial_focus={props.initialFocus ?? 'first'} restore_focus={true} onDismiss={() => setExpanded(false)}>
-      <rectangle width={props.width ?? 260} background={props.opaque ? props.theme.surface : props.theme.overlaySurface}
-        backdrop_filter={props.opaque || props.blur === false ? undefined : 'blur(10px)'}
-        border_color={props.theme.border} border_width={1} radius={props.theme.overlayRadius}
-        shadow_blur={props.theme.overlayShadowBlur} shadow_offset_y={5} shadow_color={props.theme.overlayShadow}>
-        <column width="fill" gap={12} padding={props.contentPadding ?? props.theme.overlayPadding}>
-          {props.virtualItems ? <focusScope role="list_box" accessible_name={props.label} focusable={false}>
-            <VirtualList id={`${props.id}-items`} count={props.virtualItems.count}
-              initialIndex={props.virtualItems.initialIndex} estimate={props.virtualItems.itemHeight}
-              variable={false} height={props.virtualItems.height} width="fill" overscan={2}
-              itemKey={props.virtualItems.itemKey} scrollbarVisible={true}
-              renderItem={props.virtualItems.renderItem} />
-          </focusScope> : props.children}
-          {props.closeLabel !== false ? <ReactButton id={`${props.id}-close`} label={props.closeLabel ?? 'Close'} theme={props.theme} kind="outline"
-            onClick={() => setExpanded(false)} /> : null}
+
+  return <column width={props.width} height={props.height}
+    minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
+    grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf} margin={props.margin}>
+    <Button
+      id={id}
+      width={props.width}
+      variant="secondary"
+      expanded={expanded}
+      controls={popupId}
+      accessibleName={props.accessibleLabel ?? props.trigger}
+      onClick={() => setOpen(!expanded)}
+    >
+      <row gap={theme.spacing} alignItems="center">
+        {props.leading}<text color={theme.text}>{props.trigger}</text>{props.trailing}
+      </row>
+    </Button>
+    {expanded ? <popupWindow
+      id={popupId}
+      anchor={id}
+      placement={props.placement ?? 'bottomStart'}
+      width={props.contentWidth ?? theme.overlayWidth}
+      windowLayer="popover"
+      dismissPolicy="outsidePointerOrEscape"
+      containment="none"
+      initialFocus={props.initialFocus === 'first' ? 'first' : ''}
+      restoreFocus={true}
+      accessibleName={props.accessibleLabel ?? props.trigger}
+      onDismiss={() => setOpen(false)}
+    >
+      <rectangle
+        width="100%"
+        padding={theme.overlayPadding}
+        background={props.opaque ? theme.surface : theme.overlaySurface}
+        backdropFilter={!props.opaque && props.blur !== false ? `blur(${theme.overlayBlur}px)` : undefined}
+        border={{ width: theme.overlayBorderWidth, color: theme.border }}
+        radii={theme.overlayRadius}
+        shadow={{ offsetY: theme.overlayShadowOffsetY, blur: theme.overlayShadowBlur, color: theme.overlayShadowColor }}
+      >
+        <column width="100%" gap={theme.spacing}>
+          <ButtonGroupBoundary>
+            {props.children}
+            {props.closeLabel ? <Button
+              variant="ghost"
+              onClick={() => setOpen(false)}
+            >{props.closeLabel}</Button> : null}
+          </ButtonGroupBoundary>
         </column>
       </rectangle>
-    </popupWindow> : null
-  return props.trigger === false ? <>{content}</> : <column>
-    <ReactButton id={props.id} label={props.label} theme={props.theme} kind="secondary"
-      expanded={expanded} controls={`${props.id}-popup`} onClick={() => setExpanded(!expanded)} />
-    {content}
+    </popupWindow> : null}
   </column>
 }

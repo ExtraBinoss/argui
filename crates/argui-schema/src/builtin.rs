@@ -1,6 +1,6 @@
 //! Stable schemas for the deliberately small Rust-backed visual and behavior surface.
 
-use argui_paint::{Border, CornerRadii};
+use argui_paint::CornerRadii;
 use argui_text::{
     EllipsisPosition, FontStyle, LetterSpacing, TextAlign, TextOverflow, TextStyle, TextWrap,
     UnderlineStyle,
@@ -25,6 +25,7 @@ mod layout;
 mod loop_motion;
 #[cfg(feature = "media")]
 mod media;
+mod options;
 mod path;
 mod popup_window;
 mod rectangle;
@@ -47,20 +48,19 @@ pub const PATH: NativeTypeId = NativeTypeId::from_raw(15);
 pub const TEXT_INPUT: NativeTypeId = NativeTypeId::from_raw(16);
 pub const KEY_BINDING: NativeTypeId = NativeTypeId::from_raw(17);
 pub const POPUP_WINDOW: NativeTypeId = NativeTypeId::from_raw(18);
-pub const FLICKABLE: NativeTypeId = NativeTypeId::from_raw(19);
+pub const SCROLL_VIEW: NativeTypeId = NativeTypeId::from_raw(19);
 pub const VIRTUAL_WINDOW: NativeTypeId = NativeTypeId::from_raw(20);
 pub const GRID: NativeTypeId = NativeTypeId::from_raw(21);
 pub const GPU_CANVAS: NativeTypeId = NativeTypeId::from_raw(22);
 
 pub const CHILDREN: SlotId = SlotId::from_raw(1);
-pub const KEY: PropertyId = PropertyId::from_raw(1);
+pub const ID: PropertyId = PropertyId::from_raw(1);
 pub const TOOLTIP: PropertyId = PropertyId::from_raw(2);
 pub const WIDTH: PropertyId = PropertyId::from_raw(3);
 pub const HEIGHT: PropertyId = PropertyId::from_raw(4);
 pub const BACKGROUND: PropertyId = PropertyId::from_raw(5);
 pub const GAP: PropertyId = PropertyId::from_raw(6);
 pub const PADDING: PropertyId = PropertyId::from_raw(7);
-pub const CONTENT: PropertyId = PropertyId::from_raw(8);
 pub const TEXT_VALUE: PropertyId = PropertyId::from_raw(9);
 pub const VALUE: PropertyId = PropertyId::from_raw(10);
 pub const INPUT_PLACEHOLDER: PropertyId = PropertyId::from_raw(11);
@@ -126,8 +126,6 @@ pub const MOUSE_Y: PropertyId = PropertyId::from_raw(70);
 pub const PRESSED_X: PropertyId = PropertyId::from_raw(71);
 pub const PRESSED_Y: PropertyId = PropertyId::from_raw(72);
 pub const MOUSE_CURSOR: PropertyId = PropertyId::from_raw(73);
-pub const X: PropertyId = PropertyId::from_raw(74);
-pub const Y: PropertyId = PropertyId::from_raw(75);
 pub const VISIBLE: PropertyId = PropertyId::from_raw(76);
 pub const FOCUS_ON_CLICK: PropertyId = PropertyId::from_raw(77);
 pub const FOCUS_ON_TAB: PropertyId = PropertyId::from_raw(78);
@@ -161,6 +159,19 @@ pub const DESKTOP_BACKDROP_TINT: PropertyId = PropertyId::from_raw(236);
 pub const DESKTOP_BACKDROP_FALLBACK: PropertyId = PropertyId::from_raw(237);
 pub const TEXT_PRIVACY: PropertyId = PropertyId::from_raw(238);
 pub const DIRECTION_SCOPE: PropertyId = PropertyId::from_raw(239);
+pub const MARGIN: PropertyId = PropertyId::from_raw(240);
+pub const INSET: PropertyId = PropertyId::from_raw(241);
+pub const RADII: PropertyId = PropertyId::from_raw(242);
+pub const BORDER: PropertyId = PropertyId::from_raw(243);
+pub const SHADOW: PropertyId = PropertyId::from_raw(244);
+pub const TRANSFORM: PropertyId = PropertyId::from_raw(245);
+pub const CONTAINER_RULES: PropertyId = PropertyId::from_raw(246);
+pub const SCROLLBAR_SIDE: PropertyId = PropertyId::from_raw(247);
+pub const SCROLLBAR_WIDTH: PropertyId = PropertyId::from_raw(248);
+pub const SCROLLBAR_THUMB_COLOR: PropertyId = PropertyId::from_raw(249);
+pub const SCROLLBAR_HOVER_COLOR: PropertyId = PropertyId::from_raw(250);
+pub const PLACEMENT_OFFSET: PropertyId = PropertyId::from_raw(251);
+pub const PRESSED_SCALE: PropertyId = PropertyId::from_raw(252);
 pub const TEXT_LINE_HEIGHT: PropertyId = PropertyId::from_raw(105);
 pub const TEXT_FONT_STYLE: PropertyId = PropertyId::from_raw(106);
 pub const TEXT_LETTER_SPACING: PropertyId = PropertyId::from_raw(107);
@@ -341,23 +352,17 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     popup_window::register(&mut registry)?;
     let text = NativeSchema::new(TEXT, "Text", "Displays styled text content.")
         .property(PropertySchema::new(
-            CONTENT,
-            "content",
-            ValueType::String,
-            "Displayed text.",
-        ))
-        .property(PropertySchema::new(
             TEXT_VALUE,
             "text",
             ValueType::String,
-            "Displayed text using the standard-library spelling.",
+            "Displayed text; TSX also accepts text children.",
         ))
         .property(common_property(CommonProperty::Key))
         .property(common_property(CommonProperty::Tooltip))
         .property(common_property(CommonProperty::Width))
         .property(common_property(CommonProperty::Height))
-        .property(common_property(CommonProperty::X))
-        .property(common_property(CommonProperty::Y))
+        .property(common_property(CommonProperty::Position))
+        .property(common_property(CommonProperty::Inset))
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
@@ -396,31 +401,31 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         ))
         .property(PropertySchema::new(
             TEXT_SIZE,
-            "font_size",
+            "fontSize",
             ValueType::Float,
             "Font size in logical pixels.",
         ))
         .property(PropertySchema::new(
             NO_WRAP,
-            "no_wrap",
+            "noWrap",
             ValueType::Bool,
             "Keep text on one line.",
         ))
         .property(PropertySchema::new(
             TEXT_LINE_HEIGHT,
-            "line_height",
+            "lineHeight",
             ValueType::Float,
             "Line height in logical pixels.",
         ))
         .property(PropertySchema::new(
             TEXT_FONT_STYLE,
-            "font_style",
+            "fontStyle",
             ValueType::String,
             "Font style: normal, italic or oblique.",
         ))
         .property(PropertySchema::new(
             TEXT_LETTER_SPACING,
-            "letter_spacing",
+            "letterSpacing",
             ValueType::Float,
             "Additional spacing between glyphs in logical pixels.",
         ))
@@ -438,26 +443,25 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         ))
         .property(PropertySchema::new(
             TEXT_ALIGN,
-            "text_align",
+            "textAlign",
             ValueType::String,
             "Text alignment: start, end, left, right, center or justify.",
         ))
         .property(PropertySchema::new(
             TEXT_LINE_CLAMP,
-            "line_clamp",
+            "lineClamp",
             ValueType::Int,
             "Maximum number of visual lines; zero means unlimited.",
         ))
         .property(PropertySchema::new(
             TEXT_OVERFLOW,
-            "text_overflow",
+            "textOverflow",
             ValueType::String,
             "CSS-like overflow behavior: clip or ellipsis; ellipsis_start, ellipsis_middle, and ellipsis_end are also supported.",
         ));
     registry.register(text, |input: &NativeElementInput| {
         let content = optional_string(input, TEXT_VALUE)
-            .or_else(|| optional_string(input, CONTENT))
-            .ok_or_else(|| SchemaError::Adapter("Text requires `text` or `content`".into()))?;
+            .ok_or_else(|| SchemaError::Adapter("Text requires `text`".into()))?;
         let mut style = TextStyle::default();
         if optional_bool(input, NO_WRAP) == Some(true) {
             style.wrap = TextWrap::None;
@@ -528,9 +532,9 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         if let Some(SchemaValue::String(value)) = input.get(TEXT_OVERFLOW) {
             style.overflow = match value.as_str() {
                 "clip" => TextOverflow::Clip,
-                "ellipsis" | "ellipsis_end" => TextOverflow::Ellipsis(EllipsisPosition::End),
-                "ellipsis_start" => TextOverflow::Ellipsis(EllipsisPosition::Start),
-                "ellipsis_middle" => TextOverflow::Ellipsis(EllipsisPosition::Middle),
+                "ellipsis" | "ellipsisEnd" => TextOverflow::Ellipsis(EllipsisPosition::End),
+                "ellipsisStart" => TextOverflow::Ellipsis(EllipsisPosition::Start),
+                "ellipsisMiddle" => TextOverflow::Ellipsis(EllipsisPosition::Middle),
                 _ => {
                     return Err(SchemaError::Adapter(format!(
                         "unsupported text_overflow `{value}`"
@@ -552,5 +556,6 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     media::register(&mut registry)?;
     virtual_window::register(&mut registry)?;
     registry.enable_builtin_accessibility()?;
+    registry.set_builtin_allowed_values(options::allowed_values)?;
     Ok(registry)
 }

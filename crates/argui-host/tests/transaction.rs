@@ -188,7 +188,7 @@ fn a_changed_leaf_reuses_large_siblings() {
             create(slot, builtin::TEXT),
             Operation::SetProperty {
                 id: id(slot),
-                property: builtin::CONTENT,
+                property: builtin::TEXT_VALUE,
                 value: Some(SchemaValue::String(format!("item {slot}"))),
             },
             insert(2, slot),
@@ -229,7 +229,7 @@ fn moving_a_node_between_parents_keeps_its_native_identity() {
             create(4, builtin::TEXT),
             Operation::SetProperty {
                 id: id(4),
-                property: builtin::CONTENT,
+                property: builtin::TEXT_VALUE,
                 value: Some(SchemaValue::String("moving".into())),
             },
             insert(2, 4),
@@ -331,7 +331,7 @@ fn detached_edits_do_not_change_visible_root_and_subtree_removal_releases_slots(
             create(2, builtin::TEXT),
             Operation::SetProperty {
                 id: id(2),
-                property: builtin::CONTENT,
+                property: builtin::TEXT_VALUE,
                 value: Some(SchemaValue::String("temporary".into())),
             },
         ])
@@ -357,7 +357,7 @@ fn detached_edits_do_not_change_visible_root_and_subtree_removal_releases_slots(
         },
         Operation::SetProperty {
             id: HostId::new(2, 2),
-            property: builtin::CONTENT,
+            property: builtin::TEXT_VALUE,
             value: Some(SchemaValue::String("reused slot".into())),
         },
     ])
@@ -461,7 +461,7 @@ fn isolated_update_in_ten_thousand_siblings_preserves_identity_and_reports_cost(
         });
         batch.push(Operation::SetProperty {
             id,
-            property: builtin::CONTENT,
+            property: builtin::TEXT_VALUE,
             value: Some(SchemaValue::String(index.to_string())),
         });
         batch.push(Operation::Insert {
@@ -485,7 +485,7 @@ fn isolated_update_in_ten_thousand_siblings_preserves_identity_and_reports_cost(
     let changed = host
         .commit(&[Operation::SetProperty {
             id: last,
-            property: builtin::CONTENT,
+            property: builtin::TEXT_VALUE,
             value: Some(SchemaValue::String("changed".into())),
         }])
         .expect("isolated text update");
@@ -556,7 +556,7 @@ fn large_navigation_batch_commits_atomically() {
         for value in ["first", "second", "final"] {
             operations.push(Operation::SetProperty {
                 id: id(slot),
-                property: builtin::CONTENT,
+                property: builtin::TEXT_VALUE,
                 value: Some(SchemaValue::String(value.into())),
             });
         }

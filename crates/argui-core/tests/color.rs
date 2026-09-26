@@ -70,6 +70,74 @@ fn hexadecimal_forms_are_css_compatible() {
 }
 
 #[test]
+fn oklch_literals_preserve_the_official_theme_channels_and_alpha() {
+    assert_eq!(
+        Color::from_literal("oklch(1 0 0)").unwrap().to_srgba8(),
+        [255, 255, 255, 255]
+    );
+    assert_eq!(
+        Color::from_literal("oklch(1 0 0 / 10%)")
+            .unwrap()
+            .to_srgba8(),
+        [255, 255, 255, 26]
+    );
+    assert_eq!(
+        Color::from_literal("oklch(100% 0 360deg / 50%)")
+            .unwrap()
+            .to_srgba8(),
+        [255, 255, 255, 128]
+    );
+    let blue = Color::from_literal("oklch(0.546 0.245 262.881)").unwrap();
+    assert!(blue.to_srgba8()[2] > blue.to_srgba8()[0]);
+    for invalid in [
+        "oklch(1 0)",
+        "oklch(1 0 0 / 110%)",
+        "oklch(NaN 0 0)",
+        "oklch(1 -1 0)",
+        "oklch(1 0 0",
+    ] {
+        assert_eq!(
+            Color::from_literal(invalid),
+            Err(ParseColorError::InvalidOklch)
+        );
+    }
+}
+
+#[test]
+fn rgb_literals_accept_css_forms_and_reject_malformed_channels() {
+    for literal in ["rgb(255, 0, 128)", "rgb(255 0 128)", "rgb(100% 0% 50.196%)"] {
+        assert_eq!(
+            Color::from_literal(literal).unwrap().to_srgba8(),
+            [255, 0, 128, 255]
+        );
+    }
+    for literal in [
+        "rgba(255, 0, 128, 0.5)",
+        "rgb(255 0 128 / 50%)",
+        "rgba(255 0 128 / 50%)",
+    ] {
+        assert_eq!(
+            Color::from_literal(literal).unwrap().to_srgba8(),
+            [255, 0, 128, 128]
+        );
+    }
+    for invalid in [
+        "rgb(255 0)",
+        "rgb(256 0 0)",
+        "rgb(NaN 0 0)",
+        "rgb(255, 0, 0, 0.5)",
+        "rgba(255, 0, 0)",
+        "rgb(255 0 0 / 110%)",
+        "rgb(255 0 0",
+    ] {
+        assert_eq!(
+            Color::from_literal(invalid),
+            Err(ParseColorError::InvalidRgb)
+        );
+    }
+}
+
+#[test]
 fn interpolation_is_alpha_safe_and_space_specific() {
     let transparent_red = Color::srgba(1.0, 0.0, 0.0, 0.0);
     let blue = Color::srgb(0.0, 0.0, 1.0);

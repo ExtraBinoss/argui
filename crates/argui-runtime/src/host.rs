@@ -7,7 +7,9 @@ pub(crate) mod gtk;
 use argui_core::Insets;
 #[cfg(target_os = "ios")]
 use argui_core::{Point, Rect, Size};
-use argui_platform::{WindowBackend, WindowCapabilities};
+#[cfg(not(target_arch = "wasm32"))]
+use argui_platform::WindowBackend;
+use argui_platform::WindowCapabilities;
 use winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
     window::{CursorIcon, Window},
@@ -35,10 +37,13 @@ pub(crate) trait WindowHost {
     }
     fn set_title(&self, title: &str);
     /// Enables or removes the native title bar and borders.
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_decorations(&self, decorations: bool);
     /// Returns the drawable client size in logical pixels.
+    #[cfg(not(target_arch = "wasm32"))]
     fn logical_size(&self) -> (f64, f64);
     /// Returns the outer top-left position in logical screen pixels when known.
+    #[cfg(not(target_arch = "wasm32"))]
     fn outer_position(&self) -> Option<(f64, f64)>;
     /// Requests client `width` and `height` in logical pixels.
     /// Returns the physical size when it is applied immediately, or `None`
@@ -46,11 +51,13 @@ pub(crate) trait WindowHost {
     ///
     /// # Errors
     /// Returns an error when the backend rejects the request.
+    #[cfg(not(target_arch = "wasm32"))]
     fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String>;
     /// Requests outer top-left coordinates `x` and `y` in logical screen pixels.
     ///
     /// # Errors
     /// Returns an error when the backend cannot set absolute position.
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_outer_position(&self, x: f64, y: f64) -> Result<(), String>;
     fn set_minimized(&self, minimized: bool);
     fn is_minimized(&self) -> Option<bool>;
@@ -111,9 +118,11 @@ impl WindowHost for Arc<Window> {
     fn set_title(&self, title: &str) {
         self.as_ref().set_title(title);
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_decorations(&self, decorations: bool) {
         self.as_ref().set_decorations(decorations);
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn logical_size(&self) -> (f64, f64) {
         let size: LogicalSize<f64> = self
             .as_ref()
@@ -121,6 +130,7 @@ impl WindowHost for Arc<Window> {
             .to_logical(self.as_ref().scale_factor());
         (size.width, size.height)
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn outer_position(&self) -> Option<(f64, f64)> {
         let position: LogicalPosition<f64> = self
             .as_ref()
@@ -129,12 +139,14 @@ impl WindowHost for Arc<Window> {
             .to_logical(self.as_ref().scale_factor());
         Some((position.x, position.y))
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String> {
         Ok(self
             .as_ref()
             .request_inner_size(LogicalSize::new(width, height))
             .map(|size| (size.width, size.height)))
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_outer_position(&self, x: f64, y: f64) -> Result<(), String> {
         if !matches!(
             self.capabilities().backend,
@@ -254,18 +266,23 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     fn set_title(&self, title: &str) {
         self.as_ref().set_title(title);
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_decorations(&self, decorations: bool) {
         self.as_ref().set_decorations(decorations);
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn logical_size(&self) -> (f64, f64) {
         self.as_ref().logical_size()
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn outer_position(&self) -> Option<(f64, f64)> {
         self.as_ref().outer_position()
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn request_inner_size(&self, width: f64, height: f64) -> Result<Option<(u32, u32)>, String> {
         self.as_ref().request_inner_size(width, height)
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_outer_position(&self, x: f64, y: f64) -> Result<(), String> {
         self.as_ref().set_outer_position(x, y)
     }

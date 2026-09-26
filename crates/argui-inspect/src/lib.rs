@@ -9,8 +9,8 @@ pub use memory::MemorySnapshot;
 mod trace;
 pub use frames::FrameCursor;
 pub use records::{
-    AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation, NodeSnapshot,
-    PortalSnapshot, PropertySnapshot, TreeSnapshot,
+    AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation, LayoutSnapshot,
+    NodeSnapshot, PortalSnapshot, PropertySnapshot, TreeSnapshot,
 };
 
 use trace::TraceDocument;

@@ -1,5 +1,5 @@
-use argui_core::{Affine2D, Color, Point, PointerButton, PointerEvent, PointerPhase, Rect, Size};
-use argui_paint::{ClipChain, Fill, Filter};
+use argui_core::{Affine2D, Color, Point, Rect, Size};
+use argui_paint::{Border, ClipChain, CornerRadii, Fill, Filter};
 use argui_schema::{NativeElementInput, NativeSlotValue, SchemaValue, builtin};
 use argui_ui::{
     CursorIcon, Element, ExpandedLengthPercentageAuto, FocusPolicy, HitRegion, HitShape, Overflow,
@@ -15,16 +15,25 @@ fn rectangle_paints_brush_border_and_clips_rounded_children() {
             builtin::RECTANGLE,
             &NativeElementInput::new()
                 .property(builtin::BACKGROUND, SchemaValue::Brush(background.clone()))
-                .property(builtin::BORDER_WIDTH, SchemaValue::Float(2.0))
-                .property(builtin::BORDER_COLOR, SchemaValue::Color(Color::BLACK))
-                .property(builtin::RADIUS, SchemaValue::Float(8.0))
+                .property(
+                    builtin::BORDER,
+                    SchemaValue::Border(Border::all(2.0, Color::BLACK)),
+                )
+                .property(builtin::RADII, SchemaValue::Radii(CornerRadii::all(8.0)))
                 .property(builtin::CLIP, SchemaValue::Bool(true))
                 .property(
                     builtin::BACKDROP_FILTER,
                     SchemaValue::String("blur(8px)".into()),
                 )
-                .property(builtin::X, SchemaValue::Dimension(length(12.0)))
-                .property(builtin::Y, SchemaValue::Dimension(length(4.0)))
+                .property(builtin::POSITION, SchemaValue::String("absolute".into()))
+                .property(
+                    builtin::INSET,
+                    SchemaValue::PositionInsets(argui_ui::PositionInsets {
+                        left: Some(12.0),
+                        top: Some(4.0),
+                        ..argui_ui::PositionInsets::default()
+                    }),
+                )
                 .slot(NativeSlotValue::new(
                     builtin::CHILDREN,
                     [Element::text("child")],
@@ -54,84 +63,76 @@ fn rectangle_paints_brush_border_and_clips_rounded_children() {
 }
 
 #[test]
-fn rectangle_uses_native_touch_area_hover_and_press_colors() {
-    let registry = builtin::registry().unwrap();
-    let base = Fill::Solid(Color::BLACK);
-    let hover = Fill::Solid(Color::srgb(0.2, 0.4, 0.6));
-    let pressed = Fill::Solid(Color::WHITE);
-    let rectangle = registry
+fn rectangle_focus_border_tracks_a_focused_descendant_natively() {
+    let focused = Element::container([])
+        .keyed("field")
+        .interaction(argui_ui::Interaction::default().focus_policy(FocusPolicy::TabStop));
+    let rectangle = builtin::registry()
+        .unwrap()
         .construct(
             builtin::RECTANGLE,
             &NativeElementInput::new()
-                .property(builtin::BACKGROUND, SchemaValue::Brush(base.clone()))
-                .property(builtin::HOVER_BACKGROUND, SchemaValue::Brush(hover.clone()))
                 .property(
-                    builtin::PRESSED_BACKGROUND,
-                    SchemaValue::Brush(pressed.clone()),
-                ),
+                    builtin::BORDER,
+                    SchemaValue::Border(Border::all(1.0, Color::BLACK)),
+                )
+                .property(
+                    builtin::FOCUS_BORDER_COLOR,
+                    SchemaValue::Color(Color::WHITE),
+                )
+                .slot(NativeSlotValue::new(builtin::CHILDREN, [focused])),
         )
         .unwrap();
-    let area = registry
-        .construct(
-            builtin::TOUCH_AREA,
-            &NativeElementInput::new().slot(NativeSlotValue::new(builtin::CHILDREN, [rectangle])),
-        )
-        .unwrap();
-    let mut tree = UiTree::new(area);
-    let area_node = tree.node_ids()[0];
-    let rectangle_node = tree.node_ids()[1];
+    let mut tree = UiTree::new(rectangle);
+    let root = tree.node_id_at(0).unwrap();
+    let field = tree.node_id_at(1).unwrap();
+    let border_color = |tree: &UiTree| {
+        tree.resolved_quad(root, tree.element_for(root).unwrap())
+            .border
+            .unwrap()
+            .color
+    };
+    assert_eq!(border_color(&tree), Color::BLACK);
     let region = HitRegion {
-        node: area_node,
+        node: field,
         bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
         shape: HitShape::Bounds,
         slop: Sides::default(),
         enabled: true,
-        focus_policy: FocusPolicy::None,
+        focus_policy: FocusPolicy::TabStop,
         cursor: CursorIcon::Default,
-        gestures: tree
-            .element_for(area_node)
-            .unwrap()
-            .interaction
-            .as_ref()
-            .unwrap()
-            .gestures,
+        gestures: Default::default(),
         window_drag: None,
     };
-    let color = |tree: &UiTree| {
-        tree.resolved_quad(rectangle_node, tree.element_for(rectangle_node).unwrap())
-            .background
-    };
-    assert_eq!(color(&tree), Some(base));
-    let hover_update = tree.pointer_moved(Point::new(10.0, 10.0), std::slice::from_ref(&region));
-    assert!(hover_update.events.is_empty());
-    assert!(hover_update.paint_changed);
-    assert!(!hover_update.layout_changed);
-    assert_eq!(color(&tree), Some(hover));
-    tree.pointer_event(
-        PointerEvent {
-            button: Some(PointerButton::Primary),
-            buttons: 1,
-            ..PointerEvent::mouse(PointerPhase::Pressed, Point::new(10.0, 10.0))
-        },
-        &[region],
-    );
-    assert_eq!(color(&tree), Some(pressed));
+    tree.sync_focus(&[region], Some(argui_ui::FocusRequest::Focus(field.into())));
+    assert_eq!(border_color(&tree), Color::WHITE);
 }
 
 #[test]
-fn rectangle_rejects_invalid_border_width_and_radius() {
+fn rectangle_rejects_invalid_pressed_scales() {
     let registry = builtin::registry().unwrap();
-    for (property, value) in [(builtin::BORDER_WIDTH, f32::NAN), (builtin::RADIUS, -1.0)] {
-        let error = registry
-            .construct(
-                builtin::RECTANGLE,
-                &NativeElementInput::new().property(property, SchemaValue::Float(value)),
-            )
-            .unwrap_err();
-        assert!(error.to_string().contains("finite nonnegative"));
+    for scale in [0.0, -0.1, 1.1, f32::NAN] {
+        let result = registry.construct(
+            builtin::RECTANGLE,
+            &NativeElementInput::new().property(builtin::PRESSED_SCALE, SchemaValue::Float(scale)),
+        );
+        assert!(result.is_err(), "accepted {scale}");
     }
+}
+
+#[test]
+fn rectangle_rejects_invalid_radii() {
+    let registry = builtin::registry().unwrap();
+    let error = registry
+        .construct(
+            builtin::RECTANGLE,
+            &NativeElementInput::new()
+                .property(builtin::RADII, SchemaValue::Radii(CornerRadii::all(-1.0))),
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("finite and nonnegative"));
 }
 
 #[test]
@@ -157,7 +158,7 @@ fn rectangle_authored_targets_animate_natively_and_stop_at_rest() {
             .construct(
                 builtin::RECTANGLE,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("motion".into()))
+                    .property(builtin::ID, SchemaValue::String("motion".into()))
                     .property(builtin::TRANSITION_MS, SchemaValue::Float(200.0))
                     .property(builtin::BACKGROUND, SchemaValue::Brush(Fill::Solid(color)))
                     .property(builtin::WIDTH, SchemaValue::Dimension(length(80.0))),
@@ -250,7 +251,7 @@ fn rectangle_rotation_loop_rejects_invalid_duration() {
                     .property(builtin::ROTATION_LOOP_MS, SchemaValue::Float(duration)),
             )
             .unwrap_err();
-        assert!(error.to_string().contains("rotation_loop_ms"));
+        assert!(error.to_string().contains("rotationLoopMs"));
     }
 }
 
@@ -346,7 +347,7 @@ fn rectangle_width_and_radius_loops_advance_native_properties() {
             builtin::RECTANGLE,
             &NativeElementInput::new()
                 .property(builtin::WIDTH, SchemaValue::Dimension(length(74.0)))
-                .property(builtin::RADIUS, SchemaValue::Float(7.0))
+                .property(builtin::RADII, SchemaValue::Radii(CornerRadii::all(7.0)))
                 .property(builtin::LOOP_MS, SchemaValue::Float(1000.0))
                 .property(builtin::LOOP_WIDTH, SchemaValue::Float(174.0))
                 .property(builtin::LOOP_RADIUS, SchemaValue::Float(34.0)),
@@ -381,7 +382,7 @@ fn rectangle_loop_pause_and_resume_keep_the_current_phase() {
             .construct(
                 builtin::RECTANGLE,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("phase".into()))
+                    .property(builtin::ID, SchemaValue::String("phase".into()))
                     .property(builtin::LOOP_MS, SchemaValue::Float(1000.0))
                     .property(builtin::LOOP_OPACITY, SchemaValue::Float(0.2))
                     .property(builtin::LOOP_PLAYING, SchemaValue::Bool(playing)),
@@ -444,7 +445,7 @@ fn rectangle_layout_loop_rejects_missing_or_invalid_base() {
             .property(builtin::LOOP_MS, SchemaValue::Float(1000.0))
             .property(builtin::LOOP_WIDTH, SchemaValue::Float(120.0)),
         NativeElementInput::new()
-            .property(builtin::RADIUS, SchemaValue::Float(7.0))
+            .property(builtin::RADII, SchemaValue::Radii(CornerRadii::all(7.0)))
             .property(builtin::LOOP_MS, SchemaValue::Float(1000.0))
             .property(builtin::LOOP_RADIUS, SchemaValue::Float(-1.0)),
     ] {
@@ -460,7 +461,7 @@ fn rectangle_spring_retargets_natively_and_rejects_mixed_drivers() {
             .construct(
                 builtin::RECTANGLE,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("spring".into()))
+                    .property(builtin::ID, SchemaValue::String("spring".into()))
                     .property(builtin::TRANSITION_SPRING, SchemaValue::Bool(true))
                     .property(builtin::ROTATION, SchemaValue::Float(rotation)),
             )

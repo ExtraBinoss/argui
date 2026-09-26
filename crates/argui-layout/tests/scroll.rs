@@ -6,8 +6,8 @@ use argui_text::TextEngine;
 use argui_ui::{
     Axes, Color, Element, EventHandlerId, EventListener, EventOwnerId, EventType, FlexWrap,
     Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig, ScrollbarPartStyle,
-    ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition, Transition,
-    UiEventKind, UiTree, VisualState, length, percent, property,
+    ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition,
+    Transition, UiEventKind, UiTree, VisualState, length, percent, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
@@ -562,4 +562,31 @@ fn horizontal_virtual_lists_measure_widths_and_request_a_bounded_window() {
         event.kind,
         UiEventKind::VirtualWindowChanged { start: 0, end, .. } if end < 24
     )));
+}
+
+#[test]
+fn vertical_scrollbar_can_attach_to_the_left_edge() {
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
+    )
+    .side(ScrollbarSide::Left)
+    .width(4.0)
+    .insets(Sides {
+        left: 0.0,
+        right: 0.0,
+        top: 0.0,
+        bottom: 0.0,
+    });
+    let mut ui = UiTree::new(content(style));
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 100.0))
+        .unwrap();
+    let thumb = output.scroll_regions[0]
+        .scrollbar
+        .as_ref()
+        .and_then(|bar| bar.vertical)
+        .expect("overflowing content has a vertical scrollbar");
+    assert_eq!(thumb.track.origin.x, 0.0);
+    assert_eq!(thumb.track.size.width, 4.0);
 }

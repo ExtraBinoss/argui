@@ -27,6 +27,7 @@ fn fixture(root: &Path, framework: &str, targets: &str, features: &[&str]) {
         "--targets",
         targets,
         "--yes",
+        "--no-install",
     ])
     .current_dir(root);
     for feature in features {
@@ -41,6 +42,8 @@ fn fixture(root: &Path, framework: &str, targets: &str, features: &[&str]) {
     let app = root.join("app");
     fs::create_dir_all(app.join("node_modules/typescript/bin")).unwrap();
     fs::create_dir_all(app.join("node_modules/vite/bin")).unwrap();
+    fs::create_dir_all(app.join("node_modules/oxfmt/bin")).unwrap();
+    fs::write(app.join("node_modules/oxfmt/bin/oxfmt"), "fake formatter").unwrap();
     script(
         &root.join("bin/bun"),
         r##"#!/bin/sh
@@ -48,6 +51,12 @@ printf 'bun %s\n' "$*" >> "$ARGUI_FAKE_LOG"
 case "$1" in
   --version) echo 1.4.0 ;;
   *tsc) if [ "${ARGUI_FAKE_TSC_FAIL:-}" = 1 ]; then exit 2; fi; echo types-ok ;;
+  *oxfmt)
+    case "$*" in *'src vite.config.ts'*) ;; *) exit 4 ;; esac
+    case "$*" in
+      *--check*) if grep -q 'const  x' src/format-case.tsx; then exit 2; fi ;;
+      *) printf 'const x = 1;\n' > src/format-case.tsx ;;
+    esac ;;
   *vite.js)
     if [ "$2" = build ]; then
       case "$*" in
@@ -57,6 +66,12 @@ case "$1" in
     fi
     if [ "${ARGUI_FAKE_VITE_FAIL:-}" = 1 ]; then exit 2; fi
     ;;
+  scripts/generate-assets.mjs)
+    if [ -n "${ARGUI_REAL_BUN:-}" ]; then "$ARGUI_REAL_BUN" "$ARGUI_REAL_GENERATOR" "$2"; else
+      echo '{"version":1,"totalBytes":0,"assets":[]}' > assets.generated.json
+      cp assets.generated.json assets.dev.generated.json
+      echo 'export const mediaAssets = {}' > assets.generated.ts
+    fi ;;
   *.mjs) mkdir -p "$4"; echo 'export default {}' > "$4/test.mjs" ;;
   *) exit 3 ;;
 esac
@@ -86,7 +101,7 @@ case "$(cat argui.json)" in
   *'"framework": "rust"'*) binary=demo ;;
   *) binary=argui-app-native ;;
 esac
-printf '#!/bin/sh\nif [ -n "${ARGUI_AUTOMATION_GATE:-}" ]; then dd bs=1 count=1 of=/dev/null 2>/dev/null; fi\nif [ -n "${ARGUI_AUTOMATION_OUT:-}" ]; then mkdir -p "$ARGUI_AUTOMATION_OUT"; echo '\''{"ok":true,"steps":[]}'\'' > "$ARGUI_AUTOMATION_OUT/report.json"; fi\nexit 0\n' > "$target/$profile/$binary"
+printf '#!/bin/sh\nif [ -n "${ARGUI_AUTOMATION_GATE:-}" ]; then dd bs=1 count=1 of=/dev/null 2>/dev/null; sleep 0.35; fi\nif [ -n "${ARGUI_AUTOMATION_OUT:-}" ]; then mkdir -p "$ARGUI_AUTOMATION_OUT"; echo '\''{"ok":true,"steps":[]}'\'' > "$ARGUI_AUTOMATION_OUT/report.json"; fi\nexit 0\n' > "$target/$profile/$binary"
 chmod +x "$target/$profile/$binary"
 if [ "${ARGUI_FAKE_CARGO_FAIL:-}" = 1 ]; then exit 2; fi
 "##,
@@ -148,6 +163,30 @@ fn succeeds(output: Output) {
 }
 
 #[test]
+/// A generated app formats TSX with its local Oxfmt and checks without writing.
+fn format_uses_generated_app_dependency_and_supports_check() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fixture(root, "react", "native", &[]);
+    let app = root.join("app");
+    let source = app.join("src/format-case.tsx");
+    fs::write(&source, "const  x=1\n").unwrap();
+    let failed = cli(root, &["format", "--check"], &[]);
+    assert!(!failed.status.success());
+    assert_eq!(fs::read_to_string(&source).unwrap(), "const  x=1\n");
+    succeeds(cli(root, &["format", "."], &[]));
+    assert_eq!(fs::read_to_string(&source).unwrap(), "const x = 1;\n");
+    succeeds(cli(root, &["format", "--check"], &[]));
+    let log = fs::read_to_string(root.join("commands.log")).unwrap();
+    assert!(log.contains("--config .oxfmtrc.json --check src vite.config.ts"));
+    assert!(log.contains("--config .oxfmtrc.json src vite.config.ts"));
+    fs::remove_file(app.join("node_modules/oxfmt/bin/oxfmt")).unwrap();
+    let missing = cli(root, &["format"], &[]);
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("bun install"));
+}
+
+#[test]
 /// Solid's one source tree builds native and Web, runs both, and packages release output.
 fn solid_builds_both_targets_and_packages_native() {
     let temp = tempfile::tempdir().unwrap();
@@ -160,6 +199,7 @@ fn solid_builds_both_targets_and_packages_native() {
     let app = root.join("app");
     assert!(app.join("dist/desktop/run.sh").is_file());
     assert!(app.join("dist/desktop/app.mjs").is_file());
+    assert!(app.join("dist/desktop/assets").is_dir());
     assert!(app.join("dist/web/index.html").is_file());
     assert!(
         app.join("node_modules/@argui/web-host/argui_app_web_bg.wasm")
@@ -170,6 +210,71 @@ fn solid_builds_both_targets_and_packages_native() {
     assert!(!log.contains("--features automation"));
     assert!(log.contains("wasm-pack build"));
     assert!(log.contains("bun "));
+}
+
+#[test]
+/// A freshly initialized app packages its own referenced SVG and omits an unused peer.
+fn initialized_app_packages_only_its_referenced_svg() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fixture(root, "solid", "native,web", &[]);
+    let app = root.join("app");
+    fs::create_dir(app.join("assets/mine")).unwrap();
+    fs::write(
+        app.join("assets/mine/star.svg"),
+        "<svg><path d=\"M0 0\"/></svg>",
+    )
+    .unwrap();
+    fs::write(
+        app.join("assets/mine/unused.svg"),
+        "<svg><path d=\"M1 1\"/></svg>",
+    )
+    .unwrap();
+    fs::write(
+        app.join("assets.config.json"),
+        r#"{"packs":{"mine":"mine"},"files":{},"entries":["src/main.tsx"]}"#,
+    )
+    .unwrap();
+    let source = fs::read_to_string(app.join("src/main.tsx")).unwrap();
+    fs::write(
+        app.join("src/main.tsx"),
+        format!(
+            "import {{ mediaAssets }} from '../assets.generated'\nconst ownIcon = mediaAssets['mine/star.svg']\n{source}"
+        ),
+    )
+    .unwrap();
+    let bun = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+        .map(|path| path.join("bun"))
+        .find(|path| path.is_file())
+        .expect("Bun is required for generated app tests");
+    succeeds(cli(
+        root,
+        &["build", "release"],
+        &[
+            ("ARGUI_REAL_BUN", bun.to_str().unwrap()),
+            (
+                "ARGUI_REAL_GENERATOR",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../scripts/generate-app-assets.mjs"
+                ),
+            ),
+        ],
+    ));
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(app.join("dist/desktop/assets.generated.json")).unwrap())
+            .unwrap();
+    assert_eq!(manifest["assets"].as_array().unwrap().len(), 1);
+    assert_eq!(manifest["assets"][0]["key"], "mine/star.svg");
+    assert!(app.join("dist/desktop/assets/mine/star.svg").is_file());
+    assert!(!app.join("dist/desktop/assets/mine/unused.svg").exists());
+    assert!(app.join("dist/web/assets/mine/star.svg").is_file());
+    assert!(!app.join("dist/web/assets/mine/unused.svg").exists());
+    assert!(
+        fs::read_to_string(app.join("dist/desktop/run.sh"))
+            .unwrap()
+            .contains("ARGUI_APP_ASSETS")
+    );
 }
 
 #[test]
@@ -188,6 +293,15 @@ fn react_test_and_screenshot_use_automation_host() {
     succeeds(cli(root, &["screenshot", "--out", "capture.png"], &[]));
     assert!(app.join("results/report.json").is_file());
     assert!(app.join("report.json").is_file());
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(app.join("results/report.json")).unwrap()).unwrap();
+    assert!(report["processMetrics"]["hostPid"].as_u64().unwrap() > 0);
+    assert!(
+        !report["processMetrics"]["samples"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
     let log = fs::read_to_string(root.join("commands.log")).unwrap();
     assert!(log.contains("--features automation"));
     assert!(log.contains(".argui-build-test.mjs"));
@@ -425,7 +539,7 @@ fn missing_cargo_build_tool_is_reported() {
 }
 
 #[test]
-/// TypeScript check identifies Bun disappearing after prerequisite detection.
+/// Asset generation identifies Bun disappearing after prerequisite detection.
 fn bun_disappearing_during_check_is_reported() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
@@ -438,7 +552,7 @@ fn bun_disappearing_during_check_is_reported() {
     let result = cli(root, &["check"], &[("PATH", &path)]);
     assert!(!result.status.success());
     assert!(
-        String::from_utf8_lossy(&result.stderr).contains("bun unavailable"),
+        String::from_utf8_lossy(&result.stderr).contains("app asset generation"),
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );

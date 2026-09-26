@@ -1,119 +1,213 @@
-import { createSignal } from '@argui/solid'
+import { createSignal, createUniqueId } from 'solid-js'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import type { SelectProps } from '../shared/types'
-import { nextSelectIndex, resolveSelectOptions } from '../shared/select-options'
-import { useWidgetIcons } from './assets'
-import { useButtonGroupJoined } from './button-group'
+import { useTheme } from '@argui/solid'
+import type { WidgetTheme } from '../shared/theme'
+import { keyName, nextEnabledOption, type SelectOptions } from '../shared/types'
 
-/** Composes an accessible, scrollable native combobox and anchored option popup. */
+/** Props for the native Solid Select. */
+export type SelectProps = SelectOptions & { leading?: JSX.Element; trailing?: JSX.Element }
+
+/** Renders a keyboard-accessible native option list with controlled or local value. */
 export function Select(props: SelectProps): JSX.Element {
-  const joined = useButtonGroupJoined()
-  const icons = useWidgetIcons()
-  const [expanded, setExpanded] = createSignal(false)
+  const generatedId = `argui-select-${createUniqueId()}`
+  const id = () => props.id ?? generatedId
+  const popupId = () => `${id()}-popup`
+  const theme = useTheme<WidgetTheme>()
+  const [localValue, setLocalValue] = createSignal(props.defaultValue ?? '')
+  const [localOpen, setLocalOpen] = createSignal(props.defaultOpen ?? false)
   const [activeIndex, setActiveIndex] = createSignal(-1)
-  const [focused, setFocused] = createSignal(false)
-  const [uncontrolled, setUncontrolled] = createSignal(props.defaultValue ?? '')
-  const options = () => resolveSelectOptions(props.options)
-  const value = () => props.value ?? uncontrolled()
-  const chosen = () => options().find((option) => option.value === value())
-  const width = () => Number.isFinite(props.width) && (props.width ?? 0) > 0 ? props.width! : 240
-  const open = () => {
-    if (props.disabled) return
-    const entries = options()
-    const selected = entries.findIndex((option) => option.value === value() && !option.disabled)
-    setActiveIndex(selected >= 0 ? selected : nextSelectIndex(entries, -1, 1))
-    setExpanded(true)
+  const value = () => props.value ?? localValue()
+  const expanded = () => props.open ?? localOpen()
+  const controlledReadOnly = () => props.value !== undefined && !props.onValueChange
+  const fixedOpen = () => props.open !== undefined && !props.onOpenChange
+  const disabled = () => !!props.disabled || controlledReadOnly()
+  const selectedIndex = () => props.options.findIndex((option) => option.value === value())
+  const currentIndex = () => activeIndex() >= 0 && activeIndex() < props.options.length
+    ? activeIndex() : selectedIndex()
+
+  const setOpen = (next: boolean) => {
+    if (props.open === undefined && !fixedOpen()) setLocalOpen(next)
+    props.onOpenChange?.(next)
+  }
+  const showOptions = () => {
+    if (disabled() || fixedOpen()) return
+    const selected = selectedIndex()
+    setActiveIndex(selected >= 0 && !props.options[selected]?.disabled
+      ? selected : nextEnabledOption(props.options, -1, 1))
+    setOpen(true)
   }
   const choose = (index: number) => {
-    const option = options()[index]
-    if (!option || option.disabled || props.disabled) return
-    if (props.value === undefined) setUncontrolled(option.value)
-    props.onChange?.(option.value)
-    setExpanded(false)
+    const option = props.options[index]
+    if (!option || option.disabled || disabled()) return
+    if (props.value === undefined) setLocalValue(option.value)
+    props.onValueChange?.(option.value)
+    setOpen(false)
   }
   const onKey = (payload: unknown) => {
-    if (props.disabled) return
-    if (typeof payload === 'object' && payload && 'state' in payload && payload.state !== 'pressed') return
-    const key = typeof payload === 'object' && payload && 'key' in payload
-      ? String(payload.key) : String(payload)
-    const entries = options()
-    if (key === 'Escape') setExpanded(false)
-    else if (key === 'ArrowDown' || key === 'ArrowUp') {
-      const next = nextSelectIndex(entries, activeIndex() < 0 ? (key === 'ArrowDown' ? -1 : 0) : activeIndex(),
+    if (disabled()) return
+    const key = keyName(payload)
+    if (!key) return
+    if (key === 'Escape') setOpen(false)
+    else if (key === 'Enter' || key === ' ') {
+      if (expanded()) choose(currentIndex())
+      else showOptions()
+    } else if (key === 'ArrowDown' || key === 'ArrowUp') {
+      const current = currentIndex()
+      const next = nextEnabledOption(props.options, current < 0 ? (key === 'ArrowDown' ? -1 : 0) : current,
         key === 'ArrowDown' ? 1 : -1)
-      if (next >= 0) { setActiveIndex(next); setExpanded(true) }
+      if (next >= 0) { setActiveIndex(next); setOpen(true) }
     } else if (key === 'Home' || key === 'End') {
-      const next = nextSelectIndex(entries, key === 'Home' ? -1 : 0, key === 'Home' ? 1 : -1)
-      if (next >= 0) { setActiveIndex(next); setExpanded(true) }
-    } else if (key === 'Enter' || key === ' ') {
-      if (expanded()) choose(activeIndex())
-      else open()
-    } else if (key.length === 1 && key !== ' ') {
-      const search = key.toLocaleLowerCase()
-      const next = entries.findIndex((option) => !option.disabled && option.label.toLocaleLowerCase().startsWith(search))
-      if (next >= 0) { setActiveIndex(next); setExpanded(true) }
+      const next = key === 'Home'
+        ? nextEnabledOption(props.options, -1, 1)
+        : nextEnabledOption(props.options, 0, -1)
+      if (next >= 0) { setActiveIndex(next); setOpen(true) }
     }
   }
-  return <column gap={joined ? 0 : 8}>
-    {joined ? null : <text text={props.label} color={props.theme.muted} font_size={12} />}
-    <focusScope key={props.id} role="combo_box"
-      accessible_name={`${props.label}: ${chosen()?.label ?? props.placeholder ?? 'Choose an option'}`}
-      accessible_value={chosen()?.label ?? ''} enabled={!props.disabled}
-      controls={`${props.id}-popup`}
-      active_descendant={expanded() && activeIndex() >= 0 ? `${props.id}-option-${activeIndex()}` : undefined}
-      expandable={true} expanded={expanded()} keyboard_activation="none"
-      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-      onClick={() => { if (!props.disabled) expanded() ? setExpanded(false) : open() }} onKey={onKey}>
-      <rectangle width={width()} height={joined ? 36 : props.theme.inputHeight}
-        background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
-        border_color={focused() ? props.theme.accent : props.theme.border}
-        border_width={joined ? focused() ? 2 : 0 : focused() ? 2 : 1}
-        radius={joined ? 0 : props.theme.controlRadius}
-        opacity={props.disabled ? 0.55 : 1}>
-        <row width="fill" height="fill" padding={props.theme.controlPadding} align_items="center">
-          <text text={chosen()?.label ?? props.placeholder ?? 'Choose an option'}
-            color={chosen() ? props.theme.foreground : props.theme.muted}
-            font_size={props.theme.controlFontSize} />
-          <container grow={1} />
-          {icons.chevronDown ? <svg source={icons.chevronDown} color={props.theme.muted}
-            width={16} height={16} rotation={expanded() ? 180 : 0} /> : null}
+
+  const selected = () => props.options.find((option) => option.value === value())
+  const width = () => props.width ?? 240
+  const shadcn = () => props.variant === 'shadcn'
+  const rowHeight = () => shadcn() ? 28 : 36
+  const rowCount = () => Math.max(1, props.options.length + Number(shadcn()))
+  const contentHeight = () => 8 + rowCount() * rowHeight() + (rowCount() - 1) * 2
+    + (shadcn() ? 26 : 0)
+  const optionHeight = () => Math.min(256, contentHeight())
+  // The popup's selected row overlays the center of the 32 px trigger when every row fits.
+  const placementOffset = () => shadcn() && contentHeight() <= 256
+    ? -(16 + 1 + 4 + 24 + 2 + Math.max(0, selectedIndex() + 1) * 30 + 14)
+    : undefined
+
+  return <column width={props.width ?? '100%'} height={props.height}
+    minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
+    grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf} margin={props.margin} gap={theme().spacing}>
+    {!shadcn() ? <text color={theme().textMuted} fontSize={12}>{props.label}</text> : null}
+    <focusScope
+      id={id()}
+      role="comboBox"
+      accessibleName={props.label}
+      accessibleValue={selected()?.label ?? ''}
+      enabled={!disabled() && !fixedOpen()}
+      expandable={true}
+      expanded={expanded()}
+      controls={popupId()}
+      hasPopup="listBox"
+      activeDescendant={expanded() && currentIndex() >= 0
+        ? `${id()}-option-${encodeURIComponent(props.options[currentIndex()]!.value)}` : undefined}
+      keyboardActivation="none"
+      onClick={() => expanded() ? setOpen(false) : showOptions()}
+      onKey={onKey}
+    >
+      <rectangle
+        width={width()}
+        height={shadcn() ? 32 : 40}
+        padding={theme().spacing}
+        background={theme().surface}
+        border={{ width: 1, color: disabled() ? theme().border : theme().border }}
+        radii={theme().radius}
+        focusBorderColor={theme().focusRing}
+        opacity={props.disabled ? 0.55 : 1}
+      >
+        <row width="100%" height="100%" gap={theme().spacing} alignItems="center">
+          {props.leading}
+          <container grow={1} minWidth={0}>
+            <text color={selected() ? theme().text : theme().textMuted}>
+              {selected()?.label ?? props.placeholder ?? 'Choose an option'}
+            </text>
+          </container>
+          {props.trailing}
         </row>
       </rectangle>
     </focusScope>
-    {expanded() ? <popupWindow key={`${props.id}-popup`} anchor={props.id} placement="bottom_start"
-      width={width()} window_layer="popover" dismiss_policy="outside_pointer_or_escape"
-      containment="trap" initial_focus="first" restore_focus={true}
-      onDismiss={() => setExpanded(false)}>
-      <focusScope role="list_box" accessible_name={props.label} focusable={true}
-        focus_on_tab_navigation={false} onKey={onKey}
-        active_descendant={activeIndex() >= 0 ? `${props.id}-option-${activeIndex()}` : undefined}>
-        <rectangle width={width()} background={props.theme.surface}
-          border_color={props.theme.border} border_width={1} radius={props.theme.overlayRadius}
-          shadow_blur={props.theme.overlayShadowBlur} shadow_offset_y={5} shadow_color={props.theme.overlayShadow}>
-          <column width="fill" max_height={280} scroll_y={true} gap={2} padding={4}>
-            {options().map((option, index) => <column key={`${props.id}-row-${index}`} width="fill" gap={2}>
-              {option.group && (index === 0 || options()[index - 1]?.group !== option.group)
-                ? <text text={option.group} color={props.theme.muted} font_size={11} /> : null}
-              <focusScope key={`${props.id}-option-${index}`} role="option"
-                accessible_name={option.label} selected={value() === option.value}
-                enabled={!option.disabled} keyboard_activation="enter_or_space"
-                onClick={() => choose(index)}>
-                <touchArea enabled={!option.disabled} mouse_cursor={option.disabled ? 'not_allowed' : 'pointer'}
-                  onPointerEnter={() => { if (!option.disabled) setActiveIndex(index) }}>
-                  <rectangle width="fill" height={34} opacity={option.disabled ? 0.5 : 1}
-                    background={index === activeIndex() || option.value === value()
-                      ? props.theme.surfaceRaised : props.theme.surface}
-                    radius={props.theme.controlRadius}>
-                    <row width="fill" height="fill" padding={props.theme.controlPadding} align_items="center">
-                      <text text={option.label} color={props.theme.foreground} font_size={props.theme.controlFontSize} />
+    {expanded() ? <popupWindow
+      id={popupId()}
+      role="listBox"
+      accessibleName={props.label}
+      anchor={id()}
+      placement="bottomStart"
+      placementOffset={placementOffset()}
+      width={width()}
+      windowLayer="popover"
+      dismissPolicy="outsidePointerOrEscape"
+      containment="trap"
+      initialFocus="first"
+      restoreFocus={true}
+      onDismiss={() => setOpen(false)}
+    >
+      <rectangle
+        width="100%"
+        background={theme().surface}
+        border={{ width: theme().overlayBorderWidth, color: theme().border }}
+        radii={theme().overlayRadius}
+        shadow={{ offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
+      >
+        <scrollView width="100%" height={optionHeight()}>
+          <column width="100%" gap={2} padding={4}>
+            {shadcn() ? <container height={24} padding={{ start: 6, top: 3 }}>
+              <text color={theme().textMuted} fontSize={12}>{props.label}</text>
+            </container> : null}
+            {shadcn() ? <focusScope
+              id={`${id()}-placeholder`}
+              role="option"
+              accessibleName={props.placeholder ?? 'Choose an option'}
+              selected={!selected()}
+              enabled={!disabled()}
+              keyboardActivation="enterOrSpace"
+              onClick={() => {
+                if (disabled()) return
+                if (props.value === undefined) setLocalValue('')
+                props.onValueChange?.('')
+                setOpen(false)
+              }}
+            >
+              <touchArea enabled={!disabled()} mouseCursor={disabled() ? 'notAllowed' : 'pointer'}>
+                <rectangle width="100%" height={rowHeight()} padding={{ start: 6, end: 6 }}
+                  background={!selected() ? theme().surfaceHover : theme().surface}
+                  hoverBackground={theme().controlHover} radii={theme().radius}>
+                  <row width="100%" height="100%" alignItems="center">
+                    <container grow={1} minWidth={0}><text color={theme().text}>{props.placeholder ?? 'Choose an option'}</text></container>
+                    {!selected() ? <text color={theme().text}>✓</text> : null}
+                  </row>
+                </rectangle>
+              </touchArea>
+            </focusScope> : null}
+            {props.options.length ? props.options.map((option, index) => {
+              const optionId = `${id()}-option-${encodeURIComponent(option.value)}`
+              const active = () => index === currentIndex()
+              return <focusScope
+                id={optionId}
+                key={option.value}
+                role="option"
+                accessibleName={option.label}
+                selected={value() === option.value}
+                enabled={!option.disabled && !disabled()}
+                keyboardActivation="enterOrSpace"
+                onClick={() => choose(index)}
+              >
+                <touchArea
+                  enabled={!option.disabled && !disabled()}
+                  mouseCursor={option.disabled || disabled() ? 'notAllowed' : 'pointer'}
+                  onPointerEnter={() => { if (!option.disabled) setActiveIndex(index) }}
+                >
+                  <rectangle
+                    width="100%"
+                    height={rowHeight()}
+                    padding={shadcn() ? { start: 6, end: 6 } : theme().spacing}
+                    background={active() || value() === option.value ? theme().surfaceHover : theme().surface}
+                    hoverBackground={theme().controlHover}
+                    radii={theme().radius}
+                    opacity={option.disabled ? 0.5 : 1}
+                  >
+                    <row width="100%" height="100%" alignItems="center">
+                      <container grow={1} minWidth={0}><text color={theme().text}>{option.label}</text></container>
+                      {shadcn() && value() === option.value ? <text color={theme().text}>✓</text> : null}
                     </row>
                   </rectangle>
                 </touchArea>
               </focusScope>
-            </column>)}
+            }) : !shadcn() ? <text color={theme().textMuted}>No options</text> : null}
           </column>
-        </rectangle>
-      </focusScope>
+        </scrollView>
+      </rectangle>
     </popupWindow> : null}
   </column>
 }

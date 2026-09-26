@@ -99,6 +99,16 @@ pub enum ScrollbarVisibility {
     Hidden,
 }
 
+/// Horizontal edge used by a vertical scrollbar.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ScrollbarSide {
+    /// Place the scrollbar at the physical left edge of the viewport.
+    Left,
+    /// Place the scrollbar at the physical right edge of the viewport.
+    #[default]
+    Right,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollConfig {
     pub enabled: bool,
@@ -266,6 +276,7 @@ fn finite(value: f32) -> f32 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarStyle {
     pub width: f32,
+    pub side: ScrollbarSide,
     pub insets: Sides<f32>,
     pub min_thumb: f32,
     pub visibility: ScrollbarVisibility,
@@ -284,6 +295,7 @@ impl ScrollbarStyle {
     pub const fn new(track: ScrollbarPartStyle, thumb: ScrollbarPartStyle) -> Self {
         Self {
             width: 10.0,
+            side: ScrollbarSide::Right,
             insets: Sides {
                 left: 4.0,
                 right: 4.0,
@@ -303,6 +315,15 @@ impl ScrollbarStyle {
     #[must_use]
     pub const fn width(mut self, width: f32) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Sets the physical edge used by the vertical scrollbar.
+    ///
+    /// * `side` — left or right edge of the scroll viewport.
+    #[must_use]
+    pub const fn side(mut self, side: ScrollbarSide) -> Self {
+        self.side = side;
         self
     }
 

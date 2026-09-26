@@ -10,7 +10,7 @@ fn reuses_equal_inputs_and_rebuilds_changed_values_and_children() {
     let mut cache = NativeElementCache::new();
     let id = RetainedIdentity::new(1, 2);
     let input =
-        NativeElementInput::new().property(builtin::CONTENT, SchemaValue::String("one".into()));
+        NativeElementInput::new().property(builtin::TEXT_VALUE, SchemaValue::String("one".into()));
     cache.begin_render();
     let first = cache
         .construct(&registry, builtin::TEXT, id.clone(), input.clone(), false)
@@ -21,14 +21,14 @@ fn reuses_equal_inputs_and_rebuilds_changed_values_and_children() {
         .construct(&registry, builtin::TEXT, id.clone(), input, false)
         .unwrap();
     assert!(same.ptr_eq(&first));
-    let invalid = NativeElementInput::new().property(builtin::CONTENT, SchemaValue::Bool(true));
+    let invalid = NativeElementInput::new().property(builtin::TEXT_VALUE, SchemaValue::Bool(true));
     assert!(
         cache
             .construct(&registry, builtin::TEXT, id.clone(), invalid, false)
             .is_err()
     );
     let input =
-        NativeElementInput::new().property(builtin::CONTENT, SchemaValue::String("two".into()));
+        NativeElementInput::new().property(builtin::TEXT_VALUE, SchemaValue::String("two".into()));
     let changed = cache
         .construct(&registry, builtin::TEXT, id.clone(), input.clone(), false)
         .unwrap();

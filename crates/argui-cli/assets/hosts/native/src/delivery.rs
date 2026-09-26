@@ -49,7 +49,7 @@ pub fn event_json(delivery: &NativeHostDelivery) -> Value {
         fields.insert("height".into(), json!(pointer.height));
     }
     json!({
-        "node": {"slot": delivery.callback.node.slot(), "generation": 1},
+        "node": {"slot": delivery.callback.node.slot(), "generation": delivery.callback.node.generation()},
         "callback": delivery.callback.callback.0,
         "payload": payload,
     })
@@ -83,7 +83,12 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             json!({"kind": "scroll", "offsetX": offset.x, "offsetY": offset.y})
         }
         UiEventKind::Gesture(gesture) => match gesture.kind {
-            GestureKind::Pan { delta, total, velocity, .. } => json!({
+            GestureKind::Pan {
+                delta,
+                total,
+                velocity,
+                ..
+            } => json!({
                 "kind": "pan", "deltaX": delta.x, "deltaY": delta.y,
                 "totalX": total.x, "totalY": total.y,
                 "velocityX": velocity.x, "velocityY": velocity.y,
@@ -122,7 +127,7 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             "viewportExtent": viewport_extent,
         }),
         UiEventKind::SemanticAction { action, value } => json!({
-            "kind": "semantic_action",
+            "kind": "semanticAction",
             "action": match action {
                 SemanticAction::Click => "click",
                 SemanticAction::Focus => "focus",
@@ -131,8 +136,8 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
                 SemanticAction::Decrement => "decrement",
                 SemanticAction::Expand => "expand",
                 SemanticAction::Collapse => "collapse",
-                SemanticAction::SetValue => "set_value",
-                SemanticAction::ScrollIntoView => "scroll_into_view",
+                SemanticAction::SetValue => "setValue",
+                SemanticAction::ScrollIntoView => "scrollIntoView",
             },
             "value": match value {
                 Some(SemanticValue::Text(text)) => json!(text),
@@ -140,7 +145,7 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
                 None => Value::Null,
             },
         }),
-        other => json!({"kind": format!("{:?}", other.event_type())}),
+        other => json!({"kind": other.event_type().wire_name()}),
     }
 }
 

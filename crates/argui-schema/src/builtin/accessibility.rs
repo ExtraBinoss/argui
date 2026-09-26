@@ -234,7 +234,7 @@ pub(crate) fn apply(
     if let Some(value) = string(input, SEMANTIC_HAS_POPUP) {
         semantics.popup = Some(match value {
             "menu" => PopupKind::Menu,
-            "list_box" => PopupKind::ListBox,
+            "listBox" => PopupKind::ListBox,
             "tree" => PopupKind::Tree,
             "grid" => PopupKind::Grid,
             "dialog" => PopupKind::Dialog,

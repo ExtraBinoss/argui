@@ -15,7 +15,7 @@ mod memory;
 mod values;
 pub use cache::InspectionCache;
 
-use values::properties;
+use values::{layout_snapshot, properties};
 
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -181,6 +181,12 @@ fn collect_nodes(
             summary(&element.kind, element.children.len())
         },
         bounds,
+        layout: layout_snapshot(
+            element,
+            layout_node
+                .map(|candidate| candidate.layout_bounds)
+                .unwrap_or_default(),
+        ),
         clip: layout_node.and_then(|candidate| candidate.clip),
         z_index: element.z_index,
         portal: state

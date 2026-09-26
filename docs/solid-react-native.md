@@ -33,10 +33,43 @@ neither a browser nor a WebView.
 
 Gallery controls are provided by the workspace package
 [`@argui/widgets`](../packages/widgets/package.json). It has `/solid` and
-`/react` entry points for `Button`, `InputField`, `Select`, `Popover`, the
-palette helper, and the input-text parser. The package accepts native asset
-references from its host application through `WidgetAssetProvider`; it does not
-read the gallery's generated asset manifest.
+`/react` entry points for six widgets: `Button`, `ButtonGroup`, `InputField`,
+`Select`, `Popover`, and `VirtualList`. Their props use the same public names. The root
+theme provider supplies the palette once; a local `ThemeScope` can override
+part of it for a subtree. Ordinary widgets generate their native IDs while
+mounted; give an explicit `id` for a test selector, anchor, or accessibility
+relation. The [layout guide](ui/layout.md) explains size, growth, grid,
+scrolling, and RTL on all three authoring surfaces.
+
+### Popover
+
+`Popover` owns its anchor, popup, dismissal, and focus restoration. Its trigger
+keeps its natural size; `contentWidth` sizes only the popup. Use `width` when
+the surrounding layout should also size the trigger.
+
+```tsx
+<Popover trigger="Filters" contentWidth={320}>
+  {/* Popup content */}
+</Popover>
+```
+
+The default is an uncontrolled, nonmodal popup. Escape and an outside pointer
+press dismiss it. Focus remains on the trigger unless `initialFocus="first"`
+is set for a popup with an input or another first control. Tab navigation is
+not trapped inside the popup. For controlled state, pass both `open` and
+`onOpenChange`; the type contract rejects `open` alone.
+
+```tsx
+<Popover trigger="Filters" open={open} onOpenChange={setOpen}>
+  {/* Popup content */}
+</Popover>
+```
+
+`accessibleLabel` replaces the trigger text as the accessible name when the
+visible label needs more context. `leading` and `trailing` accept application
+provided content beside the trigger text. The optional `id` provides a stable
+selector for automation. Surface, blur, radius, padding, width, border, and
+shadow defaults come from the shared `overlay*` theme tokens.
 
 ## TSX internationalization
 
@@ -59,16 +92,14 @@ add code without validating the cross-platform target, so their runner code
 and Gradle profile were removed. This is a project selection based on this
 prototype, not a claim that V8 is inherently unavailable on mobile.
 
-The gallery opens on Button and also includes Select, Media,
-Internationalization, Accessibility, Overlay, and Animation Lab pages. Its
-topbar changes light/dark mode and blue/violet/emerald accent. The sidebar
-navigates without discarding global page state. Animation Lab covers the
-implicit, timeline, composition, spring, and held-keyframe scenes.
-Continuous motion is declared through typed native loop properties. Rust
-advances the timelines on display frames; pause and resume preserve their phase
-without a JavaScript timer or a host transaction per frame. User actions retarget
-the discrete examples, and the engine interpolates those changes. Leaving the
-page unmounts its native motions.
+The active gallery opens on Button and has one Solid and one React page each
+for ButtonGroup, InputField, Select, Popover, and VirtualList. Its previous pages and
+widgets are preserved for reference in `OLD_API/` and are excluded from active
+exports and builds.
+
+The measurements below were collected on the earlier gallery. They describe
+that historical workload and must be repeated before being used as v2
+performance claims.
 
 ## Media imports
 

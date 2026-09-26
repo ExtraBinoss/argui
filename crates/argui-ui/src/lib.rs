@@ -94,8 +94,8 @@ pub use responsive::{ContainerQuery, ContainerScopeId};
 pub use scroll::{ScrollRegion, ScrollbarAxis, ScrollbarGeometry, ScrollbarRegion, scrollbar_at};
 pub use scroll_config::{
     ElasticScroll, InertialScroll, OverscrollBehavior, ScrollAnchoring, ScrollAxes, ScrollConfig,
-    ScrollPhysics, ScrollPolarity, ScrollPropagation, ScrollbarPartStyle, ScrollbarStyle,
-    ScrollbarVisibility,
+    ScrollPhysics, ScrollPolarity, ScrollPropagation, ScrollbarPartStyle, ScrollbarSide,
+    ScrollbarStyle, ScrollbarVisibility,
 };
 pub use scroll_effect::{ScrollEffect, ScrollMetric, ScrollMetrics};
 pub use scroll_gesture::ScrollGesture;
@@ -110,9 +110,9 @@ pub use style::{
     Display, ExpandedDimension, ExpandedLengthPercentage, ExpandedLengthPercentageAuto,
     FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridTemplateArea, GridTemplateAreas,
     GridTemplateComponent, GridTemplateRepetition, JustifyContent, JustifyItems, JustifySelf,
-    LayoutStyle, LengthPercentage, LengthPercentageAuto, Line, MaxTrackSizingFunction,
-    MinTrackSizingFunction, Overflow, Position, RepetitionCount, ScrollbarGutter, Sides,
-    TrackSizingFunction, WritingDirection,
+    LayoutInsets, LayoutStyle, LengthPercentage, LengthPercentageAuto, Line,
+    MaxTrackSizingFunction, MinTrackSizingFunction, Overflow, Position, PositionInsets,
+    RepetitionCount, ScrollbarGutter, Sides, TrackSizingFunction, WritingDirection,
 };
 pub use style::{
     auto, evenly_sized_tracks, flex, fr, length, line, minmax, percent, repeat, sides, span, zero,

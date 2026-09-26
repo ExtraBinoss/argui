@@ -1,15 +1,16 @@
 [package]
 name = "argui-gallery-assets"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 description = "Application owned decoded image and SVG assets"
 
 [dependencies]
-argui-media = { version = "=0.3.3", features = ["media"] }
-argui-paint = "=0.3.3"
-argui-runtime = "=0.3.3"
+argui-media = { version = "=0.4.0", features = ["media"] }
+argui-paint = "=0.4.0"
+argui-runtime = "=0.4.0"
+serde_json = "=1.0.151"
 
 [workspace]
 resolver = "3"

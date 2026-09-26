@@ -29,8 +29,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Tooltip))
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
@@ -40,7 +40,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             CANVAS_ID,
-            "canvas_id",
+            "canvasId",
             ValueType::Int,
             "Numeric ID returned by the application's GPU canvas registration.",
         )
@@ -54,7 +54,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         RESOLUTION_SCALE,
-        "resolution_scale",
+        "resolutionScale",
         ValueType::Float,
         "Physical texture resolution multiplier from 0.125 through 4.",
     ))

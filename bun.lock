@@ -14,10 +14,9 @@
     },
     "apps/gallery": {
       "name": "@argui/gallery",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@argui/host": "workspace:*",
-        "@argui/i18n": "workspace:*",
         "@argui/react": "workspace:*",
         "@argui/solid": "workspace:*",
         "@argui/widgets": "workspace:*",
@@ -30,11 +29,14 @@
     },
     "packages/host": {
       "name": "@argui/host",
-      "version": "0.3.2",
+      "version": "0.4.0",
+      "bin": {
+        "argui-generate-jsx": "./scripts/generate-custom-jsx.mjs",
+      },
     },
     "packages/i18n": {
       "name": "@argui/i18n",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "peerDependencies": {
         "react": "19.2.0",
         "solid-js": "1.9.15",
@@ -46,7 +48,7 @@
     },
     "packages/react": {
       "name": "@argui/react",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@argui/host": "workspace:*",
         "react": "19.2.0",
@@ -59,7 +61,7 @@
     },
     "packages/solid": {
       "name": "@argui/solid",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@argui/host": "workspace:*",
         "solid-js": "1.9.15",
@@ -67,11 +69,11 @@
     },
     "packages/test": {
       "name": "@argui/test",
-      "version": "0.3.3",
+      "version": "0.4.0",
     },
     "packages/widgets": {
       "name": "@argui/widgets",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@argui/host": "workspace:*",
         "@argui/react": "workspace:*",

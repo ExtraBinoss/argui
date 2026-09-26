@@ -17,7 +17,21 @@ export interface ScrollShadowOptions {
 }
 
 /** Public options shared by Solid and React native virtual lists. */
-export interface VirtualListOptions {
+interface VirtualListBaseOptions {
+  /** Minimum width on the list's native root. */
+  minWidth?: ConstraintValue
+  /** Maximum width on the list's native root. */
+  maxWidth?: ConstraintValue
+  /** Minimum height on the list's native root. */
+  minHeight?: ConstraintValue
+  /** Maximum height on the list's native root. */
+  maxHeight?: ConstraintValue
+  /** How much the list gives up when space is limited. */
+  shrink?: number
+  /** Alignment of the list within its parent layout. */
+  alignSelf?: 'start' | 'center' | 'end' | 'stretch'
+  /** Outer spacing on the native list root. */
+  margin?: InsetsValue
   /** Logical item count; only a bounded native-requested range is rendered. */
   count: number
   /** Row placed at the top when the virtual viewport first mounts. */
@@ -25,13 +39,11 @@ export interface VirtualListOptions {
   /** Observe native range changes without replacing the list's internal presenter. */
   onWindowChange?: (range: NativeWindowRange) => void
   /** Observe native item measurements, including the viewport extent. */
-  onMeasure?: (payload: unknown) => void
-  /** Stable item identity across inserts and reordering; defaults to its index. */
-  itemKey?: (index: number) => string | number
+  onMeasure?: (payload: NativeEventPayload<'measure'>) => void
+  /** Stable item identity across inserts and reordering, independent of the native node ID. */
+  itemKey: (index: number) => string | number
   /** Increment after middle inserts, removals, or reorder to reset native size measurements. */
   dataVersion?: number
-  /** Scroll direction; vertical by default. */
-  axis?: 'horizontal' | 'vertical'
   /** Initial extent estimate before the native layout measures an item. */
   estimate?: number
   /** Measure each visible item's actual width or height; enabled by default. */
@@ -46,11 +58,15 @@ export interface VirtualListOptions {
   scrollbarColor?: string
   /** Native shadow appearance and active edges. */
   shadow?: ScrollShadowOptions
-  /** Cross-axis or container width; defaults to natural layout. */
-  width?: number | string
-  /** Container height; defaults to natural layout. */
-  height?: number | string
 }
+
+/** A virtual viewport must have a resolvable size on its scroll axis. */
+export type VirtualListOptions = VirtualListBaseOptions & (
+  | { axis?: 'vertical'; width?: DimensionValue; height: DimensionValue; grow?: number }
+  | { axis?: 'vertical'; width?: DimensionValue; height?: DimensionValue; grow: number }
+  | { axis: 'horizontal'; width: DimensionValue; height?: DimensionValue; grow?: number }
+  | { axis: 'horizontal'; width?: DimensionValue; height?: DimensionValue; grow: number }
+)
 
 /** A native-computed mounted range; JavaScript only renders its requested rows. */
 export interface NativeWindowRange {
@@ -77,3 +93,5 @@ export function boundedWindow(range: NativeWindowRange, count: number): NativeWi
   if (range.start < count) return { ...range, end: Math.min(range.end, count) }
   return { start: 0, end: Math.min(count, 12), offset: 0, viewportExtent: range.viewportExtent }
 }
+import type { ConstraintValue, DimensionValue, InsetsValue } from './protocol'
+import type { NativeEventPayload } from './events'

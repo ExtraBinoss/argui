@@ -121,6 +121,9 @@ impl SchemaRegistry {
                         .map_or(0, |event| event.raw())
                         .to_le_bytes(),
                 );
+                for value in &property.allowed_values {
+                    feed(&mut hash, value.as_bytes());
+                }
             }
             for event in &schema.events {
                 feed(&mut hash, &event.id.raw().to_le_bytes());
@@ -215,6 +218,29 @@ impl SchemaRegistry {
         Ok(())
     }
 
+    /// Applies closed string domains to the complete built-in registry.
+    ///
+    /// `values` maps a canonical built-in property ID to its accepted values.
+    /// Returns an error when the resulting schema metadata is invalid.
+    pub(crate) fn set_builtin_allowed_values(
+        &mut self,
+        values: fn(crate::PropertyId) -> &'static [&'static str],
+    ) -> Result<(), SchemaError> {
+        for native in self.natives.values_mut() {
+            for property in &mut native.schema.properties {
+                let domain = values(property.id);
+                if !domain.is_empty() {
+                    property.allowed_values =
+                        domain.iter().map(|value| (*value).to_owned()).collect();
+                }
+            }
+        }
+        for native in self.natives.values() {
+            self.validate_schema(&native.schema)?;
+        }
+        Ok(())
+    }
+
     fn validate_schema(&self, schema: &NativeSchema) -> Result<(), SchemaError> {
         validate_members(
             &schema.name,
@@ -251,6 +277,23 @@ impl SchemaRegistry {
             schema.parts_iter().map(|part| (part.id.raw(), &part.name)),
         )?;
         for property in &schema.properties {
+            if !property.allowed_values.is_empty()
+                && property.value_type != crate::ValueType::String
+            {
+                return Err(SchemaError::Adapter(format!(
+                    "allowed values require a string property: {}",
+                    property.name
+                )));
+            }
+            if let Some(crate::SchemaValue::String(default)) = &property.default
+                && !property.allowed_values.is_empty()
+                && !property.allowed_values.contains(default)
+            {
+                return Err(SchemaError::InvalidPropertyValue {
+                    property: property.name.clone(),
+                    value: default.clone(),
+                });
+            }
             if let Some(observation) = property.observation
                 && (property.value_type != observation.value_type() || !property.read_only)
             {
@@ -303,6 +346,18 @@ fn validate_members<'a>(
     let mut ids = HashMap::new();
     let mut names = HashMap::new();
     for (id, name) in members {
+        let public_name = name.as_str();
+        if !public_name.starts_with(|character: char| character.is_ascii_lowercase())
+            || !public_name
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric())
+        {
+            return Err(SchemaError::InvalidPublicName {
+                native: native.clone(),
+                kind,
+                name: name.clone(),
+            });
+        }
         if ids.insert(id, ()).is_some() {
             return Err(SchemaError::DuplicateMemberId {
                 native: native.clone(),
@@ -343,6 +398,15 @@ fn validate_input(schema: &NativeSchema, input: &NativeElementInput) -> Result<(
                 property: property.name.clone(),
                 expected: property.value_type,
                 actual: value.value_type(),
+            });
+        }
+        if let crate::SchemaValue::String(value) = value
+            && !property.allowed_values.is_empty()
+            && !property.allowed_values.contains(value)
+        {
+            return Err(SchemaError::InvalidPropertyValue {
+                property: property.name.clone(),
+                value: value.clone(),
             });
         }
     }

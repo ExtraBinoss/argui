@@ -3,6 +3,7 @@ target/
 /packages/*/node_modules/
 /apps/*/node_modules/
 /apps/*/dist/
+/apps/gallery/web-host/pkg/
 /apps/web-host/pkg/
 *.profraw
 lcov.info

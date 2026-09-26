@@ -3,7 +3,7 @@
 use argui_ui::{
     CheckedState, Element, EventType, FocusContainment, FocusPolicy, FocusScope, FocusTarget,
     InitialFocus, Interaction, KeyboardActivation, Role, SemanticAction, SemanticState,
-    SemanticValue, Semantics, UserSelect,
+    SemanticValue, Semantics, StateScopeId, UserSelect,
 };
 
 use super::focus_scope_parse::{
@@ -27,6 +27,9 @@ use crate::{
     SchemaValue, SlotArity, SlotSchema, ValueType,
 };
 
+/// Shared visual-state scope used by focus-aware descendants.
+pub(super) const FOCUS_SCOPE_SCOPE: &str = "arguiFocusScope";
+
 /// Registers a generic focus scope with keyboard activation and observable focus.
 ///
 /// * `registry` — native registry receiving the scope metadata and adapter.
@@ -44,14 +47,22 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Tooltip))
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
     .property(common_property(CommonProperty::DesktopBackdropTint))
     .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
+    .property(common_property(CommonProperty::MinWidth))
+    .property(common_property(CommonProperty::MinHeight))
+    .property(common_property(CommonProperty::MaxWidth))
+    .property(common_property(CommonProperty::MaxHeight))
+    .property(common_property(CommonProperty::Grow))
+    .property(common_property(CommonProperty::Shrink))
+    .property(common_property(CommonProperty::AlignSelf))
+    .property(common_property(CommonProperty::Margin))
     .property(
         PropertySchema::new(
             ENABLED,
@@ -64,7 +75,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             FOCUS_ON_CLICK,
-            "focus_on_click",
+            "focusOnClick",
             ValueType::Bool,
             "Focus this scope when a nonfocusable descendant is pressed.",
         )
@@ -73,7 +84,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             FOCUS_ON_TAB,
-            "focus_on_tab_navigation",
+            "focusOnTabNavigation",
             ValueType::Bool,
             "Include this scope in sequential keyboard focus.",
         )
@@ -82,7 +93,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             HAS_FOCUS,
-            "has_focus",
+            "hasFocus",
             ValueType::Bool,
             "Scope owns keyboard focus.",
         )
@@ -91,7 +102,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             FOCUS_VISIBLE,
-            "focus_visible",
+            "focusVisible",
             ValueType::Bool,
             "Keyboard focus indication is active.",
         )
@@ -105,19 +116,19 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         RESTORE_FOCUS,
-        "restore_focus",
+        "restoreFocus",
         ValueType::Bool,
         "Restore prior focus when the scope disappears.",
     ))
     .property(PropertySchema::new(
         INITIAL_FOCUS,
-        "initial_focus",
+        "initialFocus",
         ValueType::String,
         "Initial child key, or first for the first focusable child.",
     ))
     .property(PropertySchema::new(
         KEYBOARD_ACTIVATION,
-        "keyboard_activation",
+        "keyboardActivation",
         ValueType::String,
         "Keys generating click: none, enter, or enter_or_space.",
     ))
@@ -129,43 +140,43 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         SEMANTIC_LABEL,
-        "accessible_name",
+        "accessibleName",
         ValueType::String,
         "Accessible name for a composed control.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_DESCRIPTION,
-        "accessible_description",
+        "accessibleDescription",
         ValueType::String,
         "Accessible description for a composed control.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_VALUE,
-        "accessible_value",
+        "accessibleValue",
         ValueType::String,
         "Current text value announced by assistive technology.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_NUMERIC_VALUE,
-        "numeric_value",
+        "numericValue",
         ValueType::Float,
         "Current numeric value announced by assistive technology.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_MINIMUM_VALUE,
-        "minimum_value",
+        "minimumValue",
         ValueType::Float,
         "Lower bound of numeric_value.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_MAXIMUM_VALUE,
-        "maximum_value",
+        "maximumValue",
         ValueType::Float,
         "Upper bound of numeric_value.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_VALUE_STEP,
-        "value_step",
+        "valueStep",
         ValueType::Float,
         "Increment of numeric_value.",
     ))
@@ -177,7 +188,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         SEMANTIC_PRESSED,
-        "pressed_state",
+        "pressedState",
         ValueType::Bool,
         "Persistent pressed state of a toggle button.",
     ))
@@ -189,7 +200,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         SEMANTIC_READ_ONLY,
-        "read_only",
+        "readOnly",
         ValueType::Bool,
         "Whether the value cannot be edited.",
     ))
@@ -201,37 +212,37 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         SEMANTIC_CAN_INCREMENT,
-        "can_increment",
+        "canIncrement",
         ValueType::Bool,
         "Expose an accessible increment action.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_CAN_DECREMENT,
-        "can_decrement",
+        "canDecrement",
         ValueType::Bool,
         "Expose an accessible decrement action.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_CAN_SET_VALUE,
-        "can_set_value",
+        "canSetValue",
         ValueType::Bool,
         "Expose an accessible set-value action.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_CAN_EXPAND,
-        "can_expand",
+        "canExpand",
         ValueType::Bool,
         "Expose an accessible expand action.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_CAN_COLLAPSE,
-        "can_collapse",
+        "canCollapse",
         ValueType::Bool,
         "Expose an accessible collapse action.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_CAN_SCROLL_INTO_VIEW,
-        "can_scroll_into_view",
+        "canScrollIntoView",
         ValueType::Bool,
         "Expose an accessible scroll-into-view action.",
     ))
@@ -255,19 +266,19 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(PropertySchema::new(
         SEMANTIC_ACTIVE_DESCENDANT,
-        "active_descendant",
+        "activeDescendant",
         ValueType::String,
         "Key of the active child in a composite control.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_LABELLED_BY,
-        "labelled_by",
+        "labelledBy",
         ValueType::String,
         "Key of the element providing this control's accessible name.",
     ))
     .property(PropertySchema::new(
         SEMANTIC_DESCRIBED_BY,
-        "described_by",
+        "describedBy",
         ValueType::String,
         "Key of the element providing this control's description.",
     ))
@@ -310,7 +321,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .event(common_event(CLICK, "click", EventType::Click))
     .event(common_event(
         SEMANTIC_ACTION,
-        "semantic_action",
+        "semanticAction",
         EventType::SemanticAction,
     ))
     .event(common_event(FOCUS, "focus", EventType::Focus))
@@ -318,7 +329,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .event(common_event(KEY_INPUT, "key", EventType::Key))
     .event(common_event(
         CAPTURE_KEY_INPUT,
-        "capture_key",
+        "captureKey",
         EventType::Key,
     ))
     .slot(SlotSchema {
@@ -367,6 +378,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         let mut element =
             apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?
                 .focus_scope(focus_scope)
+                .state_scope(StateScopeId::new(FOCUS_SCOPE_SCOPE))
                 .interaction(interaction);
         if activation != KeyboardActivation::None
             || input.events.iter().any(|event| event.id == CLICK)

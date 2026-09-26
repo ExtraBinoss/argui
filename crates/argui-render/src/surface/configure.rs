@@ -63,7 +63,7 @@ impl WindowsRenderer {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_arch = "wasm32")))]
 /// Creates the preferred GPU instance for the current platform.
 pub(super) fn instance() -> wgpu::Instance {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
@@ -75,10 +75,14 @@ pub(super) fn instance() -> wgpu::Instance {
     {
         descriptor.backends = wgpu::Backends::METAL;
     }
-    #[cfg(target_arch = "wasm32")]
-    {
-        descriptor.backends = wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL;
-    }
+    wgpu::Instance::new(descriptor)
+}
+
+/// Creates a browser WebGPU instance for Argui's storage-buffer shaders.
+#[cfg(target_arch = "wasm32")]
+pub(super) fn browser_instance() -> wgpu::Instance {
+    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    descriptor.backends = wgpu::Backends::BROWSER_WEBGPU;
     wgpu::Instance::new(descriptor)
 }
 

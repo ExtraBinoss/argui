@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "totalBytes": 137661,
+  "assets": [
+    {
+      "key": "gallery/button.svg",
+      "kind": "svg",
+      "id": 210289702017226,
+      "bytes": 272,
+      "path": "gallery/button.svg"
+    },
+    {
+      "key": "gallery/layout-example.svg",
+      "kind": "svg",
+      "id": 7074010601567763,
+      "bytes": 273,
+      "path": "gallery/layout-example.svg"
+    },
+    {
+      "key": "gallery/moon.svg",
+      "kind": "svg",
+      "id": 8534080480914967,
+      "bytes": 263,
+      "path": "gallery/moon.svg"
+    },
+    {
+      "key": "gallery/popover.svg",
+      "kind": "svg",
+      "id": 8075436257117667,
+      "bytes": 312,
+      "path": "gallery/popover.svg"
+    },
+    {
+      "key": "gallery/select.svg",
+      "kind": "svg",
+      "id": 3150152941818794,
+      "bytes": 277,
+      "path": "gallery/select.svg"
+    },
+    {
+      "key": "gallery/settings.svg",
+      "kind": "svg",
+      "id": 4003285612405311,
+      "bytes": 450,
+      "path": "gallery/settings.svg"
+    },
+    {
+      "key": "gallery/sun.svg",
+      "kind": "svg",
+      "id": 2429037204418036,
+      "bytes": 352,
+      "path": "gallery/sun.svg"
+    },
+    {
+      "key": "gallery/system.svg",
+      "kind": "svg",
+      "id": 5782066887110427,
+      "bytes": 243,
+      "path": "gallery/system.svg"
+    },
+    {
+      "key": "gallery/text-input.svg",
+      "kind": "svg",
+      "id": 3008935926873864,
+      "bytes": 281,
+      "path": "gallery/text-input.svg"
+    },
+    {
+      "key": "gallery/virtual-list.svg",
+      "kind": "svg",
+      "id": 3659538044321220,
+      "bytes": 313,
+      "path": "gallery/virtual-list.svg"
+    },
+    {
+      "key": "illustration/orbit.png",
+      "kind": "image",
+      "id": 2571842761405680,
+      "bytes": 93347,
+      "path": "illustration/orbit.png"
+    },
+    {
+      "key": "illustration/orbit.svg",
+      "kind": "svg",
+      "id": 6003398377895504,
+      "bytes": 727,
+      "path": "illustration/orbit.svg"
+    },
+    {
+      "key": "photo/saturn.jpg",
+      "kind": "image",
+      "id": 182680722277923,
+      "bytes": 37172,
+      "path": "photo/saturn.jpg"
+    },
+    {
+      "key": "tabler/check.svg",
+      "kind": "svg",
+      "id": 4418227052333180,
+      "bytes": 221,
+      "path": "tabler/check.svg"
+    },
+    {
+      "key": "tabler/chevron-down.svg",
+      "kind": "svg",
+      "id": 5981616865338806,
+      "bytes": 218,
+      "path": "tabler/chevron-down.svg"
+    },
+    {
+      "key": "tabler/chevron-right.svg",
+      "kind": "svg",
+      "id": 8016896629891356,
+      "bytes": 218,
+      "path": "tabler/chevron-right.svg"
+    },
+    {
+      "key": "tabler/heart.svg",
+      "kind": "svg",
+      "id": 4333451266351680,
+      "bytes": 449,
+      "path": "tabler/heart.svg"
+    },
+    {
+      "key": "tabler/loader-2.svg",
+      "kind": "svg",
+      "id": 5035487383804796,
+      "bytes": 224,
+      "path": "tabler/loader-2.svg"
+    },
+    {
+      "key": "tabler/photo.svg",
+      "kind": "svg",
+      "id": 1456439125952080,
+      "bytes": 594,
+      "path": "tabler/photo.svg"
+    },
+    {
+      "key": "tabler/player-play.svg",
+      "kind": "svg",
+      "id": 6833585511893982,
+      "bytes": 396,
+      "path": "tabler/player-play.svg"
+    },
+    {
+      "key": "tabler/search.svg",
+      "kind": "svg",
+      "id": 2000023927804256,
+      "bytes": 250,
+      "path": "tabler/search.svg"
+    },
+    {
+      "key": "tabler/star-filled.svg",
+      "kind": "svg",
+      "id": 6122411386721923,
+      "bytes": 244,
+      "path": "tabler/star-filled.svg"
+    },
+    {
+      "key": "tabler/star.svg",
+      "kind": "svg",
+      "id": 1326099470823436,
+      "bytes": 322,
+      "path": "tabler/star.svg"
+    },
+    {
+      "key": "tabler/x.svg",
+      "kind": "svg",
+      "id": 8953272632637284,
+      "bytes": 243,
+      "path": "tabler/x.svg"
+    }
+  ]
+}

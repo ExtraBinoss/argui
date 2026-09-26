@@ -20,7 +20,7 @@ fn input(count: usize, offset: f32) -> NativeElementInput {
             .retained_identity(RetainedIdentity::new(7, 4).with_unsigned_key(index as u64))
     });
     NativeElementInput::new()
-        .property(builtin::KEY, SchemaValue::String("window".into()))
+        .property(builtin::ID, SchemaValue::String("window".into()))
         .property(builtin::ROW_HEIGHT, SchemaValue::Float(20.0))
         .property(builtin::VIEWPORT_HEIGHT, SchemaValue::Float(60.0))
         .property(builtin::SCROLL_OFFSET, SchemaValue::Float(offset))
@@ -57,7 +57,7 @@ fn virtual_window_mounts_only_visible_rows_without_visual_policy() {
     let registry = builtin::registry().unwrap();
     let schema = registry.schema(builtin::VIRTUAL_WINDOW).unwrap();
     assert_eq!(schema.name.as_str(), "VirtualWindow");
-    for name in ["offset_y", "visible_height", "content_height"] {
+    for name in ["offsetY", "visibleHeight", "contentHeight"] {
         assert!(schema.properties.iter().any(|entry| entry.name == name));
     }
     for property in [builtin::BACKGROUND, builtin::EDGE_SHADOW_WIDTH] {
@@ -209,7 +209,7 @@ fn virtual_window_rejects_invalid_dimensions_indices_and_counts() {
 fn horizontal_window_uses_widths_and_axis_specific_scroll_effects() {
     let registry = builtin::registry().unwrap();
     let input = NativeElementInput::new()
-        .property(builtin::KEY, SchemaValue::String("horizontal".into()))
+        .property(builtin::ID, SchemaValue::String("horizontal".into()))
         .property(builtin::ROW_HEIGHT, SchemaValue::Float(30.0))
         .property(builtin::VIRTUAL_HORIZONTAL, SchemaValue::Bool(true))
         .property(builtin::VIRTUAL_VIEWPORT_WIDTH, SchemaValue::Float(90.0))

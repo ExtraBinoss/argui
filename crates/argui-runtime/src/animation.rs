@@ -138,9 +138,7 @@ impl Application {
         self.sync_animations();
         if self.animations.scheduler.needs_frame() {
             #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
-            if let Some(popup) = self.popups.entries.last() {
-                popup.native.window().request_redraw();
-            } else {
+            if !self.request_top_popup_redraw() {
                 window.request_redraw();
             }
             #[cfg(not(all(feature = "native-popups", not(target_arch = "wasm32"))))]

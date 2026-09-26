@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
-import { createRoot } from 'solid-js'
+import { createComponent, createRoot } from 'solid-js'
 import { createThemeRuntime, type NativeBridge, type ThemeWireSnapshot } from '@argui/host'
-import { useThemeSnapshot } from '../src/theme'
+import { ThemeProvider, useThemeSnapshot } from '../src/theme'
 
 test('Solid theme accessor follows a host revision and stops at owner cleanup', () => {
   let deliver: ((snapshot: ThemeWireSnapshot) => void) | undefined
@@ -18,12 +18,20 @@ test('Solid theme accessor follows a host revision and stops at owner cleanup', 
       dispose: () => {},
     },
   }
-  const runtime = createThemeRuntime(bridge, {
+  const runtime = createThemeRuntime<{ background: string }>(bridge, {
     tokens: { background: { type: 'Color', default: '#ffffff' } },
   })
   let read!: ReturnType<typeof useThemeSnapshot<{ background: string }>>
   const dispose = createRoot((cleanup) => {
-    read = useThemeSnapshot(runtime)
+    createComponent(ThemeProvider, {
+      runtime,
+      get children() {
+        return createComponent(() => {
+          read = useThemeSnapshot<{ background: string }>()
+          return null
+        }, {})
+      },
+    })
     return cleanup
   })
   expect(read().values.background).toBe('#ffffff')
@@ -32,6 +40,7 @@ test('Solid theme accessor follows a host revision and stops at owner cleanup', 
     values: { background: '#000000' }, tokenRevisions: { background: 1 },
     change: { tokens: ['background'], impact: 'Paint' },
   })
+  expect(runtime.snapshot().values.background).toBe('#000000')
   expect(read().values.background).toBe('#000000')
   dispose()
   expect(subscriptions).toBe(1)

@@ -9,13 +9,9 @@ if (adapter !== 'solid' && adapter !== 'react') {
 }
 
 const root = resolve(fileURLToPath(new URL('../../../', import.meta.url)))
-const child = spawn('cargo', ['run', '-p', 'argui-cli', '--', 'dev', 'apps/gallery'], {
+const child = spawn(resolve(root, 'scripts/gallery-hot-reload.sh'), ['desktop', adapter], {
   cwd: root,
-  env: {
-    ...process.env,
-    CARGO_TARGET_DIR: process.env.CARGO_TARGET_DIR ?? resolve(root, 'target'),
-    ARGUI_GALLERY_ENTRY: adapter,
-  },
+  env: process.env,
   stdio: 'inherit',
 })
 child.on('error', error => { console.error(error); process.exitCode = 1 })

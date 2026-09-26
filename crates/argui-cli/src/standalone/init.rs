@@ -6,6 +6,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Component, Path, PathBuf},
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -21,13 +22,16 @@ pub(super) struct Options {
     pub targets: Vec<String>,
     /// Supported optional build features.
     pub features: Vec<String>,
+    /// Whether init should run `bun install` for a TSX application.
+    pub install_dependencies: bool,
 }
 
-/// Creates the complete application or removes every newly written file.
+/// Creates the complete application and optionally installs its Bun packages.
 ///
 /// # Errors
 /// Returns an error before mutation for invalid choices and path conflicts, or
-/// after rolling back filesystem writes when staging or installation fails.
+/// after rolling back filesystem writes when file staging or placement fails.
+/// A failed Bun install leaves the created app in place with retry instructions.
 pub(super) fn create(options: &Options) -> Result<(), String> {
     validate(options)?;
     let mut files = source_files(options)?;
@@ -67,12 +71,58 @@ pub(super) fn create(options: &Options) -> Result<(), String> {
             options.directory.display()
         );
     } else {
+        let installed = options.install_dependencies && install_js_dependencies(&options.directory);
+        let install = if installed { "" } else { "bun install && " };
         println!(
-            "Next: cd {} && bun install && argui check && argui build release",
-            options.directory.display()
+            "Next: cd {} && {install}argui check && argui build release",
+            options.directory.display(),
         );
     }
     Ok(())
+}
+
+/// Tries to install a generated TSX application's Bun dependencies.
+/// `directory` is the new project root. Returns whether installation succeeded;
+/// a missing Bun executable or failed install leaves the created project usable
+/// after a later manual `bun install`.
+fn install_js_dependencies(directory: &Path) -> bool {
+    if !Command::new("bun")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+    {
+        eprintln!(
+            "Bun is unavailable; run `bun install` in {} when Bun is installed.",
+            directory.display()
+        );
+        return false;
+    }
+    match Command::new("bun")
+        .arg("install")
+        .current_dir(directory)
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            println!("Installed Bun dependencies in {}", directory.display());
+            true
+        }
+        Ok(output) => {
+            eprintln!(
+                "Bun dependency installation did not complete in {} (exit status {}). Run `bun install` there to retry.\n{}",
+                directory.display(),
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+            false
+        }
+        Err(error) => {
+            eprintln!(
+                "Bun dependency installation did not start in {}: {error}. Run `bun install` there to retry.",
+                directory.display()
+            );
+            false
+        }
+    }
 }
 
 /// Validates framework, targets, and selectable capabilities.
@@ -153,6 +203,9 @@ fn source_files(options: &Options) -> Result<BTreeMap<PathBuf, Vec<u8>>, String>
             if web && asset.path == "templates/mount.ts" {
                 files.insert("src/mount.ts".into(), asset.body.to_vec());
             }
+            if web && asset.path == "templates/assets-web.ts" {
+                files.insert("src/assets-web.ts".into(), asset.body.to_vec());
+            }
             if web && asset.path == "templates/web.ts" {
                 files.insert("src/web.ts".into(), asset.body.to_vec());
             }
@@ -161,8 +214,22 @@ fn source_files(options: &Options) -> Result<BTreeMap<PathBuf, Vec<u8>>, String>
             return Err("CLI SDK snapshot lacks the selected TSX template".into());
         }
         files.insert("package.json".into(), js_manifest(options).into_bytes());
+        files.insert(
+            ".oxfmtrc.json".into(),
+            include_bytes!("../../assets/templates/.oxfmtrc.json").to_vec(),
+        );
         files.insert("tsconfig.json".into(), tsconfig(options).into_bytes());
         files.insert("vite.config.ts".into(), vite_config(options).into_bytes());
+        files.insert(
+            "assets.config.json".into(),
+            b"{\n  \"packs\": {},\n  \"files\": {},\n  \"entries\": [\"src/main.tsx\"]\n}\n"
+                .to_vec(),
+        );
+        files.insert("assets/README.md".into(), b"Place app-owned SVG, PNG, JPEG, or WebP sources here. Configure packs and individual files in ../assets.config.json; `argui check` and `argui build` generate native and TSX asset references automatically.\n".to_vec());
+        files.insert(
+            "scripts/generate-assets.mjs".into(),
+            include_bytes!("../../assets/templates/generate-assets.mjs").to_vec(),
+        );
         if web {
             files.insert("index.html".into(), html(&options.name).into_bytes());
         }
@@ -306,7 +373,7 @@ fn js_manifest(options: &Options) -> String {
         ", \"@types/react\": \"19.2.0\", \"@types/react-reconciler\": \"0.33.0\""
     };
     format!(
-        "{{\n  \"name\": \"{}\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"arguiSdk\": {{ \"version\": \"{}\", \"delivery\": \"cli-cache-development\" }},\n  \"dependencies\": {{ {runtime} }},\n  \"devDependencies\": {{ \"typescript\": \"5.9.3\", \"vite\": \"8.2.2\", \"@types/bun\": \"1.3.11\"{plugin} }}\n}}\n",
+        "{{\n  \"name\": \"{}\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"arguiSdk\": {{ \"version\": \"{}\", \"delivery\": \"cli-cache-development\" }},\n  \"dependencies\": {{ {runtime} }},\n  \"devDependencies\": {{ \"typescript\": \"5.9.3\", \"vite\": \"8.2.2\", \"oxfmt\": \"0.70.0\", \"@types/bun\": \"1.3.11\"{plugin} }}\n}}\n",
         options.name,
         env!("CARGO_PKG_VERSION")
     )
@@ -330,10 +397,10 @@ fn vite_config(options: &Options) -> String {
     let adapter = if options.framework == "solid" {
         "plugins: [solid({ solid: { moduleName: '@argui/solid', generate: 'universal' }, hot: false })],"
     } else {
-        "oxc: { jsx: { runtime: 'automatic', importSource: '@argui/react' } }, define: { 'process.env.NODE_ENV': JSON.stringify('production') },"
+        "oxc: { jsx: { runtime: 'automatic', importSource: '@argui/react' } },"
     };
     format!(
-        "import {{ defineConfig }} from 'vite'\n{plugin}export default defineConfig(({{ mode }}) => ({{ root: import.meta.dirname, {adapter} ssr: {{ noExternal: true, resolve: {{ conditions: ['browser'] }} }}, build: mode === 'native' ? {{ ssr: 'src/main.tsx', outDir: 'dist/native', target: 'es2022', rollupOptions: {{ output: {{ entryFileNames: 'app.mjs' }} }} }} : {{ outDir: 'dist/web', target: 'es2022' }} }}))\n"
+        "import {{ defineConfig }} from 'vite'\n{plugin}export default defineConfig(({{ mode }}) => ({{ root: import.meta.dirname, {adapter} define: {{ __ARGUI_DEV_ASSETS__: JSON.stringify(process.env.ARGUI_APP_RELEASE !== '1'), 'process.env.NODE_ENV': JSON.stringify('production') }}, ssr: {{ noExternal: true, resolve: {{ conditions: ['browser'] }} }}, build: mode === 'native' ? {{ ssr: 'src/main.tsx', outDir: 'dist/native', target: 'es2022', rollupOptions: {{ output: {{ entryFileNames: 'app.mjs' }} }} }} : {{ outDir: 'dist/web', target: 'es2022' }} }}))\n"
     )
 }
 
@@ -346,13 +413,17 @@ fn html(name: &str) -> String {
 
 /// Returns concise generated project instructions.
 fn readme(options: &Options) -> String {
-    let install = if options.framework == "rust" {
-        ""
+    let (install, format_step, formatting) = if options.framework == "rust" {
+        ("", "", "")
     } else {
-        "bun install\n"
+        (
+            "bun install\n",
+            "argui format\n",
+            "`argui init` installs Bun dependencies when available. Use `--no-install` when creating an app for an offline or CI setup, then run `bun install` in the new directory. `argui format --check` reports formatting differences without modifying files. The formatter covers `src/` and `vite.config.ts` using `.oxfmtrc.json`.\n\n",
+        )
     };
     format!(
-        "# {}\n\nArgui {} application. Targets: {}.\n\nThe CLI supplies Argui SDK and host sources from its verified local cache outside this project. This is an explicit development distribution until Argui {} crates and JS SDK are published together. The application tracks the exact SDK version and hash in `argui.json`.\n\n```sh\n{install}argui check\nargui build release\n```\n\nSelect one output with `argui build release --target native` or `--target web`. Web artifacts go to `dist/web/`; native artifacts go to `dist/desktop/`. `argui dev --target native` starts the native host; `argui dev --target web` starts Vite.\n",
+        "# {}\n\nArgui {} application. Targets: {}.\n\nThe CLI supplies Argui SDK and host sources from its verified local cache outside this project. This is an explicit development distribution until Argui {} crates and JS SDK are published together. The application tracks the exact SDK version and hash in `argui.json`.\n\n```sh\n{install}argui check\n{format_step}argui build release\n```\n\n{formatting}Select one output with `argui build release --target native` or `--target web`. Web artifacts go to `dist/web/`; native artifacts go to `dist/desktop/`. `argui dev --target native` starts the native host; `argui dev --target web` starts Vite.\n",
         options.name,
         options.framework,
         options.targets.join(", "),

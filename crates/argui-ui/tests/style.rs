@@ -106,3 +106,85 @@ fn layout_builders_cover_overflow_dimensions_and_text_alignment() {
         panic!("text builder must preserve a text element");
     }
 }
+
+use argui_ui::{LayoutInsets, PositionInsets, UiTree, WritingDirection};
+
+#[test]
+/// Logical sides follow an inherited direction on every supported inset kind.
+fn logical_insets_follow_inherited_direction_without_changing_physical_sides() {
+    for (direction, expected_left, expected_right) in [
+        (WritingDirection::Ltr, 11.0, 17.0),
+        (WritingDirection::Rtl, 17.0, 11.0),
+    ] {
+        let insets = LayoutInsets {
+            top: 3.0,
+            right: 0.0,
+            bottom: 5.0,
+            left: 0.0,
+            start: Some(11.0),
+            end: Some(17.0),
+        };
+        let root = Element::column([Element::container([])
+            .layout_padding(insets)
+            .layout_margin(insets)
+            .layout_inset(PositionInsets {
+                top: Some(3.0),
+                start: Some(11.0),
+                end: Some(17.0),
+                ..PositionInsets::default()
+            })])
+        .direction_scope(direction);
+        let tree = UiTree::new(root);
+        let child = &tree.root().children[0];
+        let style = tree.resolved_layout_style(tree.node_id_at(1).unwrap(), child);
+
+        assert_eq!(
+            style.padding.left,
+            argui_ui::LengthPercentage::length(expected_left)
+        );
+        assert_eq!(
+            style.padding.right,
+            argui_ui::LengthPercentage::length(expected_right)
+        );
+        assert_eq!(
+            style.margin.left,
+            argui_ui::LengthPercentageAuto::length(expected_left)
+        );
+        assert_eq!(
+            style.margin.right,
+            argui_ui::LengthPercentageAuto::length(expected_right)
+        );
+        assert_eq!(
+            style.inset.left,
+            argui_ui::LengthPercentageAuto::length(expected_left)
+        );
+        assert_eq!(
+            style.inset.right,
+            argui_ui::LengthPercentageAuto::length(expected_right)
+        );
+        assert_eq!(style.inset.bottom, argui_ui::LengthPercentageAuto::auto());
+        assert_eq!(style.padding.top, argui_ui::LengthPercentage::length(3.0));
+        assert_eq!(
+            style.padding.bottom,
+            argui_ui::LengthPercentage::length(5.0)
+        );
+    }
+}
+
+#[test]
+/// Missing absolute insets retain `auto` instead of stretching the element.
+fn position_insets_preserve_unspecified_sides() {
+    let root = Element::container([]).layout_inset(PositionInsets {
+        start: Some(20.0),
+        ..PositionInsets::default()
+    });
+    let tree = UiTree::new(root);
+    let style = tree.resolved_layout_style(tree.node_ids()[0], tree.root());
+    assert_eq!(
+        style.inset.left,
+        argui_ui::LengthPercentageAuto::length(20.0)
+    );
+    assert_eq!(style.inset.right, argui_ui::LengthPercentageAuto::auto());
+    assert_eq!(style.inset.top, argui_ui::LengthPercentageAuto::auto());
+    assert_eq!(style.inset.bottom, argui_ui::LengthPercentageAuto::auto());
+}

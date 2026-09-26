@@ -30,7 +30,7 @@ wgpu = { workspace = true, features = ["dx12", "vulkan"] }
 wgpu = { workspace = true, features = ["metal"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wgpu = { workspace = true, features = ["webgpu", "webgl"] }
+wgpu = { workspace = true, features = ["webgpu"] }
 
 [dev-dependencies]
 pollster.workspace = true

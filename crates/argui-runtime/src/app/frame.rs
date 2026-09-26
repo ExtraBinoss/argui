@@ -22,6 +22,7 @@ impl Application {
     /// Queues an immediately applied native size for the next frame.
     /// `width` and `height` are the current drawable dimensions in pixels.
     /// The pending slot keeps only the latest size before redraw.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn queue_window_resize(&mut self, width: u32, height: u32) {
         self.pending_window_frame.resize(width, height);
         if let Some(window) = &self.window {

@@ -36,6 +36,14 @@ chrome without changing the scroll viewport. Hit testing records the track's
 actual position in paint order, so a later sibling painted above it owns the
 overlap while the remaining track stays interactive.
 
+In TSX, `scrollView` has no scrollbar by default. Setting `scrollbarSide`
+(`"left"` or `"right"`), `scrollbarWidth`, `scrollbarThumbColor`, or
+`scrollbarHoverColor` opts into its native vertical scrollbar. The left side
+is useful for a sidebar adjacent to the window edge. The thumb changes color
+on hover through retained native state; scrolling does not call JavaScript
+for each frame. The Rust API exposes the same choice through
+`ScrollbarStyle::side(ScrollbarSide::Left)`.
+
 `ScrollbarPartStyle` gives the track and thumb their own base `QuadStyle`,
 `StylePatch` values, and `StyleTransition`. Hover and thumb drag feed the same
 retained transition registry as ordinary elements, so colors, borders, opacity,
@@ -115,5 +123,6 @@ extra layer, and idle effects request no animation frames. Active effects still
 have an offscreen/filter cost in the existing render graph; custom shaders retain
 their usual responsibility for output alpha and any expansion beyond the source.
 
-The TSX gallery's **Effects → Scroll shadow** page demonstrates virtual,
-horizontal, and nested scrolling with adjustable shadow width and intensity.
+The former gallery's **Effects → Scroll shadow** demonstration is archived in
+`OLD_API/`. The active gallery's `VirtualList` page exercises the v2 viewport
+and bounded list window.

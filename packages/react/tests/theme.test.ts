@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { act, createElement } from 'react'
 import { createThemeRuntime, NativeHost, type NativeBridge, type ThemeWireSnapshot } from '@argui/host'
-import { createRoot, useTheme } from '../src'
+import { createRoot, ThemeProvider, useTheme } from '../src'
 
 test('React theme hook renders a delivered host revision', () => {
   const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -24,12 +24,14 @@ test('React theme hook renders a delivered host revision', () => {
       dispose: () => {},
     },
   }
-  const runtime = createThemeRuntime(bridge, {
+  const runtime = createThemeRuntime<{ foreground: string }>(bridge, {
     tokens: { foreground: { type: 'Color', default: '#ffffff' } },
   })
   const root = createRoot(new NativeHost(bridge, 'theme-test'))
-  function ThemedText() { return createElement('text', { text: useTheme(runtime).foreground }) }
-  act(() => root.render(createElement(ThemedText)))
+  function ThemedText() { return createElement('text', { text: useTheme<{ foreground: string }>().foreground }) }
+  act(() => root.render(createElement(ThemeProvider<{ foreground: string }>, {
+    runtime, children: createElement(ThemedText),
+  })))
   expect(root.nativeRoot().children[0]?.values.get(3)?.value).toBe('#ffffff')
   act(() => deliver?.({
     revision: 1, variant: 'dark', resolvedVariant: 'dark', systemScheme: 'light',

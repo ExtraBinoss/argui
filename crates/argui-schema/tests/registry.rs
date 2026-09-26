@@ -15,7 +15,7 @@ fn generic_ids_construct_native_elements_without_name_dispatch() {
         .construct(
             builtin::TEXT,
             &NativeElementInput::new().property(
-                builtin::CONTENT,
+                builtin::TEXT_VALUE,
                 SchemaValue::String("schema driven".into()),
             ),
         )
@@ -54,7 +54,7 @@ fn every_builtin_visual_element_exposes_group_opacity() {
         .construct(
             builtin::TEXT,
             &NativeElementInput::new()
-                .property(builtin::CONTENT, SchemaValue::String("fade".into()))
+                .property(builtin::TEXT_VALUE, SchemaValue::String("fade".into()))
                 .property(builtin::OPACITY, SchemaValue::Float(0.25)),
         )
         .unwrap();
@@ -67,7 +67,7 @@ fn registry_types_and_adapter_level_cross_property_rules_are_enforced() {
     let error = registry
         .construct(
             builtin::TEXT,
-            &NativeElementInput::new().property(builtin::CONTENT, SchemaValue::Bool(true)),
+            &NativeElementInput::new().property(builtin::TEXT_VALUE, SchemaValue::Bool(true)),
         )
         .unwrap_err();
     assert!(matches!(error, SchemaError::PropertyType { .. }));
@@ -132,7 +132,7 @@ fn native_event_handlers_are_validated_and_attached_by_id() {
         .construct(
             builtin::TOUCH_AREA,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("save".into()))
+                .property(builtin::ID, SchemaValue::String("save".into()))
                 .event(NativeEventValue::new(builtin::CLICK, handler)),
         )
         .unwrap();
@@ -143,7 +143,7 @@ fn native_event_handlers_are_validated_and_attached_by_id() {
         .construct(
             builtin::TOUCH_AREA,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("save".into()))
+                .property(builtin::ID, SchemaValue::String("save".into()))
                 .event(NativeEventValue::new(EventId::from_raw(99), handler)),
         )
         .unwrap_err();
@@ -158,7 +158,7 @@ fn disabled_focus_scope_has_noninteractive_accessible_semantics() {
         .construct(
             builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("disabled".into()))
+                .property(builtin::ID, SchemaValue::String("disabled".into()))
                 .property(builtin::SEMANTIC_ROLE, SchemaValue::String("button".into()))
                 .property(
                     builtin::SEMANTIC_LABEL,
@@ -189,10 +189,10 @@ fn focus_scope_exposes_busy_and_expanded_selection_semantics() {
         .construct(
             builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("theme".into()))
+                .property(builtin::ID, SchemaValue::String("theme".into()))
                 .property(
                     builtin::SEMANTIC_ROLE,
-                    SchemaValue::String("combo_box".into()),
+                    SchemaValue::String("comboBox".into()),
                 )
                 .property(builtin::SEMANTIC_LABEL, SchemaValue::String("Theme".into()))
                 .property(builtin::BUSY, SchemaValue::Bool(true))
@@ -222,7 +222,7 @@ fn popup_window_keeps_its_anchor_and_dismiss_listener() {
             builtin::POPUP_WINDOW,
             &NativeElementInput::new()
                 .property(builtin::ANCHOR, SchemaValue::String("theme-anchor".into()))
-                .property(builtin::KEY, SchemaValue::String("theme-options".into()))
+                .property(builtin::ID, SchemaValue::String("theme-options".into()))
                 .event(NativeEventValue::new(builtin::DISMISS, handler)),
         )
         .unwrap();

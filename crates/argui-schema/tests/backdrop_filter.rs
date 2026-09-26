@@ -42,6 +42,10 @@ fn parses_shadow_and_argui_extensions() {
     assert!(
         matches!(modern_color[0], Filter::DropShadow(shadow) if shadow.color == Color::srgba(0.0, 0.0, 1.0, 0.5))
     );
+    let perceptual = parse("drop-shadow(0 4px 3px oklch(1 0 0 / 50%))").unwrap();
+    assert!(
+        matches!(perceptual[0], Filter::DropShadow(shadow) if shadow.color.to_srgba8() == [255, 255, 255, 128])
+    );
 }
 
 #[test]

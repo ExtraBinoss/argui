@@ -1,11 +1,38 @@
-//! Converts retained UI deliveries into browser callback payloads.
+//! Converts native UI deliveries into the JavaScript bridge event payload.
+
+use std::collections::HashMap;
 
 use argui_core::{Key, KeyState};
-use argui_runtime::NativeHostDelivery;
-use argui_ui::{SemanticAction, SemanticValue, UiEventKind};
+use argui_runtime::{HostId, NativeHostDelivery};
+use argui_ui::{GestureKind, GesturePhase, SemanticAction, SemanticValue, UiEventKind};
 use serde_json::{Value, json};
 
-/// Encodes one retained callback and its UI event for the JavaScript subscriber.
+/// Keeps the newest virtual-window callback for each native node in a burst.
+///
+/// `deliveries` is the native FIFO burst. Returns deliveries in order, with
+/// obsolete window ranges removed until a different event forms an ordering
+/// boundary. Clicks and measurements are never discarded.
+pub fn coalesce_virtual_windows(deliveries: Vec<NativeHostDelivery>) -> Vec<NativeHostDelivery> {
+    let mut result = Vec::with_capacity(deliveries.len());
+    let mut pending: HashMap<(HostId, u32), usize> = HashMap::new();
+    for delivery in deliveries {
+        if matches!(delivery.kind, UiEventKind::VirtualWindowChanged { .. }) {
+            let key = (delivery.callback.node, delivery.callback.callback.0);
+            if let Some(index) = pending.get(&key) {
+                result[*index] = delivery;
+            } else {
+                pending.insert(key, result.len());
+                result.push(delivery);
+            }
+        } else {
+            pending.clear();
+            result.push(delivery);
+        }
+    }
+    result
+}
+
+/// Encodes one native callback and its UI event for the JavaScript subscriber.
 ///
 /// `delivery` contains the native node, callback, and event. Returns the
 /// JSON object accepted by the gallery bridge.
@@ -30,8 +57,9 @@ pub fn event_json(delivery: &NativeHostDelivery) -> Value {
 
 /// Encodes the public fields of `kind` for a JavaScript event handler.
 ///
-/// Returns a JSON payload with a stable `kind` string; scroll events include
-/// the native absolute offset in logical pixels.
+/// Returns a JSON payload with a stable `kind` string. Text edits carry UTF-8
+/// byte range endpoints and replacement text. Scroll and pan distances use
+/// logical pixels, while pan velocity uses logical pixels per second.
 pub fn ui_event_payload(kind: &UiEventKind) -> Value {
     match kind {
         UiEventKind::KeyInput(input) => json!({
@@ -43,6 +71,10 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             "repeat": input.repeat,
         }),
         UiEventKind::TextChanged(text) => json!({"kind": "input", "text": text}),
+        UiEventKind::TextEdited(edit) => json!({
+            "kind": "edit", "start": edit.range.start, "end": edit.range.end,
+            "text": edit.replacement,
+        }),
         UiEventKind::Submitted(text) => json!({"kind": "submit", "text": text}),
         UiEventKind::Focused => json!({"kind": "focus"}),
         UiEventKind::Blurred => json!({"kind": "blur"}),
@@ -50,6 +82,25 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
         UiEventKind::Scrolled { offset, .. } => {
             json!({"kind": "scroll", "offsetX": offset.x, "offsetY": offset.y})
         }
+        UiEventKind::Gesture(gesture) => match gesture.kind {
+            GestureKind::Pan {
+                delta,
+                total,
+                velocity,
+                ..
+            } => json!({
+                "kind": "pan", "deltaX": delta.x, "deltaY": delta.y,
+                "totalX": total.x, "totalY": total.y,
+                "velocityX": velocity.x, "velocityY": velocity.y,
+                "phase": match gesture.phase {
+                    GesturePhase::Started => "started",
+                    GesturePhase::Changed => "changed",
+                    GesturePhase::Ended => "ended",
+                    GesturePhase::Cancelled => "cancelled",
+                },
+            }),
+            _ => json!({"kind": "gesture"}),
+        },
         UiEventKind::VirtualMeasured {
             items,
             corrected_offset,
@@ -76,7 +127,7 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             "viewportExtent": viewport_extent,
         }),
         UiEventKind::SemanticAction { action, value } => json!({
-            "kind": "semantic_action",
+            "kind": "semanticAction",
             "action": match action {
                 SemanticAction::Click => "click",
                 SemanticAction::Focus => "focus",
@@ -85,8 +136,8 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
                 SemanticAction::Decrement => "decrement",
                 SemanticAction::Expand => "expand",
                 SemanticAction::Collapse => "collapse",
-                SemanticAction::SetValue => "set_value",
-                SemanticAction::ScrollIntoView => "scroll_into_view",
+                SemanticAction::SetValue => "setValue",
+                SemanticAction::ScrollIntoView => "scrollIntoView",
             },
             "value": match value {
                 Some(SemanticValue::Text(text)) => json!(text),
@@ -94,7 +145,7 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
                 None => Value::Null,
             },
         }),
-        other => json!({"kind": format!("{:?}", other.event_type())}),
+        other => json!({"kind": other.event_type().wire_name()}),
     }
 }
 

@@ -5,24 +5,19 @@ mod automation;
 mod component_install;
 mod components;
 mod icons;
-mod native;
 mod project;
 mod sdk;
 mod source_cache;
 mod standalone;
-mod web;
+mod update;
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{env, path::Path, process::Command};
 
 pub use component_install::install;
 pub use components::{catalog, component_files};
-pub use project::{Framework, Project, Target};
+pub use project::{Framework, Project};
 
-const HELP: &str = "Argui CLI\n\nUsage:\n  argui init [rust|solid|react] [--dir PATH] [--name NAME] [--targets native,web] [--feature tasks] [--feature automation] [--yes]\n  argui check [path] [--json]\n  argui build [dev|release] [--target native|web]\n  argui dev [--target native|web]\n  argui run [dev|release] [--target native|web]\n  argui test [app-path] <file.test.ts|file.test.tsx> --out <directory>\n  argui screenshot [app-path] --out <file.png>\n  argui add [--solid|--react] <component>... [--project PATH]\n  argui list components [--solid|--react] [--project PATH] [--json]\n  argui icon <source.png>\n  argui doctor [web]\n\nInit writes directly into --dir (default current directory). Solid and React select native and web by default; Rust currently supports native. Mobile requires both Android and iOS, so remains unavailable until the iOS shell and packaging exist. Run bun install in a generated TSX project before check or build.\n";
+const HELP: &str = "Argui CLI\n\nUsage:\n  argui init [rust|solid|react] [--dir PATH] [--name NAME] [--targets native,web] [--feature tasks] [--feature automation] [--yes] [--no-install]\n  argui check [path] [--json]\n  argui format [path] [--check]\n  argui build [dev|release] [--target native|web]\n  argui dev [--target native|web]\n  argui run [dev|release] [--target native|web]\n  argui test [app-path] <file.test.ts|file.test.tsx> --out <directory>\n  argui screenshot [app-path] --out <file.png>\n  argui add [--solid|--react] <component>... [--project PATH]\n  argui list components [--solid|--react] [--project PATH] [--json]\n  argui icon <source.png>\n  argui doctor [web]\n  argui update [--check]\n\nInit writes directly into --dir (default current directory). Solid and React select native and web by default; Rust currently supports native. Mobile requires both Android and iOS, so remains unavailable until the iOS shell and packaging exist. Init installs Bun dependencies when available; --no-install skips that step.\n";
 #[cfg(windows)]
 const C_COMPILER: (&str, &str) = ("cl", "https://rust-lang.org/tools/install/");
 #[cfg(target_os = "macos")]
@@ -61,76 +56,20 @@ pub fn run_in(cwd: &Path, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         [] => overview(cwd),
-        [command, options @ ..]
-            if command == "init"
-                && (options.is_empty()
-                    || options.first().is_some_and(|value| value == "rust")
-                    || options.iter().any(|value| value.starts_with("--"))) =>
-        {
-            standalone::init(cwd, options)
-        }
-        [command, preset]
-            if command == "init" && (preset == "counter-web" || preset == "counter-native") =>
-        {
-            let target = if preset == "counter-web" {
-                Target::Web
-            } else {
-                Target::Native
-            };
-            project::init_from_target(cwd, Framework::Solid, target, preset)
-        }
-        [command, framework, name] if command == "init" => {
-            let (adapter, target) = match framework.as_str() {
-                "web" => (Framework::Solid, Target::Web),
-                "native" => (Framework::Solid, Target::Native),
-                _ => (
-                    Framework::parse(framework)?,
-                    if name.ends_with("-web") {
-                        Target::Web
-                    } else {
-                        Target::Native
-                    },
-                ),
-            };
-            project::init_from_target(cwd, adapter, target, name)
-        }
-        [command, framework] if command == "init" => {
-            let (framework, target, name) = match framework.as_str() {
-                "web" => (Framework::Solid, Target::Web, "argui-web-app".to_owned()),
-                "native" => (
-                    Framework::Solid,
-                    Target::Native,
-                    "argui-native-app".to_owned(),
-                ),
-                _ => {
-                    let framework = Framework::parse(framework)?;
-                    (
-                        framework,
-                        Target::Native,
-                        format!("argui-{}-app", framework.name()),
-                    )
-                }
-            };
-            project::init_from_target(cwd, framework, target, &name)
-        }
+        [command, options @ ..] if command == "init" => standalone::init(cwd, options),
         [command] if command == "doctor" => doctor(),
         [command, target] if command == "doctor" && target == "web" => doctor_web(),
+        [command, options @ ..] if command == "update" => update::run(options),
         [command, source] if command == "icon" => icons::generate(cwd, Path::new(source)),
         [command, options @ ..] if command == "test" => automation::test(cwd, options),
         [command, options @ ..] if command == "screenshot" => automation::screenshot(cwd, options),
-        [command, options @ ..] if command == "check" => {
-            if standalone::is_project(&standalone::selected_path(cwd, options)) {
-                standalone::command(cwd, command, options)
-            } else {
-                check_project(cwd, options)
-            }
-        }
-        [command, options @ ..] if command == "build" || command == "run" || command == "dev" => {
-            if standalone::is_project(&standalone::selected_path(cwd, options)) {
-                standalone::command(cwd, command, options)
-            } else {
-                project_command(cwd, command, options)
-            }
+        [command, options @ ..]
+            if matches!(
+                command.as_str(),
+                "check" | "format" | "build" | "run" | "dev"
+            ) =>
+        {
+            standalone::command(cwd, command, options)
         }
         [command, options @ ..] if command == "add" => add_components(cwd, options),
         [command, subject, options @ ..] if command == "list" && subject == "components" => {
@@ -191,10 +130,11 @@ fn add_components(cwd: &Path, options: &[String]) -> Result<(), String> {
         .ancestors()
         .find(|ancestor| ancestor.join("argui.json").is_file())
         .ok_or("cannot locate argui.json; use --project PATH")?;
-    if standalone::is_project(app) && standalone::load(app)?.framework == "rust" {
+    let project = standalone::load(app)?;
+    if project.framework == "rust" {
         return Err("argui add installs TSX components; this project uses pure Rust".into());
     }
-    let default = project::load(app)?.framework;
+    let default = Framework::parse(&project.framework)?;
     let requests = requests
         .into_iter()
         .map(|(framework, name)| (framework.unwrap_or(default), name))
@@ -229,65 +169,6 @@ fn list_components(cwd: &Path, options: &[String]) -> Result<(), String> {
         }
     }
     components::list(cwd, project.as_deref(), framework, json)
-}
-
-/// Resolves an optional app path against `cwd`, leaving an in-app command local.
-/// The returned path is later validated through its `argui.json` manifest.
-fn app_path(cwd: &Path, path: Option<&str>) -> PathBuf {
-    path.map_or_else(|| cwd.to_path_buf(), |path| cwd.join(path))
-}
-
-/// Checks a project selected by an optional path and `--json` flag.
-///
-/// # Errors
-/// Returns an error for invalid arguments, missing manifests, or diagnostics.
-fn check_project(cwd: &Path, options: &[String]) -> Result<(), String> {
-    let (path, json) = match options {
-        [] => (None, false),
-        [flag] if flag == "--json" => (None, true),
-        [path] => (Some(path.as_str()), false),
-        [path, flag] if flag == "--json" => (Some(path.as_str()), true),
-        _ => return Err("usage: argui check [path] [--json]".into()),
-    };
-    project::check(&app_path(cwd, path), json)
-}
-
-/// Builds or runs an app selected by `options`; a path may appear before or
-/// after the mode. `dev` is an alias for `run dev`.
-///
-/// # Errors
-/// Returns an error for invalid arguments or failed build/runtime tools.
-fn project_command(cwd: &Path, command: &str, options: &[String]) -> Result<(), String> {
-    let (path, release) = if command == "dev" {
-        match options {
-            [] => (None, false),
-            [path] => (Some(path.as_str()), false),
-            _ => return Err("usage: argui dev [path]".into()),
-        }
-    } else {
-        match options {
-            [] if command == "build" => (None, false),
-            [mode] if mode == "dev" || mode == "release" => (None, mode == "release"),
-            [path] if command == "build" => (Some(path.as_str()), false),
-            [path, mode] if mode == "dev" || mode == "release" => {
-                (Some(path.as_str()), mode == "release")
-            }
-            [mode, path] if mode == "dev" || mode == "release" => {
-                (Some(path.as_str()), mode == "release")
-            }
-            _ => return Err(format!("usage: argui {command} [path] <dev|release>")),
-        }
-    };
-    let app = app_path(cwd, path);
-    project::build(&app, release)?;
-    if command != "build" {
-        if project::load(&app)?.target == Target::Web {
-            web::run(&app, release)?;
-        } else {
-            native::run(&app, release)?;
-        }
-    }
-    Ok(())
 }
 
 /// Checks browser build tools and prints installation steps for missing ones.
@@ -342,10 +223,17 @@ pub fn doctor_web() -> Result<(), String> {
 /// Returns an error only if standard output cannot be written.
 pub fn overview(cwd: &Path) -> Result<(), String> {
     use std::io::Write;
-    let project = project::load(cwd).ok();
+    let project = standalone::load(cwd).ok();
     let context = project.map_or_else(
         || "Argui workspace".to_owned(),
-        |app| format!("{} ({} / {:?})", app.name, app.framework.name(), app.target),
+        |app| {
+            format!(
+                "{} ({} / {})",
+                app.name,
+                app.framework,
+                app.targets.join(", ")
+            )
+        },
     );
     let js = if available("bun") { "ready" } else { "missing" };
     let rust = if available("cargo") && available("rustc") {
@@ -354,7 +242,7 @@ pub fn overview(cwd: &Path) -> Result<(), String> {
         "missing"
     };
     let message = format!(
-        "Argui {}  ·  TSX CLI\n\nSystem   {} / {}\nProject  {context}\nTools    Bun {js}  ·  Rust {rust}\n\nGet started\n  argui init counter-web      Create a browser canvas app\n  argui init counter-native   Create a desktop app\n  argui init react my-app     Create a React desktop app\n  argui doctor                Check build prerequisites and install links\n  argui --help                All commands\n\nIf Argui is useful to you or your app, give it a star or talk with us on Discord:\n  https://github.com/ExtraBinoss/argui  ·  https://discord.gg/66rjffMmD\n",
+        "Argui {}  ·  TSX CLI\n\nSystem   {} / {}\nProject  {context}\nTools    Bun {js}  ·  Rust {rust}\n\nGet started\n  argui init solid --dir my-app      Create a Solid native/Web app\n  argui init react --dir my-app      Create a React native/Web app\n  argui init rust --dir my-app       Create a native Rust app\n  argui doctor                       Check build prerequisites\n  argui --help                       All commands\n\nIf Argui is useful to you or your app, give it a star or talk with us on Discord:\n  https://github.com/ExtraBinoss/argui  ·  https://discord.gg/66rjffMmD\n",
         env!("CARGO_PKG_VERSION"),
         env::consts::OS,
         env::consts::ARCH

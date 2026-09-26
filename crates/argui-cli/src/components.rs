@@ -1,6 +1,5 @@
 //! Versioned Argui widget registry and catalog.
 
-use crate::component_install::read_bounded;
 use crate::project::{self, Framework};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -26,48 +25,31 @@ impl Registry {
 }
 
 #[derive(Deserialize)]
-#[serde(untagged)]
-pub(super) enum ComponentEntry {
-    Unversioned(BTreeMap<String, Vec<String>>),
-    Versioned {
-        version: String,
-        source: BTreeMap<String, String>,
-        solid: Vec<String>,
-        react: Vec<String>,
-    },
+pub(super) struct ComponentEntry {
+    pub(super) version: String,
+    pub(super) source: BTreeMap<String, String>,
+    pub(super) solid: Vec<String>,
+    pub(super) react: Vec<String>,
 }
 
 impl ComponentEntry {
-    /// Returns paths for the selected adapter and validates versioned source metadata.
+    /// Returns paths for the selected adapter and validates immutable source metadata.
     ///
     /// # Errors
-    /// Returns an error if the versioned source URL is absent or malformed.
+    /// Returns an error if the source URL or component version is absent or malformed.
     fn paths(&self, framework: Framework) -> Result<&[String], String> {
-        match self {
-            Self::Unversioned(files) => files
-                .get(framework.name())
-                .map(Vec::as_slice)
-                .ok_or_else(|| format!("component has no {} variant", framework.name())),
-            Self::Versioned {
-                version,
-                source,
-                solid,
-                react,
-            } => {
-                if version.is_empty()
-                    || !source.get(framework.name()).is_some_and(|url| {
-                        url.starts_with("https://github.com/") && url.contains("/blob/v")
-                    })
-                {
-                    return Err("component has no immutable source URL or version".into());
-                }
-                Ok(if framework == Framework::Solid {
-                    solid
-                } else {
-                    react
-                })
-            }
+        if self.version.is_empty()
+            || !self.source.get(framework.name()).is_some_and(|url| {
+                url.starts_with("https://github.com/") && url.contains("/blob/v")
+            })
+        {
+            return Err("component has no immutable source URL or version".into());
         }
+        Ok(if framework == Framework::Solid {
+            &self.solid
+        } else {
+            &self.react
+        })
     }
 }
 
@@ -82,13 +64,13 @@ pub(super) fn files(
     framework: Framework,
     names: &[String],
 ) -> Result<Vec<String>, String> {
-    if registry.version != 1 && registry.version != 2 {
+    if registry.version != 2 {
         return Err(format!(
             "unsupported component registry version {}",
             registry.version
         ));
     }
-    if registry.version == 2 && registry.argui_version.as_deref().is_none_or(str::is_empty) {
+    if registry.argui_version.as_deref().is_none_or(str::is_empty) {
         return Err("versioned registry lacks arguiVersion".into());
     }
     let mut paths = BTreeSet::new();
@@ -96,8 +78,7 @@ pub(super) fn files(
         if !project::valid_name(name) {
             return Err(format!("invalid component name `{name}`"));
         }
-        let canonical = if name == "input" { "input-field" } else { name };
-        let component = registry.components.get(canonical).ok_or_else(|| {
+        let component = registry.components.get(name).ok_or_else(|| {
             format!(
                 "unknown component `{name}`; available: {}",
                 registry
@@ -108,38 +89,32 @@ pub(super) fn files(
                     .join(", ")
             )
         })?;
-        if let ComponentEntry::Versioned { source, .. } = component {
-            let release = registry
-                .argui_version
-                .as_deref()
-                .ok_or("versioned registry lacks arguiVersion")?;
-            let expected = format!(
-                "https://github.com/ExtraBinoss/argui/blob/v{release}/packages/widgets/src/"
-            );
-            if !source
-                .get(framework.name())
-                .is_some_and(|url| url.starts_with(&expected))
-            {
-                return Err(format!(
-                    "component `{name}` source does not match Argui v{release}"
-                ));
-            }
+        let release = registry
+            .argui_version
+            .as_deref()
+            .ok_or("versioned registry lacks arguiVersion")?;
+        let expected =
+            format!("https://github.com/ExtraBinoss/argui/blob/v{release}/packages/widgets/src/");
+        if !component
+            .source
+            .get(framework.name())
+            .is_some_and(|url| url.starts_with(&expected))
+        {
+            return Err(format!(
+                "component `{name}` source does not match Argui v{release}"
+            ));
         }
         let dependencies = component
             .paths(framework)
             .map_err(|error| format!("component `{name}`: {error}"))?;
-        if registry.version == 2 && matches!(component, ComponentEntry::Unversioned(_)) {
-            return Err(format!("component `{name}` lacks versioned metadata"));
-        }
         for path in dependencies {
             if !safe_path(path) {
                 return Err(format!("unsafe registry path `{path}`"));
             }
-            if registry.version == 2
-                && !registry
-                    .files
-                    .get(path)
-                    .is_some_and(|hash| valid_hash(hash))
+            if !registry
+                .files
+                .get(path)
+                .is_some_and(|hash| valid_hash(hash))
             {
                 return Err(format!(
                     "component `{name}` lacks a SHA-256 checksum for `{path}`"
@@ -196,7 +171,7 @@ fn catalog_with_sources(
 ) -> Result<String, String> {
     let registry: Registry =
         serde_json::from_str(registry_json).map_err(|error| error.to_string())?;
-    if !matches!(registry.version, 1 | 2) {
+    if registry.version != 2 {
         return Err(format!(
             "unsupported component registry version {}",
             registry.version
@@ -209,26 +184,19 @@ fn catalog_with_sources(
                 continue;
             }
             let paths = files(&registry, adapter, std::slice::from_ref(name))?;
-            let (version, source) = match component {
-                ComponentEntry::Unversioned(_) => {
-                    ("unversioned".to_owned(), "local checkout".to_owned())
-                }
-                ComponentEntry::Versioned {
-                    version, source, ..
-                } => (
-                    version.clone(),
-                    source.get(adapter.name()).cloned().unwrap_or_default(),
-                ),
-            };
             rows.push(CatalogRow {
                 name: name.clone(),
                 source: if published {
-                    source
+                    component
+                        .source
+                        .get(adapter.name())
+                        .cloned()
+                        .unwrap_or_default()
                 } else {
                     "unpublished development snapshot".into()
                 },
                 framework: adapter.name().to_owned(),
-                version,
+                version: component.version.clone(),
                 installed: project.is_some_and(|app| {
                     app.components
                         .contains(&format!("{}/{name}", adapter.name()))
@@ -255,7 +223,7 @@ fn catalog_with_sources(
     }
 }
 
-/// Lists components from the checkout's registry or the CLI's embedded catalog.
+/// Lists components from the release registry or CLI's embedded catalog.
 /// `cwd` may be a project directory, while `project_path` explicitly selects one.
 ///
 /// # Errors
@@ -270,31 +238,18 @@ pub fn list(
         cwd.ancestors()
             .find(|ancestor| ancestor.join("argui.json").is_file())
     });
-    let standalone = app
-        .filter(|path| crate::standalone::is_project(path))
-        .map(crate::standalone::load)
-        .transpose()?;
-    let project = app
-        .filter(|_| {
-            standalone
-                .as_ref()
-                .is_none_or(|app| app.framework != "rust")
-        })
-        .map(project::load)
-        .transpose()?;
-    let registry = if let Some(app) = &standalone
+    let project = app.map(crate::standalone::load).transpose()?;
+    let registry = if let Some(app) = &project
         && app.distribution == "release"
     {
         crate::source_cache::registry(&app.argui_version)?
-    } else if let Ok(root) = project::find_root(cwd) {
-        read_bounded(&root.join("components/registry.json"))?
     } else {
         include_str!("../../../components/registry.json").to_owned()
     };
-    let published = standalone
+    let published = project
         .as_ref()
         .is_some_and(|app| app.distribution == "release")
-        || standalone.is_none() && crate::sdk::release_available();
+        || project.is_none() && crate::sdk::release_available();
     println!(
         "{}",
         catalog_with_sources(&registry, project.as_ref(), framework, json, published)?

@@ -16,6 +16,81 @@ pub type Sides<T> = taffy::geometry::Rect<T>;
 pub type Dimensions<T> = taffy::geometry::Size<T>;
 pub type Axes<T> = taffy::geometry::Point<T>;
 
+/// Logical pixel insets resolved against the effective writing direction.
+///
+/// Physical sides remain available for ordinary layout. In Rust builders,
+/// `start` and `end` replace the corresponding physical side after direction
+/// inheritance. The TSX wire rejects a value that mixes logical and physical
+/// horizontal sides, so one authored object has one unambiguous convention.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LayoutInsets {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+    pub start: Option<f32>,
+    pub end: Option<f32>,
+}
+
+impl LayoutInsets {
+    /// Creates equal physical insets on all four sides in logical pixels.
+    #[must_use]
+    pub const fn all(value: f32) -> Self {
+        Self {
+            top: value,
+            right: value,
+            bottom: value,
+            left: value,
+            start: None,
+            end: None,
+        }
+    }
+
+    /// Returns logical horizontal sides mapped to physical left and right.
+    ///
+    /// `direction` is the inherited writing direction of the target element.
+    /// `None` leaves the corresponding physical side unchanged.
+    #[must_use]
+    pub(crate) const fn horizontal(
+        self,
+        direction: WritingDirection,
+    ) -> (Option<f32>, Option<f32>) {
+        match direction {
+            WritingDirection::Ltr => (self.start, self.end),
+            WritingDirection::Rtl => (self.end, self.start),
+        }
+    }
+}
+
+/// Positioned edges in logical pixels, preserving absent sides as `auto`.
+///
+/// Unlike padding and margin, an unspecified inset must not pin an absolute
+/// element to that side of its containing box.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PositionInsets {
+    pub top: Option<f32>,
+    pub right: Option<f32>,
+    pub bottom: Option<f32>,
+    pub left: Option<f32>,
+    pub start: Option<f32>,
+    pub end: Option<f32>,
+}
+
+impl PositionInsets {
+    /// Maps logical horizontal edges to physical sides in `direction`.
+    /// Missing edges remain unset, so the layout engine can retain `auto`.
+    #[must_use]
+    pub(crate) const fn horizontal(
+        self,
+        direction: WritingDirection,
+    ) -> (Option<f32>, Option<f32>) {
+        match direction {
+            WritingDirection::Ltr => (self.start, self.end),
+            WritingDirection::Rtl => (self.end, self.start),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Position {
     #[default]
@@ -88,6 +163,12 @@ pub struct LayoutStyle {
     pub aspect_ratio: Option<f32>,
     pub margin: Sides<LengthPercentageAuto>,
     pub padding: Sides<LengthPercentage>,
+    /// Logical horizontal padding awaiting inherited direction resolution.
+    pub logical_padding: Option<LayoutInsets>,
+    /// Logical horizontal margin awaiting inherited direction resolution.
+    pub logical_margin: Option<LayoutInsets>,
+    /// Logical horizontal position insets awaiting inherited direction resolution.
+    pub logical_inset: Option<PositionInsets>,
     pub border: Sides<LengthPercentage>,
     pub align_items: Option<AlignItems>,
     pub align_self: Option<AlignSelf>,
@@ -133,6 +214,9 @@ impl Default for LayoutStyle {
             aspect_ratio: None,
             margin: zero_auto_sides(),
             padding: zero_sides(),
+            logical_padding: None,
+            logical_margin: None,
+            logical_inset: None,
             border: zero_sides(),
             align_items: None,
             align_self: None,

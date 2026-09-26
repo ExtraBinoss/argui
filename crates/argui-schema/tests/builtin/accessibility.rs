@@ -10,16 +10,16 @@ fn every_builtin_exposes_the_same_semantic_contract() {
     for native in registry.schemas() {
         for name in [
             "role",
-            "accessible_name",
-            "accessible_description",
-            "labelled_by",
-            "described_by",
+            "accessibleName",
+            "accessibleDescription",
+            "labelledBy",
+            "describedBy",
             "controls",
             "focusable",
-            "keyboard_activation",
-            "numeric_value",
-            "checked_state",
-            "can_increment",
+            "keyboardActivation",
+            "numericValue",
+            "checkedState",
+            "canIncrement",
         ] {
             assert!(
                 native
@@ -35,7 +35,7 @@ fn every_builtin_exposes_the_same_semantic_contract() {
             native
                 .events
                 .iter()
-                .any(|event| event.name.as_str() == "semantic_action")
+                .any(|event| event.name.as_str() == "semanticAction")
         );
     }
 }
@@ -58,7 +58,7 @@ fn visual_primitives_gain_semantics_only_when_authored() {
                 .property(builtin::SEMANTIC_FOCUSABLE, SchemaValue::Bool(true))
                 .property(
                     builtin::KEYBOARD_ACTIVATION,
-                    SchemaValue::String("enter_or_space".into()),
+                    SchemaValue::String("enterOrSpace".into()),
                 )
                 .event(NativeEventValue::new(builtin::CLICK, handler)),
         )
@@ -133,7 +133,7 @@ fn numeric_ranges_and_mixed_state_reach_native_semantics() {
             &NativeElementInput::new()
                 .property(
                     builtin::SEMANTIC_ROLE,
-                    SchemaValue::String("check_box".into()),
+                    SchemaValue::String("checkBox".into()),
                 )
                 .property(
                     builtin::SEMANTIC_CHECKED_STATE,
@@ -172,7 +172,7 @@ fn malformed_numeric_and_checked_states_are_rejected() {
     ] {
         assert!(matches!(
             registry.construct(builtin::RECTANGLE, &input),
-            Err(SchemaError::Adapter(_))
+            Err(SchemaError::Adapter(_) | SchemaError::InvalidPropertyValue { .. })
         ));
     }
 }
@@ -215,7 +215,7 @@ fn custom_control_states_actions_and_relations_are_explicit() {
             &NativeElementInput::new()
                 .property(
                     builtin::SEMANTIC_ROLE,
-                    SchemaValue::String("combo_box".into()),
+                    SchemaValue::String("comboBox".into()),
                 )
                 .property(
                     builtin::SEMANTIC_DESCRIPTION,
@@ -236,7 +236,7 @@ fn custom_control_states_actions_and_relations_are_explicit() {
                 .property(builtin::SEMANTIC_LIVE, SchemaValue::String("polite".into()))
                 .property(
                     builtin::SEMANTIC_HAS_POPUP,
-                    SchemaValue::String("list_box".into()),
+                    SchemaValue::String("listBox".into()),
                 )
                 .property(
                     builtin::SEMANTIC_SORT,
@@ -293,7 +293,7 @@ fn custom_control_states_actions_and_relations_are_explicit() {
 fn explicit_false_removes_a_native_action() {
     let registry = builtin::registry().unwrap();
     let input = NativeElementInput::new()
-        .property(builtin::KEY, SchemaValue::String("editor".into()))
+        .property(builtin::ID, SchemaValue::String("editor".into()))
         .property(builtin::SEMANTIC_CAN_SET_VALUE, SchemaValue::Bool(false));
     let editor = registry.construct(builtin::TEXT_INPUT, &input).unwrap();
     assert!(
@@ -318,7 +318,7 @@ fn disabled_and_nonfocusable_controls_advertise_no_actions() {
                 .property(builtin::SEMANTIC_DISABLED, SchemaValue::Bool(true))
                 .property(
                     builtin::KEYBOARD_ACTIVATION,
-                    SchemaValue::String("enter_or_space".into()),
+                    SchemaValue::String("enterOrSpace".into()),
                 )
                 .property(builtin::SEMANTIC_CAN_EXPAND, SchemaValue::Bool(true)),
         )

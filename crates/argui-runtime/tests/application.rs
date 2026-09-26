@@ -1,5 +1,6 @@
 use argui_animation::{Duration, Frame, Time};
 use argui_core::{Color, ColorScheme, Insets, Point, PointerId};
+#[cfg(feature = "inspect")]
 use argui_inspect::InspectorHandle;
 use argui_platform::{WindowConfig, WindowKey, WindowSpec};
 use argui_render::DamageTracking;
@@ -307,6 +308,7 @@ fn app_model_defaults_are_noop_and_return_empty_resources() {
     assert!(model.image_assets().is_empty());
     assert!(model.vector_assets().is_empty());
     assert!(model.effect_definitions().is_empty());
+    #[cfg(feature = "inspect")]
     assert!(model.inspector(&main).is_none());
     assert_eq!(model.take_clipboard_request(&main), None);
     assert_eq!(model.take_scroll_request(&main), None);
@@ -437,6 +439,7 @@ impl Render for EffectsSurface {
         cx.request_paint();
     }
 
+    #[cfg(feature = "inspect")]
     fn inspector(&self) -> Option<InspectorHandle> {
         Some(InspectorHandle::default())
     }
@@ -512,7 +515,9 @@ fn single_window_adapter_exposes_every_component_effect_without_a_native_window(
     assert!(model.take_theme_request(&other).is_none());
     assert!(model.wants_animation_frame(&main));
     assert!(!model.wants_animation_frame(&other));
+    #[cfg(feature = "inspect")]
     assert!(model.inspector(&main).is_some());
+    #[cfg(feature = "inspect")]
     assert!(model.inspector(&other).is_none());
 }
 

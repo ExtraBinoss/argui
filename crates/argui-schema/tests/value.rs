@@ -1,7 +1,7 @@
-use argui_core::{Color, Insets, Transform2D};
+use argui_core::{Color, Transform2D};
 use argui_paint::{Border, CornerRadii, Fill, ImageId, Shadow};
 use argui_schema::{AssetHandle, SchemaValue, ValueType};
-use argui_ui::length;
+use argui_ui::{LayoutInsets, LengthPercentageAuto, PositionInsets, length};
 
 #[test]
 fn each_runtime_value_reports_its_canonical_schema_type() {
@@ -17,7 +17,18 @@ fn each_runtime_value_reports_its_canonical_schema_type() {
             ValueType::Brush,
         ),
         (SchemaValue::Dimension(length(24.0)), ValueType::Dimension),
-        (SchemaValue::Insets(Insets::ZERO), ValueType::Insets),
+        (
+            SchemaValue::Constraint(LengthPercentageAuto::percent(0.5)),
+            ValueType::Constraint,
+        ),
+        (
+            SchemaValue::Insets(LayoutInsets::default()),
+            ValueType::Insets,
+        ),
+        (
+            SchemaValue::PositionInsets(PositionInsets::default()),
+            ValueType::PositionInsets,
+        ),
         (SchemaValue::Radii(CornerRadii::all(3.0)), ValueType::Radii),
         (
             SchemaValue::Border(Border::all(1.0, Color::BLACK)),

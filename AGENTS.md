@@ -1,6 +1,9 @@
 # Argui contributor rules
 
 Read `docs/contributing/code-quality.md` before changing code.
+Before creating any Argui component, using Argui primitives in Rust or TSX,
+or changing an Argui gallery/example, read
+`skills/argui-common-pitfalls/SKILL.md` and follow the relevant guidance.
 
 For Linux GUI checks, read [docs/contributing/linux-testing.md](docs/contributing/linux-testing.md) and use
 `./scripts/linux-hidden-display.sh COMMAND...`. Keep test windows and browsers

@@ -1,0 +1,15 @@
+{
+  "packs": {
+    "tabler": "tabler",
+    "gallery": "gallery"
+  },
+  "files": {
+    "illustration/orbit.png": "illustration/orbit.png",
+    "illustration/orbit.svg": "illustration/orbit.svg",
+    "photo/saturn.jpg": "photo/saturn.jpg"
+  },
+  "entries": [
+    "src/solid/main.tsx",
+    "src/react/main.tsx"
+  ]
+}

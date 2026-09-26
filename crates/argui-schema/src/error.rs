@@ -52,6 +52,14 @@ pub enum SchemaError {
         expected: ValueType,
         actual: ValueType,
     },
+    #[error("property `{property}` does not accept `{value}`")]
+    InvalidPropertyValue { property: Name, value: String },
+    #[error("{kind} `{name}` in native schema `{native}` must use camelCase")]
+    InvalidPublicName {
+        native: Name,
+        kind: &'static str,
+        name: Name,
+    },
     #[error("property `{0}` is read-only")]
     ReadOnlyProperty(Name),
     #[error("required property `{property}` is missing")]

@@ -1,6 +1,6 @@
 [package]
 name = "argui-gallery-quickjs"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.89"
 license = "MIT OR Apache-2.0"
@@ -18,17 +18,17 @@ automation = ["dep:argui-automation", "argui-runtime/inspect", "dev-metrics"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-argui-gallery-assets = { path = "../assets-host", version = "0.3.3" }
-argui-core = { path = "../../../crates/argui-core", version = "0.3.3" }
-argui-automation = { path = "../../../crates/argui-automation", version = "0.3.3", optional = true }
-argui-effects = { path = "../../../crates/argui-effects", version = "0.3.3", features = ["scroll"] }
-argui-host = { path = "../../../crates/argui-host", version = "0.3.3", features = ["media"] }
-argui-i18n = { path = "../../../crates/argui-i18n", version = "0.3.3" }
-argui-paint = { path = "../../../crates/argui-paint", version = "0.3.3" }
-argui-platform = { path = "../../../crates/argui-platform", version = "0.3.3", features = ["file-picker"] }
-argui-render = { path = "../../../crates/argui-render", version = "0.3.3" }
-argui-runtime = { path = "../../../crates/argui-runtime", version = "0.3.3" }
-argui-ui = { path = "../../../crates/argui-ui", version = "0.3.3" }
+argui-gallery-assets = { path = "../assets-host", version = "0.4.0" }
+argui-core = { path = "../../../crates/argui-core", version = "0.4.0" }
+argui-automation = { path = "../../../crates/argui-automation", version = "0.4.0", optional = true }
+argui-effects = { path = "../../../crates/argui-effects", version = "0.4.0", features = ["scroll"] }
+argui-host = { path = "../../../crates/argui-host", version = "0.4.0", features = ["media"] }
+argui-i18n = { path = "../../../crates/argui-i18n", version = "0.4.0" }
+argui-paint = { path = "../../../crates/argui-paint", version = "0.4.0" }
+argui-platform = { path = "../../../crates/argui-platform", version = "0.4.0", features = ["file-picker"] }
+argui-render = { path = "../../../crates/argui-render", version = "0.4.0" }
+argui-runtime = { path = "../../../crates/argui-runtime", version = "0.4.0" }
+argui-ui = { path = "../../../crates/argui-ui", version = "0.4.0" }
 rquickjs = "=0.14.0"
 rquickjs-sys = { version = "=0.14.0", features = ["bindgen"] }
 serde_json = "=1.0.151"
@@ -37,11 +37,11 @@ image = { version = "=0.25.10", default-features = false, features = ["png"] }
 pollster = "=0.4.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-argui-runtime = { path = "../../../crates/argui-runtime", version = "0.3.3", features = ["android"] }
-argui-text = { path = "../../../crates/argui-text", version = "0.3.3" }
+argui-runtime = { path = "../../../crates/argui-runtime", version = "0.4.0", features = ["android"] }
+argui-text = { path = "../../../crates/argui-text", version = "0.4.0" }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
-argui-runtime = { path = "../../../crates/argui-runtime", version = "0.3.3", features = ["tray", "global-shortcuts", "desktop-backdrop"] }
+argui-runtime = { path = "../../../crates/argui-runtime", version = "0.4.0", features = ["tray", "global-shortcuts", "desktop-backdrop"] }
 
 [workspace]
 resolver = "3"

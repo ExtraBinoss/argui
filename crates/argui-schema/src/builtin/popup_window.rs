@@ -8,8 +8,8 @@ use argui_ui::{
 
 use super::{
     ANCHOR, CHILDREN, CommonProperty, DISMISS, DISMISS_POLICY, FOCUS_CONTAINMENT, INITIAL_FOCUS,
-    PLACEMENT, POPUP_WINDOW, RESTORE_FOCUS, VISIBLE, WINDOW_LAYER, apply_common, common_event,
-    common_property, optional_bool,
+    PLACEMENT, PLACEMENT_OFFSET, POPUP_WINDOW, RESTORE_FOCUS, VISIBLE, WINDOW_LAYER, apply_common,
+    common_event, common_property, optional_bool,
 };
 use crate::{
     NativeElementInput, NativeSchema, PropertySchema, SchemaError, SchemaRegistry, SchemaValue,
@@ -49,19 +49,25 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         ValueType::String,
         "Anchor side or viewport alignment; collisions fit the viewport.",
     ))
+    .property(PropertySchema::new(
+        PLACEMENT_OFFSET,
+        "placementOffset",
+        ValueType::Float,
+        "Signed distance in logical pixels from an anchored edge; defaults to 6.",
+    ))
     .property(
         PropertySchema::new(
             DISMISS_POLICY,
-            "dismiss_policy",
+            "dismissPolicy",
             ValueType::String,
             "Dismissal trigger: manual, outside_pointer, outside_hover, escape, or combined policies.",
         )
-        .default_value(SchemaValue::String("outside_pointer_or_escape".into())),
+        .default_value(SchemaValue::String("outsidePointerOrEscape".into())),
     )
     .property(
         PropertySchema::new(
             WINDOW_LAYER,
-            "window_layer",
+            "windowLayer",
             ValueType::String,
             "Portal stacking layer, such as popover or modal.",
         )
@@ -76,7 +82,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             RESTORE_FOCUS,
-            "restore_focus",
+            "restoreFocus",
             ValueType::Bool,
             "Restore previous focus after the popup closes.",
         )
@@ -84,7 +90,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(PropertySchema::new(
         INITIAL_FOCUS,
-        "initial_focus",
+        "initialFocus",
         ValueType::String,
         "Initial descendant key, first focusable descendant, or empty for none.",
     ))
@@ -114,13 +120,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             return Ok(element);
         }
         element = match anchor {
-            Some(key) => element.anchored_portal(
-                layer,
-                key,
-                FloatingPlacement::new(parse_anchor_placement(
-                    placement.unwrap_or("bottom_start"),
-                )?),
-            ),
+            Some(key) => {
+                let mut floating = FloatingPlacement::new(parse_anchor_placement(
+                    placement.unwrap_or("bottomStart"),
+                )?);
+                if let Some(SchemaValue::Float(offset)) = input.get(PLACEMENT_OFFSET) {
+                    floating = floating.offset(*offset);
+                }
+                element.anchored_portal(layer, key, floating)
+            }
             None => element.viewport_portal(
                 layer,
                 parse_viewport_placement(placement.unwrap_or("center"))?,
@@ -178,14 +186,14 @@ fn parse_layer(value: Option<&SchemaValue>) -> Result<WindowLayer, SchemaError> 
 fn parse_dismiss(value: Option<&SchemaValue>) -> Result<DismissPolicy, SchemaError> {
     let name = match value {
         Some(SchemaValue::String(name)) => name.as_str(),
-        _ => "outside_pointer_or_escape",
+        _ => "outsidePointerOrEscape",
     };
     match name {
         "manual" => Ok(DismissPolicy::Manual),
-        "outside_pointer" => Ok(DismissPolicy::OutsidePointer),
+        "outsidePointer" => Ok(DismissPolicy::OutsidePointer),
         "escape" => Ok(DismissPolicy::Escape),
-        "outside_pointer_or_escape" => Ok(DismissPolicy::OutsidePointerOrEscape),
-        "outside_hover_or_escape" => Ok(DismissPolicy::OutsideHoverOrEscape),
+        "outsidePointerOrEscape" => Ok(DismissPolicy::OutsidePointerOrEscape),
+        "outsideHoverOrEscape" => Ok(DismissPolicy::OutsideHoverOrEscape),
         _ => Err(SchemaError::Adapter(format!(
             "PopupWindow does not support dismiss_policy `{name}`"
         ))),
@@ -237,18 +245,18 @@ fn parse_initial(value: Option<&SchemaValue>) -> Option<InitialFocus> {
 /// Returns an adapter error for unsupported anchor placement.
 fn parse_anchor_placement(name: &str) -> Result<Placement, SchemaError> {
     match name {
-        "top_start" => Ok(Placement::TopStart),
+        "topStart" => Ok(Placement::TopStart),
         "top" => Ok(Placement::Top),
-        "top_end" => Ok(Placement::TopEnd),
-        "bottom_start" => Ok(Placement::BottomStart),
+        "topEnd" => Ok(Placement::TopEnd),
+        "bottomStart" => Ok(Placement::BottomStart),
         "bottom" => Ok(Placement::Bottom),
-        "bottom_end" => Ok(Placement::BottomEnd),
-        "left_start" => Ok(Placement::LeftStart),
+        "bottomEnd" => Ok(Placement::BottomEnd),
+        "leftStart" => Ok(Placement::LeftStart),
         "left" => Ok(Placement::Left),
-        "left_end" => Ok(Placement::LeftEnd),
-        "right_start" => Ok(Placement::RightStart),
+        "leftEnd" => Ok(Placement::LeftEnd),
+        "rightStart" => Ok(Placement::RightStart),
         "right" => Ok(Placement::Right),
-        "right_end" => Ok(Placement::RightEnd),
+        "rightEnd" => Ok(Placement::RightEnd),
         _ => Err(SchemaError::Adapter(format!(
             "PopupWindow does not support anchored placement `{name}`"
         ))),
@@ -266,16 +274,16 @@ fn parse_viewport_placement(name: &str) -> Result<ViewportPlacement, SchemaError
     let placement = match name {
         "fill" => ViewportPlacement::fill(),
         "center" => ViewportPlacement::centered(),
-        "top_start" => {
+        "topStart" => {
             ViewportPlacement::centered().align(ViewportAlign::Start, ViewportAlign::Start)
         }
         "top" => ViewportPlacement::centered().align(ViewportAlign::Center, ViewportAlign::Start),
-        "top_end" => ViewportPlacement::centered().align(ViewportAlign::End, ViewportAlign::Start),
-        "bottom_start" => {
+        "topEnd" => ViewportPlacement::centered().align(ViewportAlign::End, ViewportAlign::Start),
+        "bottomStart" => {
             ViewportPlacement::centered().align(ViewportAlign::Start, ViewportAlign::End)
         }
         "bottom" => ViewportPlacement::centered().align(ViewportAlign::Center, ViewportAlign::End),
-        "bottom_end" => ViewportPlacement::centered().align(ViewportAlign::End, ViewportAlign::End),
+        "bottomEnd" => ViewportPlacement::centered().align(ViewportAlign::End, ViewportAlign::End),
         _ => {
             return Err(SchemaError::Adapter(format!(
                 "PopupWindow does not support viewport placement `{name}`"

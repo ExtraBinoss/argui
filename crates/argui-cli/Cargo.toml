@@ -20,6 +20,15 @@ serde.workspace = true
 serde_json.workspace = true
 image.workspace = true
 sha2 = "0.10.9"
+reqwest.workspace = true
+semver.workspace = true
+tempfile.workspace = true
+flate2.workspace = true
+tar.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+self-replace.workspace = true
+zip = { version = "=0.6.6", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tempfile.workspace = true

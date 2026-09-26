@@ -1,9 +1,80 @@
-use argui_core::Transform2D;
+use argui_core::{Rect, Transform2D};
 use argui_inspect::{
-    PropertySnapshot, StyleField, StyleLength, StyleProperty, StyleUnit, StyleValue,
+    LayoutSnapshot, PropertySnapshot, StyleField, StyleLength, StyleProperty, StyleUnit, StyleValue,
 };
 use argui_paint::{Fill, Filter, LayerStyle};
-use argui_ui::{Dimension, Element, ExpandedDimension, Overflow};
+use argui_ui::{
+    Dimension, Element, ExpandedDimension, ExpandedLengthPercentageAuto, LengthPercentageAuto,
+    Overflow,
+};
+
+/// Captures the authored constraints and the computed rectangle for inspection.
+///
+/// `element` supplies authored layout inputs; `computed` is the untransformed
+/// rectangle produced by the layout engine. Returns explanatory sizing data.
+pub(super) fn layout_snapshot(element: &Element, computed: Rect) -> LayoutSnapshot {
+    let style = &element.style;
+    let mut notes = Vec::new();
+    if matches!(style.size.width.expand(), ExpandedDimension::Percent(_)) {
+        notes.push("Percentage width is relative to the containing block, not remaining flex space; use grow for the latter".into());
+    }
+    if matches!(style.size.height.expand(), ExpandedDimension::Percent(_)) {
+        notes.push("Percentage height needs a definite containing-block height".into());
+    }
+    if style.overflow.y.scrolls()
+        && matches!(style.size.height.expand(), ExpandedDimension::Auto)
+        && matches!(
+            style.max_size.height.expand(),
+            ExpandedLengthPercentageAuto::Auto
+        )
+    {
+        notes.push("Vertical scroll viewport has no authored height or maxHeight; check its parent constraint".into());
+    }
+    if let (ExpandedLengthPercentageAuto::Length(min), ExpandedLengthPercentageAuto::Length(max)) =
+        (style.min_size.width.expand(), style.max_size.width.expand())
+        && min > max
+    {
+        notes.push("minWidth exceeds maxWidth".into());
+    }
+    if let (ExpandedLengthPercentageAuto::Length(min), ExpandedLengthPercentageAuto::Length(max)) = (
+        style.min_size.height.expand(),
+        style.max_size.height.expand(),
+    ) && min > max
+    {
+        notes.push("minHeight exceeds maxHeight".into());
+    }
+    LayoutSnapshot {
+        preferred_width: dimension_name(style.size.width),
+        preferred_height: dimension_name(style.size.height),
+        min_width: constraint_name(style.min_size.width),
+        max_width: constraint_name(style.max_size.width),
+        min_height: constraint_name(style.min_size.height),
+        max_height: constraint_name(style.max_size.height),
+        grow: style.flex_grow,
+        shrink: style.flex_shrink,
+        computed,
+        notes,
+    }
+}
+
+/// Names a preferred size using the same logical units authors provide.
+fn dimension_name(value: Dimension) -> String {
+    match value.expand() {
+        ExpandedDimension::Auto => "auto".into(),
+        ExpandedDimension::Length(pixels) => format!("{pixels}px"),
+        ExpandedDimension::Percent(fraction) => format!("{}%", fraction * 100.0),
+        other => format!("{other:?}"),
+    }
+}
+
+/// Names a minimum or maximum size using its authored unit.
+fn constraint_name(value: LengthPercentageAuto) -> String {
+    match value.expand() {
+        ExpandedLengthPercentageAuto::Auto => "auto".into(),
+        ExpandedLengthPercentageAuto::Length(pixels) => format!("{pixels}px"),
+        ExpandedLengthPercentageAuto::Percent(fraction) => format!("{}%", fraction * 100.0),
+    }
+}
 
 pub(super) fn properties(element: &Element) -> Vec<PropertySnapshot> {
     StyleProperty::ALL

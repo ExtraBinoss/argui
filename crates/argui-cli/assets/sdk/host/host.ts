@@ -1,6 +1,5 @@
 import type {
   HostId,
-  AssetRef,
   NativeBridge,
   NativeContract,
   NativeDelivery,
@@ -11,6 +10,7 @@ import type {
   WireValue,
 } from './protocol'
 import { applyInputEdit, inputEdit } from './text-edit'
+import { encodeValue, equalValue } from './wire-values'
 
 interface TextValueStamp { length: number; first: number; second: number }
 interface TextValueHistory { entries: { value?: string; stamp?: TextValueStamp }[]; bytes: number }
@@ -35,6 +35,14 @@ export interface NativeNode {
   children: NativeNode[]
   values: Map<number, WireValue>
   listeners: Map<number, number>
+  inlineText?: boolean
+}
+
+/** Stable public reference shared by Solid and React, invalid after native removal. */
+export interface NativeHandle {
+  readonly id: string | null
+  readonly hostId: HostId | null
+  readonly mounted: boolean
 }
 
 /** The shared presentation graph and transaction queue for framework adapters. */
@@ -48,6 +56,11 @@ export class NativeHost {
   private readonly removed = new WeakSet<NativeNode>()
   private readonly textAscii = new WeakMap<NativeNode, boolean>()
   private readonly textHistory = new WeakMap<NativeNode, TextValueHistory>()
+  private readonly identities = new Map<string, NativeNode>()
+  private readonly autoIdentities = new WeakMap<NativeNode, string>()
+  private readonly handles = new WeakMap<NativeNode, NativeHandle>()
+  private readonly composedText = new WeakSet<NativeNode>()
+  private settingInlineText = false
   private readonly pending: Operation[] = []
   private readonly unsubscribe: () => void
   private nextSlot = 1
@@ -61,7 +74,20 @@ export class NativeHost {
     if (this.contract.abiHash !== expectedAbiHash) {
       throw new Error(`Argui schema hash mismatch: application ${expectedAbiHash}, native ${this.contract.abiHash}`)
     }
-    for (const type of this.contract.natives) this.types.set(type.name, type)
+    const publicName = /^[a-z][a-zA-Z0-9]*$/
+    for (const type of this.contract.natives) {
+      for (const property of type.properties) {
+        if (!publicName.test(property.name) || property.allowedValues?.some((value) => !publicName.test(value))) {
+          throw new Error(`Invalid public schema property ${type.name}.${property.name}`)
+        }
+      }
+      for (const event of type.events) {
+        if (!publicName.test(event.name) || event.eventType && !publicName.test(event.eventType)) {
+          throw new Error(`Invalid public schema event ${type.name}.${event.name}`)
+        }
+      }
+      this.types.set(type.name, type)
+    }
     this.unsubscribe = bridge.subscribe((event) => this.deliver(event))
   }
 
@@ -75,6 +101,11 @@ export class NativeHost {
       values: new Map(), listeners: new Map(),
     }
     this.enqueue({ kind: 'create', id: node.id, nativeType: type.id })
+    if (type.properties.some((property) => property.name === 'id')) {
+      const generated = `argui-${node.id.slot}-${node.id.generation}`
+      this.autoIdentities.set(node, generated)
+      this.setProperty(node, 'id', generated)
+    }
     if (type.name === 'TextInput') this.textAscii.set(node, true)
     return node
   }
@@ -86,30 +117,66 @@ export class NativeHost {
     return node
   }
 
+  /** Creates presentation text that can be folded into a parent `<text>` value. */
+  createInlineTextNode(value: string): NativeNode {
+    const type = this.types.get('Text')
+    if (!type) throw new Error('Unknown native primitive: Text')
+    const property = type.properties.find((entry) => entry.name === 'text')
+    if (!property) throw new Error('Text primitive has no text property')
+    return {
+      id: { slot: this.nextSlot++, generation: 1 }, type, parent: null, children: [],
+      values: new Map([[property.id, { type: 'String', value }]]), listeners: new Map(), inlineText: true,
+    }
+  }
+
   /** Replaces a `Text` primitive's content. */
   replaceText(node: NativeNode, value: string): void {
+    if (node.inlineText) {
+      const property = node.type.properties.find((entry) => entry.name === 'text')!
+      node.values.set(property.id, { type: 'String', value })
+      if (node.parent?.type.name === 'Text') this.updateInlineText(node.parent)
+      return
+    }
     this.setProperty(node, 'text', value)
   }
 
   /** Sets a schema property or event handler on `node`. */
   setProperty(node: NativeNode, name: string, value: unknown): void {
+    if (name === 'id' && value == null) {
+      value = `argui-${node.id.slot}-${node.id.generation}`
+      this.autoIdentities.set(node, value as string)
+    }
+    if (node.type.name === 'Text' && name === 'text'
+      && this.composedText.has(node) && !this.settingInlineText) {
+      throw new Error('<text> accepts either children or text, not both')
+    }
     if (name === 'ref') {
-      if (typeof value === 'function') value(node)
+      if (typeof value === 'function') value(this.handle(node))
       return
     }
     if (name.startsWith('on') && name.length > 2) {
-      this.setEvent(node, camelToSnake(name.slice(2)), value)
+      this.setEvent(node, name[2]!.toLowerCase() + name.slice(3), value)
       return
     }
     const key = `${node.type.id}:${name}`
     let property = this.properties.get(key)
     if (property === undefined) {
-      property = node.type.properties.find((entry) => entry.name === camelToSnake(name))
+      property = node.type.properties.find((entry) => entry.name === name)
       if (property) this.properties.set(key, property)
     }
     if (!property) throw new Error(`${node.type.name} has no property ${name}`)
     if (property.readOnly) throw new Error(`${node.type.name}.${name} is read-only`)
     const wire = value == null ? null : encodeValue(property, value)
+    if (name === 'id') {
+      if (wire?.type !== 'String' || !wire.value) throw new TypeError('Native id must be a non-empty string')
+      const id = wire.value as string
+      if (id !== this.autoIdentities.get(node)) this.autoIdentities.delete(node)
+      const owner = this.identities.get(id)
+      if (owner && owner !== node) throw new Error(`Duplicate native id: ${id}`)
+      const previous = node.values.get(property.id)?.value
+      if (typeof previous === 'string' && previous !== id) this.identities.delete(previous)
+      this.identities.set(id, node)
+    }
     if (node.type.name === 'TextInput' && property.name === 'value') {
       const history = this.textHistory.get(node)
       if (history && wire?.type === 'String' && typeof wire.value === 'string') {
@@ -136,7 +203,20 @@ export class NativeHost {
     }
     if (wire) node.values.set(property.id, wire)
     else node.values.delete(property.id)
-    if (!this.removed.has(node)) this.enqueue({ kind: 'setProperty', id: node.id, property: property.id, value: wire })
+    if (!this.removed.has(node)) {
+      let pending: Operation | undefined
+      if (name === 'id') {
+        for (let index = this.pending.length - 1; index >= 0; index--) {
+          const operation = this.pending[index]!
+          if (operation.kind === 'setProperty' && operation.id === node.id && operation.property === property.id) {
+            pending = operation
+            break
+          }
+        }
+      }
+      if (pending?.kind === 'setProperty') pending.value = wire
+      else this.enqueue({ kind: 'setProperty', id: node.id, property: property.id, value: wire })
+    }
   }
 
   /** Inserts or moves `child` under `parent` before an optional sibling. */
@@ -145,12 +225,19 @@ export class NativeHost {
     if (child === parent || isAncestor(child, parent)) throw new Error('Native presentation cycle')
     if (before === child) return
     if (child.parent) {
-      const oldIndex = child.parent.children.indexOf(child)
-      child.parent.children.splice(oldIndex, 1)
+      const previous = child.parent
+      const oldIndex = previous.children.indexOf(child)
+      previous.children.splice(oldIndex, 1)
+      if (previous.type.name === 'Text' && child.inlineText) this.updateInlineText(previous)
     }
     const index = before ? parent.children.indexOf(before) : parent.children.length
     parent.children.splice(index, 0, child)
     child.parent = parent
+    if (parent.type.name === 'Text' && child.inlineText) {
+      this.updateInlineText(parent)
+      return
+    }
+    if (child.inlineText) this.materializeInlineText(child)
     const parentWasRemoved = this.removed.has(parent)
     this.revive(parent)
     this.revive(child)
@@ -164,6 +251,10 @@ export class NativeHost {
     if (child.parent !== parent) throw new Error('Node is not a child of parent')
     parent.children.splice(parent.children.indexOf(child), 1)
     child.parent = null
+    if (parent.type.name === 'Text' && child.inlineText) {
+      this.updateInlineText(parent)
+      return
+    }
     if (!this.removed.has(child)) {
       this.retire(child)
       this.enqueue({ kind: 'remove', id: child.id })
@@ -183,6 +274,39 @@ export class NativeHost {
   getNextSibling(node: NativeNode): NativeNode | undefined {
     if (!node.parent) return undefined
     return node.parent.children[node.parent.children.indexOf(node) + 1]
+  }
+
+  /** Returns a stable public reference for a node or a deferred framework instance. */
+  handle(node: NativeNode | (() => NativeNode | null)): NativeHandle {
+    if (typeof node !== 'function') {
+      const existing = this.handles.get(node)
+      if (existing) return existing
+      const created = this.makeHandle(() => node)
+      this.handles.set(node, created)
+      return created
+    }
+    return this.makeHandle(node)
+  }
+
+  private makeHandle(resolve: () => NativeNode | null): NativeHandle {
+    const host = this
+    return {
+      get id() {
+        const node = resolve()
+        const property = node?.type.properties.find((entry) => entry.name === 'id')
+        const value = property && node?.values.get(property.id)?.value
+        return typeof value === 'string' ? value : null
+      },
+      get hostId() { const node = resolve(); return node && host.isMounted(node) ? node.id : null },
+      get mounted() { const node = resolve(); return !!node && host.isMounted(node) },
+    }
+  }
+
+  private isMounted(node: NativeNode): boolean {
+    if (node.inlineText || this.removed.has(node)) return false
+    let current = node
+    while (current.parent) current = current.parent
+    return current === this.root
   }
 
   /** Makes `node` the visible native root and flushes the initial transaction. */
@@ -215,6 +339,7 @@ export class NativeHost {
   dispose(): void {
     if (this.root) this.setRoot(null)
     this.callbacks.clear()
+    this.identities.clear()
     this.unsubscribe()
   }
 
@@ -311,6 +436,16 @@ export class NativeHost {
   /** Retires a removed subtree and its callbacks until it is mounted again. */
   private retire(node: NativeNode): void {
     this.removed.add(node)
+    const identity = node.type.properties.find((property) => property.name === 'id')
+    if (identity) {
+      const previousAuto = this.autoIdentities.get(node)
+      if (previousAuto) {
+        node.values.set(identity.id, { type: 'String', value: `argui-${node.id.slot}-${node.id.generation}` })
+        this.autoIdentities.set(node, `argui-${node.id.slot}-${node.id.generation}`)
+      }
+      const value = node.values.get(identity.id)?.value
+      if (typeof value === 'string') this.identities.delete(value)
+    }
     for (const callback of node.listeners.values()) this.callbacks.delete(callback)
     for (const child of node.children) this.retire(child)
   }
@@ -320,6 +455,15 @@ export class NativeHost {
     if (!this.removed.delete(node)) return
     node.id = { slot: this.nextSlot++, generation: 1 }
     this.enqueue({ kind: 'create', id: node.id, nativeType: node.type.id })
+    const identity = node.type.properties.find((property) => property.name === 'id')
+    if (identity) {
+      const value = node.values.get(identity.id)?.value
+      if (typeof value === 'string') {
+        const owner = this.identities.get(value)
+        if (owner && owner !== node) throw new Error(`Duplicate native id: ${value}`)
+        this.identities.set(value, node)
+      }
+    }
     for (const [property, value] of node.values) {
       this.enqueue({ kind: 'setProperty', id: node.id, property, value })
     }
@@ -330,15 +474,40 @@ export class NativeHost {
       this.enqueue({ kind: 'setListener', id: node.id, event, callback })
     }
     for (const child of node.children) {
+      if (child.inlineText) continue
       this.revive(child)
       this.enqueue({ kind: 'insert', parent: node.id, child: child.id, before: null })
     }
   }
-}
 
-/** Converts a property or event suffix from JSX spelling to Rust schema spelling. */
-function camelToSnake(name: string): string {
-  return name.replace(/[A-Z]/g, (letter, index) => `${index ? '_' : ''}${letter.toLowerCase()}`)
+  private updateInlineText(parent: NativeNode): void {
+    const property = parent.type.properties.find((entry) => entry.name === 'text')!
+    if (!this.composedText.has(parent) && parent.values.has(property.id) && parent.children.length > 0) {
+      throw new Error('<text> accepts either children or text, not both')
+    }
+    const content = parent.children.map((child) => {
+      if (!child.inlineText) throw new TypeError('<text> children must resolve to text')
+      return child.values.get(property.id)?.value ?? ''
+    }).join('')
+    this.settingInlineText = true
+    try { this.setProperty(parent, 'text', content) } finally { this.settingInlineText = false }
+    if (parent.children.length) this.composedText.add(parent)
+    else this.composedText.delete(parent)
+  }
+
+  private materializeInlineText(node: NativeNode): void {
+    node.inlineText = false
+    this.enqueue({ kind: 'create', id: node.id, nativeType: node.type.id })
+    for (const [property, value] of node.values) {
+      this.enqueue({ kind: 'setProperty', id: node.id, property, value })
+    }
+    const identity = node.type.properties.find((entry) => entry.name === 'id')
+    if (identity) {
+      const generated = `argui-${node.id.slot}-${node.id.generation}`
+      this.autoIdentities.set(node, generated)
+      this.setProperty(node, 'id', generated)
+    }
+  }
 }
 
 /** Returns whether `ancestor` contains `node` in the pending presentation graph. */
@@ -347,52 +516,4 @@ function isAncestor(ancestor: NativeNode, node: NativeNode): boolean {
     if (current === ancestor) return true
   }
   return false
-}
-
-/** Encodes a schema value for the Rust bridge's tagged `SchemaValue` decoder. */
-function encodeValue(property: NativeProperty, value: unknown): WireValue {
-  switch (property.valueType) {
-    case 'Bool':
-      if (typeof value !== 'boolean') break
-      return { type: 'Bool', value }
-    case 'Int':
-      if (typeof value !== 'number' || !Number.isSafeInteger(value)) break
-      return { type: 'Int', value }
-    case 'Float':
-      if (typeof value !== 'number' || !Number.isFinite(value)) break
-      return { type: property.valueType, value }
-    case 'String':
-    case 'Name':
-    case 'Color':
-    case 'Brush':
-      if (typeof value !== 'string') break
-      return { type: property.valueType, value }
-    case 'Dimension':
-      if (typeof value !== 'number' && typeof value !== 'string') break
-      return { type: 'Dimension', value }
-    case 'Insets':
-    case 'Radii':
-    case 'Transform':
-      if (typeof value !== 'number' && typeof value !== 'object') break
-      return { type: property.valueType, value }
-    case 'Asset':
-      if (typeof value !== 'object' || !value) break
-      {
-        const asset = value as AssetRef
-        if ((asset.kind !== 'image' && asset.kind !== 'svg') || !Number.isSafeInteger(asset.id) || asset.id <= 0) break
-        return { type: 'Asset', value: { kind: asset.kind, id: asset.id } }
-      }
-  }
-  throw new TypeError(`Invalid ${property.valueType} value for ${property.name}`)
-}
-
-/** Compares wire values, including stable asset identity, to avoid redundant native mutations. */
-function equalValue(left: WireValue | undefined, right: WireValue): boolean {
-  if (left?.type !== right.type) return false
-  if (right.type === 'Asset') {
-    const previous = left.value as AssetRef
-    const next = right.value as AssetRef
-    return previous.kind === next.kind && previous.id === next.id
-  }
-  return left.value === right.value
 }

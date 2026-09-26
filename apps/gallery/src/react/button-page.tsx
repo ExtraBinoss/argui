@@ -1,41 +1,38 @@
 /** @jsxImportSource @argui/react */
-import type { ReactElement } from 'react'
-import { Button as ReactButton, type Palette } from '@argui/widgets/react'
-import { mediaAssets } from '../assets.generated'
+import { useState, type ReactElement } from 'react'
+import { useTheme } from '@argui/react'
+import { Button, type WidgetTheme } from '@argui/widgets/react'
+import { mediaAssets } from '../../assets.generated'
 
-/** Keeps button activation state in the shell while demonstrating every variant. */
-export function ReactButtonPage(props: { theme: Palette; clicks: number; lastUsed: string; starActive: boolean; activate: (label: string) => void }): ReactElement {
-  return (
-    <column width="fill" gap={18}>
-      <text width="fill" text="Actions, variants and interactive states."
-        color={props.theme.muted} font_size={14} />
-      <text text="Variants" color={props.theme.foreground} font_size={16} weight={600} />
-      <row wrap={true} gap={10}>
-        <ReactButton id="button-primary" label="Primary" theme={props.theme} kind="primary" onClick={() => props.activate('Primary')} />
-        <ReactButton id="button-secondary" label="Secondary" theme={props.theme} kind="secondary" onClick={() => props.activate('Secondary')} />
-        <ReactButton id="button-outline" label="Outline" theme={props.theme} kind="outline" onClick={() => props.activate('Outline')} />
-        <ReactButton id="button-ghost" label="Ghost" theme={props.theme} kind="ghost" onClick={() => props.activate('Ghost')} />
-        <ReactButton id="button-destructive" label="Delete" theme={props.theme} kind="destructive" onClick={() => props.activate('Delete')} />
-        <ReactButton id="button-link" label="Link action" theme={props.theme} kind="link" onClick={() => props.activate('Link')} />
-      </row>
-      <text text="Sizes" color={props.theme.foreground} font_size={16} weight={600} />
-      <row wrap={true} gap={10} align_items="center">
-        <ReactButton id="button-xs" label="Extra small" theme={props.theme} size="xs" onClick={() => props.activate('XS')} />
-        <ReactButton id="button-sm" label="Small" theme={props.theme} size="sm" onClick={() => props.activate('SM')} />
-        <ReactButton id="button-lg" label="Large" theme={props.theme} size="lg" onClick={() => props.activate('LG')} />
-        <ReactButton id="button-icon-sm" label="Star small" theme={props.theme} size="icon-sm"
-          icon={mediaAssets['tabler/star.svg']} onClick={() => props.activate('Icon SM')} />
-      </row>
-      <text text="States and icons" color={props.theme.foreground} font_size={16} weight={600} />
-      <row wrap={true} gap={10}>
-        <ReactButton id="button-disabled" label="Disabled" theme={props.theme} kind="outline" disabled onClick={() => props.activate('Disabled')} />
-        <ReactButton id="button-busy" label="Loading" theme={props.theme} kind="primary" busy onClick={() => props.activate('Loading')} />
-        <ReactButton id="button-star" label="Star" theme={props.theme} kind="outline" selected={props.starActive}
-          icon={mediaAssets['tabler/star.svg']} activeIcon={mediaAssets['tabler/star-filled.svg']}
-          iconOnly onClick={() => props.activate('Star')} />
-      </row>
-      <text text={`Clicks: ${props.clicks} · Last used: ${props.lastUsed}`}
-        color={props.theme.muted} font_size={13} />
-    </column>
-  )
+/** Shows every button variant, a toggle icon, and optional press motion. */
+export function ButtonPage(): ReactElement {
+  const [clicks, setClicks] = useState(0)
+  const [favorite, setFavorite] = useState(false)
+  const theme = useTheme<WidgetTheme>()
+  const activate = () => setClicks((current) => current + 1)
+  return <column width="100%" gap={16}>
+    <text color={theme.text} fontSize={24}>Button</text>
+    <text color={theme.textMuted}>Button text comes from children. Colors use the Neutral roles; hover and press feedback stay native.</text>
+    <row gap={8} wrap={true}>
+      <Button id="button-default" onClick={activate}>Default</Button>
+      <Button variant="outline" onClick={activate}>Outline</Button>
+      <Button variant="secondary" onClick={activate}>Secondary</Button>
+      <Button variant="ghost" onClick={activate}>Ghost</Button>
+      <Button variant="destructive" onClick={activate}>Destructive</Button>
+      <Button variant="link" onClick={activate}>Link</Button>
+      <Button iconOnly accessibleName="Favorite" variant="ghost" pressed={favorite} onClick={() => setFavorite(current => !current)}>
+        <svg source={mediaAssets['tabler/star.svg']} width={18} height={18} color={favorite ? theme.primary : theme.text} />
+      </Button>
+      <Button disabled onClick={activate}>Disabled</Button>
+    </row>
+    <text color={theme.text}>Sizes and motion</text>
+    <row gap={8} wrap={true} alignItems="center">
+      <Button size="xs" onClick={activate}>Extra small</Button>
+      <Button size="sm" onClick={activate}>Small</Button>
+      <Button size="default" onClick={activate}>Default</Button>
+      <Button size="lg" onClick={activate}>Large</Button>
+      <Button variant="outline" pressAnimation={false} onClick={activate}>Motion off</Button>
+    </row>
+    <text color={theme.text} text={`Clicked ${clicks} times`} />
+  </column>
 }

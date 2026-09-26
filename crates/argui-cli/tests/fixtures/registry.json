@@ -1,7 +1,30 @@
 {
-  "version": 1,
+  "version": 2,
+  "arguiVersion": "0.3.3",
+  "files": {
+    "react/assets.tsx": "c6a4258f07e189cfaf27cd6e9d526ec9f7b3900a60197b0c166d67b90fa631ea",
+    "react/button.tsx": "75fb6dd5fa6e1b4f3d7ab3c1891f6343f487eab31569e157efdde82a008b6108",
+    "react/dialog.tsx": "94be278d1106103992bddd6de5aa9450d8ffbf29658815c8a140d4a08577fb92",
+    "react/input-field.tsx": "3c8fa30bb59fc0cdfed93efcc9335e909ad6d265e8c4cacb469ed4ba87b358f6",
+    "react/popover.tsx": "6e14c24e12ac11d90df1a4a3083494fc6cf9ba2b3553c05f76cd835af167f9cf",
+    "react/select.tsx": "d998c17f7d3001ffad77239aa1be4aa838d8f274c39875bbbda90f436df7d222",
+    "shared/input-text.ts": "b8e0fa853c05ff923d4ed2a5a4d981f7a3a30affd886d872bab5906968477049",
+    "shared/theme.ts": "b353d78dbccbcf3e4670d0055a5d898aeaf9c76d8f3c6903472a857ef939e4cd",
+    "shared/types.ts": "ff1f92f3d427a857d5a200c144913cd3b1d4e8caebca3a759a9b31e958109fb0",
+    "solid/assets.tsx": "2fbaa32a495cd9690946bb1d36ee570569cdc1328658aa74d185a2bf866b7922",
+    "solid/button.tsx": "74a70c68eda6a1f7278aeb2aa7be6176c1f4d75cd8d2d43c554e7d5c7a510936",
+    "solid/dialog.tsx": "d6111cf0f61385def652e49515f454d6cd97dc08fc104dd2833f626c480a3932",
+    "solid/input-field.tsx": "50a969d8c0aebc31c32b72d855e9a4fa7da8aaa665a15a8bd2b0d46460cfb283",
+    "solid/popover.tsx": "a17ca02d4152bfc931dbe27971343e100ce8153ac2ffe3b4c08be4ae496a0146",
+    "solid/select.tsx": "f68a6fa6c5ff8af241671c189eb522e0441476a815387ef4bc489552e2ac11ea"
+  },
   "components": {
     "button": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/button.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/button.tsx"
+      },
       "solid": [
         "shared/theme.ts",
         "shared/types.ts",
@@ -16,6 +39,11 @@
       ]
     },
     "input-field": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/input-field.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/input-field.tsx"
+      },
       "solid": [
         "shared/input-text.ts",
         "shared/theme.ts",
@@ -34,6 +62,11 @@
       ]
     },
     "popover": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/popover.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/popover.tsx"
+      },
       "solid": [
         "shared/theme.ts",
         "shared/types.ts",
@@ -50,6 +83,11 @@
       ]
     },
     "select": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/select.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/select.tsx"
+      },
       "solid": [
         "shared/theme.ts",
         "shared/types.ts",
@@ -64,6 +102,11 @@
       ]
     },
     "dialog": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/dialog.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/dialog.tsx"
+      },
       "solid": [
         "shared/theme.ts",
         "shared/types.ts",

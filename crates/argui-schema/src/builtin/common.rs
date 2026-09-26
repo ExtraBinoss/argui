@@ -1,15 +1,16 @@
 //! Shared schema declarations and style application for built-in primitives.
 
 use argui_ui::{
-    DesktopBackdrop, Dimension, Display, Element, EventType, ExpandedDimension,
-    LengthPercentageAuto, Sides, TextSelectionHighlight,
+    AlignSelf, DesktopBackdrop, Display, Element, EventType, ExpandedLengthPercentageAuto,
+    LengthPercentageAuto, Position, TextSelectionHighlight,
 };
 
 use super::{
-    BACKDROP_FILTER, BACKGROUND, BLUR, CLICK, DESKTOP_BACKDROP_FALLBACK, DESKTOP_BACKDROP_TINT,
-    DISMISS, FOCUS, GAP, HEIGHT, INPUT_CHANGED, KEY, MIN_HEIGHT, MIN_WIDTH, OPACITY, PADDING,
-    ROTATION, SCROLL, SELECTION_COLOR, SELECTION_FILL, SELECTION_RADIUS, SUBMIT, TEXT_EDIT,
-    TOOLTIP, VIRTUAL_MEASURE, VIRTUAL_WINDOW_CHANGE, VISIBLE, WIDTH, X, Y,
+    ALIGN_SELF, BACKDROP_FILTER, BACKGROUND, BLUR, CLICK, DESKTOP_BACKDROP_FALLBACK,
+    DESKTOP_BACKDROP_TINT, DISMISS, FOCUS, GAP, GROW, HEIGHT, ID, INPUT_CHANGED, INSET, MARGIN,
+    MAX_HEIGHT, MAX_WIDTH, MIN_HEIGHT, MIN_WIDTH, OPACITY, PADDING, POSITION, ROTATION, SCROLL,
+    SELECTION_COLOR, SELECTION_FILL, SELECTION_RADIUS, SHRINK, SUBMIT, TEXT_EDIT, TOOLTIP,
+    VIRTUAL_MEASURE, VIRTUAL_WINDOW_CHANGE, VISIBLE, WIDTH,
 };
 use crate::{
     EventId, EventSchema, NativeElementInput, PropertyId, PropertySchema, SchemaError, SchemaValue,
@@ -23,8 +24,8 @@ pub(super) enum CommonProperty {
     Tooltip,
     Width,
     Height,
-    X,
-    Y,
+    Position,
+    Inset,
     Rotation,
     Opacity,
     BackdropFilter,
@@ -33,6 +34,12 @@ pub(super) enum CommonProperty {
     Visible,
     MinWidth,
     MinHeight,
+    MaxWidth,
+    MaxHeight,
+    Grow,
+    Shrink,
+    AlignSelf,
+    Margin,
     Background,
     SelectionFill,
     SelectionColor,
@@ -46,9 +53,12 @@ pub(super) enum CommonProperty {
 /// * `property` — shared property to declare.
 pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
     match property {
-        CommonProperty::Key => {
-            PropertySchema::new(KEY, "key", ValueType::String, "Public reconciliation key.")
-        }
+        CommonProperty::Key => PropertySchema::new(
+            ID,
+            "id",
+            ValueType::String,
+            "Optional addressable native identity; framework key is separate.",
+        ),
         CommonProperty::Tooltip => PropertySchema::new(
             TOOLTIP,
             "tooltip",
@@ -61,17 +71,18 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
         CommonProperty::Height => {
             PropertySchema::new(HEIGHT, "height", ValueType::Dimension, "Preferred height.")
         }
-        CommonProperty::X => PropertySchema::new(
-            X,
-            "x",
-            ValueType::Dimension,
-            "Horizontal position within the parent.",
-        ),
-        CommonProperty::Y => PropertySchema::new(
-            Y,
-            "y",
-            ValueType::Dimension,
-            "Vertical position within the parent.",
+        CommonProperty::Position => PropertySchema::new(
+            POSITION,
+            "position",
+            ValueType::String,
+            "Relative, absolute, or sticky positioning.",
+        )
+        .allowed_values(&["relative", "absolute", "sticky"]),
+        CommonProperty::Inset => PropertySchema::new(
+            INSET,
+            "inset",
+            ValueType::PositionInsets,
+            "Positioned offsets; start/end follow writing direction.",
         ),
         CommonProperty::Rotation => PropertySchema::new(
             ROTATION,
@@ -89,20 +100,20 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
         .default_value(SchemaValue::Float(1.0)),
         CommonProperty::BackdropFilter => PropertySchema::new(
             BACKDROP_FILTER,
-            "backdrop_filter",
+            "backdropFilter",
             ValueType::String,
             "CSS-like ordered filters applied to pixels already painted behind this element.",
         )
         .default_value(SchemaValue::String("none".into())),
         CommonProperty::DesktopBackdropTint => PropertySchema::new(
             DESKTOP_BACKDROP_TINT,
-            "desktop_backdrop_tint",
+            "desktopBackdropTint",
             ValueType::Color,
             "Tint painted over a native desktop blur; pair with desktop_backdrop_fallback.",
         ),
         CommonProperty::DesktopBackdropFallback => PropertySchema::new(
             DESKTOP_BACKDROP_FALLBACK,
-            "desktop_backdrop_fallback",
+            "desktopBackdropFallback",
             ValueType::Color,
             "Color painted when native desktop blur is unavailable; pair with desktop_backdrop_tint.",
         ),
@@ -115,15 +126,46 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
         .default_value(SchemaValue::Bool(true)),
         CommonProperty::MinWidth => PropertySchema::new(
             MIN_WIDTH,
-            "min_width",
-            ValueType::Float,
-            "Minimum width in logical pixels.",
+            "minWidth",
+            ValueType::Constraint,
+            "Minimum width as pixels, a percentage, or auto.",
         ),
         CommonProperty::MinHeight => PropertySchema::new(
             MIN_HEIGHT,
-            "min_height",
-            ValueType::Float,
-            "Minimum height in logical pixels.",
+            "minHeight",
+            ValueType::Constraint,
+            "Minimum height as pixels, a percentage, or auto.",
+        ),
+        CommonProperty::MaxWidth => PropertySchema::new(
+            MAX_WIDTH,
+            "maxWidth",
+            ValueType::Constraint,
+            "Maximum width as pixels, a percentage, or auto.",
+        ),
+        CommonProperty::MaxHeight => PropertySchema::new(
+            MAX_HEIGHT,
+            "maxHeight",
+            ValueType::Constraint,
+            "Maximum height as pixels, a percentage, or auto.",
+        ),
+        CommonProperty::Grow => {
+            PropertySchema::new(GROW, "grow", ValueType::Float, "Flex growth factor.")
+        }
+        CommonProperty::Shrink => {
+            PropertySchema::new(SHRINK, "shrink", ValueType::Float, "Flex shrink factor.")
+        }
+        CommonProperty::AlignSelf => PropertySchema::new(
+            ALIGN_SELF,
+            "alignSelf",
+            ValueType::String,
+            "Alignment within the parent cross axis.",
+        )
+        .allowed_values(&["start", "center", "end", "stretch"]),
+        CommonProperty::Margin => PropertySchema::new(
+            MARGIN,
+            "margin",
+            ValueType::Insets,
+            "Outer spacing; start/end follow writing direction.",
         ),
         CommonProperty::Background => PropertySchema::new(
             BACKGROUND,
@@ -133,19 +175,19 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
         ),
         CommonProperty::SelectionFill => PropertySchema::new(
             SELECTION_FILL,
-            "selection_fill",
+            "selectionFill",
             ValueType::Brush,
             "Inherited GPU fill for selected text fragments.",
         ),
         CommonProperty::SelectionColor => PropertySchema::new(
             SELECTION_COLOR,
-            "selection_color",
+            "selectionColor",
             ValueType::Color,
             "Solid color for selected text when no selection_fill is set.",
         ),
         CommonProperty::SelectionRadius => PropertySchema::new(
             SELECTION_RADIUS,
-            "selection_radius",
+            "selectionRadius",
             ValueType::Float,
             "Corner radius of selected text fragments.",
         ),
@@ -153,10 +195,12 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
             PropertySchema::new(GAP, "gap", ValueType::Float, "Uniform child gap.")
                 .default_value(SchemaValue::Float(0.0))
         }
-        CommonProperty::Padding => {
-            PropertySchema::new(PADDING, "padding", ValueType::Float, "Uniform padding.")
-                .default_value(SchemaValue::Float(0.0))
-        }
+        CommonProperty::Padding => PropertySchema::new(
+            PADDING,
+            "padding",
+            ValueType::Insets,
+            "Inner spacing in logical pixels; start/end follow writing direction.",
+        ),
     }
 }
 
@@ -205,7 +249,7 @@ pub(super) fn apply_common(
     mut element: Element,
     input: &NativeElementInput,
 ) -> Result<Element, SchemaError> {
-    if let Some(SchemaValue::String(value)) = input.get(KEY) {
+    if let Some(SchemaValue::String(value)) = input.get(ID) {
         element = element.keyed(value.clone());
     }
     if let Some(SchemaValue::String(value)) = input.get(TOOLTIP) {
@@ -217,27 +261,73 @@ pub(super) fn apply_common(
     if let Some(SchemaValue::Dimension(value)) = input.get(HEIGHT) {
         element = element.height(*value);
     }
-    let x = input.get(X).and_then(|value| match value {
-        SchemaValue::Dimension(value) => Some(*value),
-        _ => None,
-    });
-    let y = input.get(Y).and_then(|value| match value {
-        SchemaValue::Dimension(value) => Some(*value),
-        _ => None,
-    });
-    if x.is_some() || y.is_some() {
-        element = element.absolute(Sides {
-            left: inset_coordinate(x),
-            right: LengthPercentageAuto::auto(),
-            top: inset_coordinate(y),
-            bottom: LengthPercentageAuto::auto(),
+    if let Some(SchemaValue::String(value)) = input.get(POSITION) {
+        element = element.position(match value.as_str() {
+            "relative" => Position::Relative,
+            "absolute" => Position::Absolute,
+            "sticky" => Position::Sticky,
+            _ => {
+                return Err(SchemaError::Adapter(format!(
+                    "unsupported position `{value}`"
+                )));
+            }
         });
     }
-    if let Some(SchemaValue::Float(value)) = input.get(MIN_WIDTH) {
-        element = element.min_width(argui_ui::length(*value));
+    if let Some(SchemaValue::PositionInsets(value)) = input.get(INSET) {
+        if input.get(POSITION).is_none() {
+            return Err(SchemaError::Adapter(
+                "inset requires an explicit position".into(),
+            ));
+        }
+        element = element.layout_inset(*value);
     }
-    if let Some(SchemaValue::Float(value)) = input.get(MIN_HEIGHT) {
-        element = element.min_height(argui_ui::length(*value));
+    if let Some(SchemaValue::Constraint(value)) = input.get(MIN_WIDTH) {
+        validate_constraint(*value, "minWidth")?;
+        element = element.min_width(*value);
+    }
+    if let Some(SchemaValue::Constraint(value)) = input.get(MIN_HEIGHT) {
+        validate_constraint(*value, "minHeight")?;
+        element = element.min_height(*value);
+    }
+    if let Some(SchemaValue::Constraint(value)) = input.get(MAX_WIDTH) {
+        validate_constraint(*value, "maxWidth")?;
+        element = element.max_width(*value);
+    }
+    if let Some(SchemaValue::Constraint(value)) = input.get(MAX_HEIGHT) {
+        validate_constraint(*value, "maxHeight")?;
+        element = element.max_height(*value);
+    }
+    if let Some(SchemaValue::Float(value)) = input.get(GROW) {
+        if !value.is_finite() || *value < 0.0 {
+            return Err(SchemaError::Adapter(
+                "grow must be finite and nonnegative".into(),
+            ));
+        }
+        element = element.grow(*value);
+    }
+    if let Some(SchemaValue::Float(value)) = input.get(SHRINK) {
+        if !value.is_finite() || *value < 0.0 {
+            return Err(SchemaError::Adapter(
+                "shrink must be finite and nonnegative".into(),
+            ));
+        }
+        element = element.shrink(*value);
+    }
+    if let Some(SchemaValue::String(value)) = input.get(ALIGN_SELF) {
+        element = element.align_self(match value.as_str() {
+            "start" => AlignSelf::FLEX_START,
+            "center" => AlignSelf::CENTER,
+            "end" => AlignSelf::FLEX_END,
+            "stretch" => AlignSelf::STRETCH,
+            _ => {
+                return Err(SchemaError::Adapter(format!(
+                    "unsupported alignSelf `{value}`"
+                )));
+            }
+        });
+    }
+    if let Some(SchemaValue::Insets(value)) = input.get(MARGIN) {
+        element = element.layout_margin(*value);
     }
     if let Some(SchemaValue::Color(value)) = input.get(BACKGROUND) {
         element = element.background(*value);
@@ -297,17 +387,6 @@ pub(super) fn apply_common(
     Ok(element)
 }
 
-/// Converts an authored position coordinate to a Taffy inset value.
-///
-/// * `value` — optional dimension bound to `x` or `y`.
-fn inset_coordinate(value: Option<Dimension>) -> LengthPercentageAuto {
-    match value.map(Dimension::expand) {
-        Some(ExpandedDimension::Length(pixels)) => LengthPercentageAuto::length(pixels),
-        Some(ExpandedDimension::Percent(fraction)) => LengthPercentageAuto::percent(fraction),
-        Some(_) | None => LengthPercentageAuto::auto(),
-    }
-}
-
 /// Applies child spacing shared by native containers and controls.
 ///
 /// * `element` — native element receiving spacing.
@@ -316,10 +395,28 @@ pub(super) fn apply_container(mut element: Element, input: &NativeElementInput) 
     if let Some(SchemaValue::Float(value)) = input.get(GAP) {
         element = element.gap(*value);
     }
-    if let Some(SchemaValue::Float(value)) = input.get(PADDING) {
-        element = element.padding(Sides::length(*value));
+    if let Some(SchemaValue::Insets(value)) = input.get(PADDING) {
+        element = element.layout_padding(*value);
     }
     element
+}
+
+/// Rejects negative or nonfinite pixel and percent layout constraints.
+///
+/// `value` is the typed min/max bound, and `name` appears in diagnostics.
+/// Returns an adapter error for an invalid bound.
+pub(super) fn validate_constraint(
+    value: LengthPercentageAuto,
+    name: &str,
+) -> Result<(), SchemaError> {
+    let valid = match value.expand() {
+        ExpandedLengthPercentageAuto::Length(value)
+        | ExpandedLengthPercentageAuto::Percent(value) => value.is_finite() && value >= 0.0,
+        ExpandedLengthPercentageAuto::Auto => true,
+    };
+    valid
+        .then_some(())
+        .ok_or_else(|| SchemaError::Adapter(format!("{name} must be finite and nonnegative")))
 }
 
 /// Returns a required string property after registry validation.

@@ -73,5 +73,8 @@ fn path_rejects_missing_or_raster_sources_and_invalid_fit() {
             .property(builtin::SOURCE, vector)
             .property(builtin::FIT, SchemaValue::String("stretch".into())),
     );
-    assert!(matches!(invalid, Err(SchemaError::Adapter(_))));
+    assert!(matches!(
+        invalid,
+        Err(SchemaError::InvalidPropertyValue { .. })
+    ));
 }

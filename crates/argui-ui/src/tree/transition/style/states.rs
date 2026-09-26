@@ -132,6 +132,10 @@ impl StateContext {
                 }
             }
         }
+        if aggregate.contains(VisualState::Focused) {
+            self.nodes[root].visual.insert(VisualState::FocusWithin);
+            aggregate.insert(VisualState::FocusWithin);
+        }
         if let Some(id) = element.state_scope.clone() {
             let scope = self.scopes.len();
             self.scopes.push(ResolvedScope {

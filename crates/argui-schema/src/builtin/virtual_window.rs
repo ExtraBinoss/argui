@@ -7,7 +7,7 @@ use argui_ui::{
 };
 
 use super::{
-    CHILDREN, CONTENT_HEIGHT, CONTENT_WIDTH, CommonProperty, GROW, ITEM_COUNT, KEY, OFFSET_X,
+    CHILDREN, CONTENT_HEIGHT, CONTENT_WIDTH, CommonProperty, GROW, ID, ITEM_COUNT, OFFSET_X,
     OFFSET_Y, OVERSCAN, ROW_HEIGHT, SCROLL, SCROLL_OFFSET, SCROLLBAR_THUMB, VARIABLE_HEIGHT,
     VIEWPORT_HEIGHT, VIRTUAL_DATA_VERSION, VIRTUAL_HORIZONTAL, VIRTUAL_MEASURE,
     VIRTUAL_SCROLLBAR_VISIBLE, VIRTUAL_SCROLLBAR_WIDTH, VIRTUAL_SHADOW_COLOR, VIRTUAL_SHADOW_END,
@@ -38,10 +38,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Tooltip))
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::MinWidth))
     .property(common_property(CommonProperty::MinHeight))
+    .property(common_property(CommonProperty::MaxWidth))
+    .property(common_property(CommonProperty::MaxHeight))
+    .property(common_property(CommonProperty::Shrink))
+    .property(common_property(CommonProperty::AlignSelf))
+    .property(common_property(CommonProperty::Margin))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
@@ -57,7 +62,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             ROW_HEIGHT,
-            "row_height",
+            "rowHeight",
             ValueType::Float,
             "Positive row height or estimate before variable rows are measured.",
         )
@@ -67,7 +72,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             VARIABLE_HEIGHT,
-            "variable_height",
+            "variableHeight",
             ValueType::Bool,
             "Measure rich row heights and retain their scroll anchor.",
         )
@@ -87,7 +92,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             VIRTUAL_VIEWPORT_WIDTH,
-            "viewport_width",
+            "viewportWidth",
             ValueType::Float,
             "Optional measured horizontal viewport width.",
         )
@@ -96,7 +101,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             VIEWPORT_HEIGHT,
-            "viewport_height",
+            "viewportHeight",
             ValueType::Float,
             "Optional viewport height; omitted values track the laid-out height.",
         )
@@ -115,56 +120,56 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(PropertySchema::new(
         SCROLLBAR_THUMB,
-        "scrollbar_thumb",
+        "scrollbarThumb",
         ValueType::Color,
         "Optional thumb color; omitted windows remain visually neutral.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SCROLLBAR_VISIBLE,
-        "scrollbar_visible",
+        "scrollbarVisible",
         ValueType::Bool,
         "Show a native scrollbar for this window.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SCROLLBAR_WIDTH,
-        "scrollbar_width",
+        "scrollbarWidth",
         ValueType::Float,
         "Native scrollbar width in logical pixels.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SHADOW_COLOR,
-        "shadow_color",
+        "shadowColor",
         ValueType::Color,
         "Optional scroll edge shadow color; omitted color fades into the backdrop.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SHADOW_INTENSITY,
-        "shadow_intensity",
+        "shadowIntensity",
         ValueType::Float,
         "Scroll edge shadow opacity strength.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SHADOW_WIDTH,
-        "shadow_width",
+        "shadowWidth",
         ValueType::Float,
         "Scroll edge shadow width in logical pixels.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SHADOW_START,
-        "shadow_start",
+        "shadowStart",
         ValueType::Bool,
         "Enable the leading scroll edge shadow.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SHADOW_END,
-        "shadow_end",
+        "shadowEnd",
         ValueType::Bool,
         "Enable the trailing scroll edge shadow.",
     ))
     .property(
         PropertySchema::new(
             OFFSET_X,
-            "offset_x",
+            "offsetX",
             ValueType::Dimension,
             "Laid-out horizontal scroll position.",
         )
@@ -173,7 +178,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             VIRTUAL_VISIBLE_WIDTH,
-            "visible_width",
+            "visibleWidth",
             ValueType::Dimension,
             "Laid-out horizontal viewport width.",
         )
@@ -182,7 +187,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             CONTENT_WIDTH,
-            "content_width",
+            "contentWidth",
             ValueType::Dimension,
             "Laid-out full content width.",
         )
@@ -191,7 +196,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             OFFSET_Y,
-            "offset_y",
+            "offsetY",
             ValueType::Dimension,
             "Laid-out vertical scroll position in logical pixels.",
         )
@@ -200,7 +205,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             VISIBLE_HEIGHT,
-            "visible_height",
+            "visibleHeight",
             ValueType::Dimension,
             "Laid-out visible viewport height in logical pixels.",
         )
@@ -209,7 +214,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             CONTENT_HEIGHT,
-            "content_height",
+            "contentHeight",
             ValueType::Dimension,
             "Laid-out full content height in logical pixels.",
         )
@@ -227,19 +232,19 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(PropertySchema::new(
         ITEM_COUNT,
-        "__item_count",
+        "itemCount",
         ValueType::Int,
         "Host-provided collection length.",
     ))
     .property(PropertySchema::new(
         WINDOW_START,
-        "__window_start",
+        "windowStart",
         ValueType::Int,
         "Host-provided first mounted row index.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_DATA_VERSION,
-        "__data_version",
+        "dataVersion",
         ValueType::Int,
         "Increment after a middle insertion, removal, or reorder to reset item measurements.",
     ))
@@ -271,13 +276,13 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         documentation: "Only keyed rows in the current virtual window.".into(),
     });
     registry.register(schema, |input: &NativeElementInput| {
-        let key = required_string(input, KEY, "key")?;
-        let row_height = float(input, ROW_HEIGHT, "row_height", 0.0)?;
+        let key = required_string(input, ID, "id")?;
+        let row_height = float(input, ROW_HEIGHT, "rowHeight", 0.0)?;
         let horizontal = optional_bool(input, VIRTUAL_HORIZONTAL).unwrap_or(false);
         let viewport = if horizontal {
-            float(input, VIRTUAL_VIEWPORT_WIDTH, "viewport_width", 0.0)?
+            float(input, VIRTUAL_VIEWPORT_WIDTH, "viewportWidth", 0.0)?
         } else {
-            float(input, VIEWPORT_HEIGHT, "viewport_height", 0.0)?
+            float(input, VIEWPORT_HEIGHT, "viewportHeight", 0.0)?
         };
         let offset = float(input, SCROLL_OFFSET, "offset", 0.0)?;
         if row_height <= 0.0 || viewport < 0.0 {
@@ -313,7 +318,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         if input.get(SCROLLBAR_THUMB).is_some()
             || optional_bool(input, VIRTUAL_SCROLLBAR_VISIBLE).unwrap_or(false)
         {
-            let width = float(input, VIRTUAL_SCROLLBAR_WIDTH, "scrollbar_width", 8.0)?;
+            let width = float(input, VIRTUAL_SCROLLBAR_WIDTH, "scrollbarWidth", 8.0)?;
             if width <= 0.0 {
                 return Err(SchemaError::Adapter(
                     "VirtualWindow requires positive scrollbar_width".into(),
@@ -339,8 +344,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             scroll = scroll.scrollbar(scrollbar);
             element = element.scrollbar_gutter(ScrollbarGutter::Stable);
         }
-        let shadow_width = float(input, VIRTUAL_SHADOW_WIDTH, "shadow_width", 0.0)?;
-        let shadow_intensity = float(input, VIRTUAL_SHADOW_INTENSITY, "shadow_intensity", 1.0)?;
+        let shadow_width = float(input, VIRTUAL_SHADOW_WIDTH, "shadowWidth", 0.0)?;
+        let shadow_intensity = float(input, VIRTUAL_SHADOW_INTENSITY, "shadowIntensity", 1.0)?;
         if shadow_width < 0.0 || !(0.0..=1.0).contains(&shadow_intensity) {
             return Err(SchemaError::Adapter(
                 "VirtualWindow requires nonnegative shadow_width and shadow_intensity in [0,1]"
@@ -368,9 +373,6 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             scroll = scroll.effect(effect);
         }
         element = element.scroll_config(scroll);
-        if let Some(SchemaValue::Float(grow)) = input.get(GROW) {
-            element = element.grow(*grow);
-        }
         Ok(apply_events(apply_common(element, input)?, input))
     })
 }

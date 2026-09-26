@@ -17,10 +17,12 @@ pub(super) fn register(
         .property(common_property(CommonProperty::Tooltip))
         .property(common_property(CommonProperty::Width))
         .property(common_property(CommonProperty::Height))
+        .property(common_property(CommonProperty::Position))
+        .property(common_property(CommonProperty::Inset))
         .property(
             PropertySchema::new(
                 MEASURED_WIDTH,
-                "measured_width",
+                "measuredWidth",
                 ValueType::Dimension,
                 "Last completed layout width in logical pixels; read-only and one frame delayed.",
             )
@@ -30,15 +32,13 @@ pub(super) fn register(
         .property(
             PropertySchema::new(
                 MEASURED_HEIGHT,
-                "measured_height",
+                "measuredHeight",
                 ValueType::Dimension,
                 "Last completed layout height in logical pixels; read-only and one frame delayed.",
             )
             .observed(crate::ObservationKind::MeasuredHeight)
             .not_animatable(),
         )
-        .property(common_property(CommonProperty::X))
-        .property(common_property(CommonProperty::Y))
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
@@ -58,21 +58,9 @@ pub(super) fn register(
         .property(common_property(CommonProperty::Padding))
         .property(PropertySchema::new(
             DIRECTION_SCOPE,
-            "direction_scope",
+            "directionScope",
             ValueType::String,
             "Writing direction inherited by visual descendants and portal content: ltr or rtl.",
-        ))
-        .property(PropertySchema::new(
-            SCROLL_Y,
-            "scroll_y",
-            ValueType::Bool,
-            "Enable vertical scrolling and a visible scrollbar.",
-        ))
-        .property(PropertySchema::new(
-            SCROLLBAR_THUMB,
-            "scrollbar_thumb",
-            ValueType::Color,
-            "Color of the vertical scrollbar thumb.",
         ))
         .property(PropertySchema::new(
             WRAP,
@@ -93,26 +81,14 @@ pub(super) fn register(
             "Flex shrink factor.",
         ))
         .property(PropertySchema::new(
-            BORDER_COLOR,
-            "border_color",
-            ValueType::Color,
-            "Outline color.",
-        ))
-        .property(PropertySchema::new(
-            RADIUS,
-            "radius",
-            ValueType::Float,
-            "Corner radius in logical pixels.",
-        ))
-        .property(PropertySchema::new(
             ALIGN_ITEMS,
-            "align_items",
+            "alignItems",
             ValueType::String,
             "Cross-axis alignment of children.",
         ))
         .property(PropertySchema::new(
             JUSTIFY_CONTENT,
-            "justify_content",
+            "justifyContent",
             ValueType::String,
             "Main-axis distribution of children.",
         ))
@@ -154,12 +130,6 @@ pub(super) fn register(
         if let Some(SchemaValue::Float(shrink)) = input.get(SHRINK) {
             element = element.shrink(*shrink);
         }
-        if let Some(SchemaValue::Color(color)) = input.get(BORDER_COLOR) {
-            element = element.border(Border::all(1.0, *color));
-        }
-        if let Some(SchemaValue::Float(radius)) = input.get(RADIUS) {
-            element = element.radius(CornerRadii::all(*radius));
-        }
         if let Some(SchemaValue::String(value)) = input.get(ALIGN_ITEMS) {
             element = element.align_items(match value.as_str() {
                 "start" => AlignItems::START,
@@ -178,34 +148,15 @@ pub(super) fn register(
                 "start" => JustifyContent::START,
                 "center" => JustifyContent::CENTER,
                 "end" => JustifyContent::END,
-                "space_between" => JustifyContent::SPACE_BETWEEN,
-                "space_around" => JustifyContent::SPACE_AROUND,
-                "space_evenly" => JustifyContent::SPACE_EVENLY,
+                "spaceBetween" => JustifyContent::SPACE_BETWEEN,
+                "spaceAround" => JustifyContent::SPACE_AROUND,
+                "spaceEvenly" => JustifyContent::SPACE_EVENLY,
                 _ => {
                     return Err(SchemaError::Adapter(format!(
                         "{name} does not support justify_content `{value}`"
                     )));
                 }
             });
-        }
-        if optional_bool(input, SCROLL_Y) == Some(true) {
-            let thumb = match input.get(SCROLLBAR_THUMB) {
-                Some(SchemaValue::Color(color)) => *color,
-                _ => argui_core::Color::srgba(0.45, 0.50, 0.57, 0.75),
-            };
-            let scrollbar = argui_ui::ScrollbarStyle::new(
-                argui_ui::ScrollbarPartStyle::new(argui_paint::QuadStyle::default()),
-                argui_ui::ScrollbarPartStyle::new(argui_paint::QuadStyle::solid(thumb)),
-            )
-            .width(8.0)
-            .visibility(argui_ui::ScrollbarVisibility::Always);
-            element = element
-                .overflow(argui_ui::Axes {
-                    x: argui_ui::Overflow::Hidden,
-                    y: argui_ui::Overflow::Auto,
-                })
-                .scroll_config(argui_ui::ScrollConfig::default().scrollbar(scrollbar))
-                .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable);
         }
         Ok(apply_events(
             loop_motion::apply(

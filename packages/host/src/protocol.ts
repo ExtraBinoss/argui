@@ -10,6 +10,95 @@ export interface AssetRef {
   id: number
 }
 
+/** A preferred size in logical pixels, a containing-block percentage, or intrinsic sizing. */
+export type DimensionValue = number | 'auto' | `${number}%`
+
+/** A minimum or maximum size constraint in logical pixels, percent, or auto. */
+export type ConstraintValue = number | 'auto' | `${number}%`
+
+/** One fixed, intrinsic, fractional or bounded native grid track. */
+export type GridTrackSingle = number | 'auto' | `${number}%`
+  | { fr: number }
+  | { minmax: { min: number; max: number | { fr: number } } }
+
+/** A grid track or one native repeat group. */
+export type GridTrackValue = GridTrackSingle | {
+  repeat: { count: number | 'autoFit' | 'autoFill'; tracks: readonly GridTrackSingle[] }
+}
+
+/** Ordered tracks for a row or column grid axis. */
+export type GridTracksValue = readonly GridTrackValue[]
+
+/** A native container condition and the layout values it applies when matched. */
+export interface ContainerRuleValue {
+  scope: string
+  when: {
+    minWidth?: number
+    maxWidth?: number
+    minHeight?: number
+    maxHeight?: number
+    orientation?: 'landscape' | 'portrait'
+  }
+  style: {
+    gridColumns?: GridTracksValue
+    gridRows?: GridTracksValue
+    width?: DimensionValue
+    height?: DimensionValue
+    gap?: number
+    grow?: number
+    shrink?: number
+    alignItems?: 'start' | 'center' | 'end' | 'stretch'
+    justifyContent?: 'start' | 'center' | 'end' | 'spaceBetween' | 'spaceAround' | 'spaceEvenly'
+  }
+}
+
+type VerticalInsets = {
+  top?: number
+  bottom?: number
+}
+
+/** Physical or writing-direction edges; horizontal modes cannot be mixed. */
+export type InsetsValue = number | (VerticalInsets & (
+  { right?: number; left?: number; start?: never; end?: never }
+  | { start?: number; end?: number; right?: never; left?: never }
+))
+
+/** Positioned edges; omitted object sides stay automatic rather than becoming zero. */
+export type PositionInsetsValue = InsetsValue
+
+/** Per-corner radii in logical pixels. */
+export type RadiiValue = number | {
+  topLeft?: number
+  topRight?: number
+  bottomRight?: number
+  bottomLeft?: number
+}
+
+/** Stroke surrounding one native surface. */
+export interface BorderValue {
+  width: number | { top: number; right: number; bottom: number; left: number }
+  color: string
+}
+
+/** One native shadow, with offsets, blur and spread in logical pixels. */
+export interface ShadowValue {
+  offsetX?: number
+  offsetY?: number
+  blur: number
+  spread?: number
+  color: string
+  inset?: boolean
+}
+
+/** Paint-only transform; it does not reserve layout space. */
+export interface TransformValue {
+  translateX?: number
+  translateY?: number
+  scaleX?: number
+  scaleY?: number
+  rotation?: number
+}
+
 /** A schema value with the Rust `SchemaValue` variant made explicit on the wire. */
 export interface WireValue {
   type: string
@@ -31,12 +120,17 @@ export interface NativeProperty {
   name: string
   valueType: string
   readOnly: boolean
+  required?: boolean
+  default?: string | null
+  allowedValues?: readonly string[]
 }
 
 /** Event metadata exported from the Rust `SchemaRegistry`. */
 export interface NativeEvent {
   id: number
   name: string
+  eventType?: string
+  payload?: string | null
 }
 
 /** Native primitive metadata exported from the Rust `SchemaRegistry`. */

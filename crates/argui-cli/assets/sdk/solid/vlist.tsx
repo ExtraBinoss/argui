@@ -1,58 +1,83 @@
-import { createSignal, createUniqueId } from 'solid-js'
+import { For, createMemo, createSignal, untrack, type Accessor } from 'solid-js'
 import { boundedWindow, nativeWindowRange, type NativeWindowRange, type VirtualListOptions } from '@argui/host'
 import type { JSX } from './jsx-runtime'
 
 /** Props for a native list that mounts only its visible keyed items. */
-export interface VirtualListProps extends VirtualListOptions {
+export type VirtualListProps = VirtualListOptions & {
   id?: string
   renderItem: (index: number) => JSX.Element
 }
 
 /** Renders only ranges requested by the native virtual list as its viewport moves. */
 export function VirtualList(props: VirtualListProps): JSX.Element {
-  const generatedId = `virtual-list-${createUniqueId()}`
-  const id = () => props.id ?? generatedId
+  const initial = Math.max(0, Math.min(props.count - 1,
+    Number.isFinite(props.initialIndex) ? Math.trunc(props.initialIndex!) : 0))
   const [window, setWindow] = createSignal<NativeWindowRange>({
-    start: 0, end: Math.min(props.count, 12), offset: 0, viewportExtent: 0,
+    start: initial, end: Math.min(props.count, initial + 12), offset: initial * (props.estimate ?? 48), viewportExtent: 0,
   })
   const axis = () => props.axis ?? 'vertical'
   const shadow = () => props.shadow
   const current = () => props.count <= 32
     ? { ...boundedWindow(window(), props.count), start: 0, end: props.count }
     : boundedWindow(window(), props.count)
-  const rows = () => {
+  const entries = new Map<string | number, { index: Accessor<number>; setIndex: (index: number) => void }>()
+  const rows = createMemo(() => {
     const range = current()
-    return Array.from({ length: range.end - range.start }, (_, position) => {
+    const seen = new Set<string | number>()
+    const next = Array.from({ length: range.end - range.start }, (_, position) => {
       const index = range.start + position
-      return <container key={`${id()}-item-${props.itemKey?.(index) ?? index}`} shrink={0}>{props.renderItem(index)}</container>
+      const key = props.itemKey(index)
+      if (seen.has(key)) throw new Error(`Duplicate virtual list item key: ${key}`)
+      seen.add(key)
+      let entry = entries.get(key)
+      if (!entry) {
+        const [read, write] = createSignal(index)
+        entry = { index: read, setIndex: write }
+        entries.set(key, entry)
+      } else if (untrack(entry.index) !== index) entry.setIndex(index)
+      return entry
     })
-  }
+    for (const key of entries.keys()) if (!seen.has(key)) entries.delete(key)
+    return next
+  })
   return <virtualWindow
-    key={id()}
-    width={props.width ?? (axis() === 'horizontal' ? 'fill' : undefined)}
-    height={props.height ?? (axis() === 'vertical' ? 'fill' : undefined)}
+    id={props.id}
+    width={props.width}
+    height={props.height}
+    minWidth={props.minWidth}
+    maxWidth={props.maxWidth}
+    minHeight={props.minHeight}
+    maxHeight={props.maxHeight}
+    grow={props.grow}
+    shrink={props.shrink}
+    alignSelf={props.alignSelf}
+    margin={props.margin}
     horizontal={axis() === 'horizontal'}
-    row_height={props.estimate ?? 48}
-    variable_height={props.variable ?? true}
-    viewport_width={axis() === 'horizontal' && current().viewportExtent > 0 ? current().viewportExtent : undefined}
-    viewport_height={axis() === 'vertical' && current().viewportExtent > 0 ? current().viewportExtent : undefined}
+    rowHeight={props.estimate ?? 48}
+    variableHeight={props.variable ?? true}
+    viewportWidth={axis() === 'horizontal' && current().viewportExtent > 0 ? current().viewportExtent : undefined}
+    viewportHeight={axis() === 'vertical' && current().viewportExtent > 0 ? current().viewportExtent : undefined}
     offset={current().offset}
     overscan={props.overscan ?? 3}
-    scrollbar_visible={props.scrollbarVisible ?? !!props.scrollbarColor}
-    scrollbar_width={props.scrollbarWidth}
-    scrollbar_thumb={props.scrollbarColor}
-    shadow_color={shadow()?.color}
-    shadow_intensity={shadow()?.intensity}
-    shadow_width={shadow()?.width}
-    shadow_start={axis() === 'horizontal' ? shadow()?.left : shadow()?.top}
-    shadow_end={axis() === 'horizontal' ? shadow()?.right : shadow()?.bottom}
-    __item_count={props.count}
-    __data_version={props.dataVersion ?? 0}
-    __window_start={current().start}
-    onWindow={(payload: unknown) => {
+    scrollbarVisible={props.scrollbarVisible ?? !!props.scrollbarColor}
+    scrollbarWidth={props.scrollbarWidth}
+    scrollbarThumb={props.scrollbarColor}
+    shadowColor={shadow()?.color}
+    shadowIntensity={shadow()?.intensity}
+    shadowWidth={shadow()?.width}
+    shadowStart={axis() === 'horizontal' ? shadow()?.left : shadow()?.top}
+    shadowEnd={axis() === 'horizontal' ? shadow()?.right : shadow()?.bottom}
+    itemCount={props.count}
+    dataVersion={props.dataVersion ?? 0}
+    windowStart={current().start}
+    onWindow={(payload) => {
       const next = nativeWindowRange(payload, props.count)
-      if (next && (next.start !== window().start || next.end !== window().end
-        || next.viewportExtent !== window().viewportExtent)) setWindow(next)
+      if (next) {
+        if (next.start !== window().start || next.end !== window().end
+          || next.viewportExtent !== window().viewportExtent) setWindow(next)
+        props.onWindowChange?.(next)
+      }
     }}
-  >{rows()}</virtualWindow>
+    onMeasure={props.onMeasure}
+  ><For each={rows()}>{(entry) => <container shrink={0}>{props.renderItem(entry.index())}</container>}</For></virtualWindow>
 }

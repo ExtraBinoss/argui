@@ -16,6 +16,7 @@ pub struct WebHostHandle {
     host: NativeHost,
     proxy: winit::event_loop::EventLoopProxy<UserEvent>,
     canvases: GpuCanvasRegistry,
+    assets: NativeHostAssets,
 }
 
 impl WebHostHandle {
@@ -28,6 +29,30 @@ impl WebHostHandle {
     pub fn start(
         window: WindowConfig,
         renderer: RendererConfig,
+        on_delivery: impl Fn(NativeHostDelivery) + 'static,
+        on_event: impl FnMut(RuntimeEvent) + 'static,
+    ) -> Result<Self, RuntimeError> {
+        Self::start_with_assets(
+            window,
+            renderer,
+            NativeHostAssets::default(),
+            on_delivery,
+            on_event,
+        )
+    }
+
+    /// Starts the browser renderer with app-owned image and SVG assets.
+    ///
+    /// `window` chooses the canvas parent, `renderer` supplies GPU configuration,
+    /// `assets` are registered before the first frame, and the callbacks receive
+    /// UI deliveries and runtime diagnostics.
+    ///
+    /// # Errors
+    /// Returns a schema or browser event-loop initialization error.
+    pub fn start_with_assets(
+        window: WindowConfig,
+        renderer: RendererConfig,
+        assets: NativeHostAssets,
         on_delivery: impl Fn(NativeHostDelivery) + 'static,
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Result<Self, RuntimeError> {
@@ -49,7 +74,7 @@ impl WebHostHandle {
             None,
             on_event,
         );
-        application.install_native_host_assets(NativeHostAssets::default());
+        application.install_native_host_assets(assets.clone());
         application.native_host = Some(host);
         application.web_host_events = Some(Box::new(on_delivery));
         application.set_event_proxy(proxy.clone());
@@ -59,6 +84,7 @@ impl WebHostHandle {
             host: shadow,
             proxy,
             canvases,
+            assets,
         })
     }
 
@@ -79,7 +105,7 @@ impl WebHostHandle {
             .cloned()
             .map(WireOperation::into_native)
             .collect::<Result<Vec<_>, _>>()?;
-        validate_native_host_assets(&decoded, &[], &[])?;
+        validate_native_host_assets(&decoded, &self.assets.images, &self.assets.vectors)?;
         validate_native_host_canvases(&decoded, &self.canvases)?;
         self.host
             .validate(&decoded)

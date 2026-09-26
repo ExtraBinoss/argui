@@ -1,10 +1,17 @@
 //! Visually neutral scroll viewport for declarative scroll compositions.
 
-use argui_ui::{Axes, Element, EventType, Overflow, ScrollAxes, ScrollConfig};
+use argui_animation::{Duration, Tween};
+use argui_paint::{CornerRadii, QuadStyle};
+use argui_ui::{
+    Axes, Color, Element, EventType, Overflow, ScrollAxes, ScrollConfig, ScrollbarPartStyle,
+    ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition,
+    Transition, VisualState, property,
+};
 
 use super::{
     CHILDREN, CONTENT_HEIGHT, CONTENT_WIDTH, CommonProperty, ENABLED, FLICK_VIEWPORT_HEIGHT,
-    FLICK_VIEWPORT_WIDTH, GROW, OFFSET_X, OFFSET_Y, SCROLL, SCROLL_X, SCROLL_Y, apply_common,
+    FLICK_VIEWPORT_WIDTH, GROW, OFFSET_X, OFFSET_Y, SCROLL, SCROLL_X, SCROLL_Y,
+    SCROLLBAR_HOVER_COLOR, SCROLLBAR_SIDE, SCROLLBAR_THUMB_COLOR, SCROLLBAR_WIDTH, apply_common,
     common_property, optional_bool,
 };
 use crate::{
@@ -21,18 +28,23 @@ use crate::{
 /// Returns a schema error if the type or its members conflict with another built-in.
 pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError> {
     let schema = NativeSchema::new(
-        super::FLICKABLE,
-        "Flickable",
+        super::SCROLL_VIEW,
+        "ScrollView",
         "Scroll viewport with input physics and independently authored visuals.",
     )
     .property(common_property(CommonProperty::Key))
     .property(common_property(CommonProperty::Tooltip))
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::MinWidth))
     .property(common_property(CommonProperty::MinHeight))
+    .property(common_property(CommonProperty::MaxWidth))
+    .property(common_property(CommonProperty::MaxHeight))
+    .property(common_property(CommonProperty::Shrink))
+    .property(common_property(CommonProperty::AlignSelf))
+    .property(common_property(CommonProperty::Margin))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
@@ -46,7 +58,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             SCROLL_X,
-            "scroll_x",
+            "scrollX",
             ValueType::Bool,
             "Allow horizontal scrolling.",
         )
@@ -55,12 +67,36 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             SCROLL_Y,
-            "scroll_y",
+            "scrollY",
             ValueType::Bool,
             "Allow vertical scrolling.",
         )
         .default_value(SchemaValue::Bool(true)),
     )
+    .property(PropertySchema::new(
+        SCROLLBAR_SIDE,
+        "scrollbarSide",
+        ValueType::String,
+        "Physical edge of the optional vertical scrollbar: left or right.",
+    ))
+    .property(PropertySchema::new(
+        SCROLLBAR_WIDTH,
+        "scrollbarWidth",
+        ValueType::Float,
+        "Width of the optional native scrollbar in logical pixels.",
+    ))
+    .property(PropertySchema::new(
+        SCROLLBAR_THUMB_COLOR,
+        "scrollbarThumbColor",
+        ValueType::Color,
+        "Native thumb color before hover.",
+    ))
+    .property(PropertySchema::new(
+        SCROLLBAR_HOVER_COLOR,
+        "scrollbarHoverColor",
+        ValueType::Color,
+        "Native thumb color while hovered.",
+    ))
     .property(PropertySchema::new(
         GROW,
         "grow",
@@ -70,7 +106,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             OFFSET_X,
-            "offset_x",
+            "offsetX",
             ValueType::Dimension,
             "Current horizontal scroll offset.",
         )
@@ -79,7 +115,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             OFFSET_Y,
-            "offset_y",
+            "offsetY",
             ValueType::Dimension,
             "Current vertical scroll offset.",
         )
@@ -88,7 +124,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             FLICK_VIEWPORT_WIDTH,
-            "viewport_width",
+            "viewportWidth",
             ValueType::Dimension,
             "Laid-out viewport width.",
         )
@@ -97,7 +133,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             FLICK_VIEWPORT_HEIGHT,
-            "viewport_height",
+            "viewportHeight",
             ValueType::Dimension,
             "Laid-out viewport height.",
         )
@@ -106,7 +142,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             CONTENT_WIDTH,
-            "content_width",
+            "contentWidth",
             ValueType::Dimension,
             "Scrollable content width.",
         )
@@ -115,7 +151,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             CONTENT_HEIGHT,
-            "content_height",
+            "contentHeight",
             ValueType::Dimension,
             "Scrollable content height.",
         )
@@ -144,9 +180,63 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             (true, false) => ScrollAxes::Horizontal,
             _ => ScrollAxes::Vertical,
         };
-        let config = ScrollConfig::default()
+        let mut config = ScrollConfig::default()
             .enabled(optional_bool(input, ENABLED).unwrap_or(true) && (x || y))
             .axes(axes);
+        if [
+            SCROLLBAR_SIDE,
+            SCROLLBAR_WIDTH,
+            SCROLLBAR_THUMB_COLOR,
+            SCROLLBAR_HOVER_COLOR,
+        ]
+        .iter()
+        .any(|id| input.get(*id).is_some())
+        {
+            let side = match input.get(SCROLLBAR_SIDE) {
+                Some(SchemaValue::String(value)) if value == "left" => ScrollbarSide::Left,
+                _ => ScrollbarSide::Right,
+            };
+            let width = match input.get(SCROLLBAR_WIDTH) {
+                Some(SchemaValue::Float(value)) if value.is_finite() && *value > 0.0 => *value,
+                Some(_) => {
+                    return Err(SchemaError::Adapter(
+                        "scrollbarWidth must be a positive finite number".into(),
+                    ));
+                }
+                None => 4.0,
+            };
+            let thumb = match input.get(SCROLLBAR_THUMB_COLOR) {
+                Some(SchemaValue::Color(color)) => *color,
+                _ => Color::srgba(0.5, 0.5, 0.5, 0.45),
+            };
+            let hover = match input.get(SCROLLBAR_HOVER_COLOR) {
+                Some(SchemaValue::Color(color)) => *color,
+                _ => Color::srgba(0.5, 0.5, 0.5, 0.9),
+            };
+            let scrollbar = ScrollbarStyle::new(
+                ScrollbarPartStyle::new(QuadStyle::default()),
+                ScrollbarPartStyle::new(
+                    QuadStyle::solid(thumb).radius(CornerRadii::all(width / 2.0)),
+                )
+                .when(
+                    VisualState::Hovered,
+                    StylePatch::new().set(property::BackgroundColor, hover),
+                )
+                .transition(StyleTransition::new(Transition::tween(Tween::new(
+                    Duration::from_millis(120),
+                )))),
+            )
+            .side(side)
+            .width(width)
+            .insets(Sides {
+                left: 0.0,
+                right: 0.0,
+                top: 4.0,
+                bottom: 4.0,
+            })
+            .visibility(ScrollbarVisibility::Always);
+            config = config.scrollbar(scrollbar);
+        }
         let overflow = Axes {
             x: if x { Overflow::Auto } else { Overflow::Hidden },
             y: if y { Overflow::Auto } else { Overflow::Hidden },
@@ -154,9 +244,6 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         let mut element = apply_common(Element::column(input.children(CHILDREN).to_vec()), input)?
             .overflow(overflow)
             .scroll_config(config);
-        if let Some(SchemaValue::Float(grow)) = input.get(GROW) {
-            element = element.grow(*grow);
-        }
         for event in &input.events {
             if event.id == SCROLL {
                 element = element.on(event.handler.direct_listener(EventType::Scroll));

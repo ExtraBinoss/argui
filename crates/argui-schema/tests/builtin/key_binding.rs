@@ -88,7 +88,7 @@ fn shortcut_spellings_cover_navigation_function_keys_and_modifier_aliases() {
         "Home",
         "End",
         "PageUp",
-        "page_down",
+        "pageDown",
         "Left",
         "ArrowLeft",
         "Right",

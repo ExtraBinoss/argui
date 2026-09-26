@@ -2,7 +2,7 @@ use argui_automation::{Action, Driver, Viewport};
 use argui_host::{CallbackId, HostId, Operation};
 use argui_render::{AdapterProfile, GpuFrameProfile, GpuPassProfile, RenderProfile};
 use argui_schema::{SchemaValue, builtin};
-use argui_ui::length;
+use argui_ui::{LengthPercentageAuto, length};
 use std::time::Duration;
 
 /// Returns a first-generation native node ID for a test slot.
@@ -102,7 +102,7 @@ fn host_commit_inspection_and_pointer_delivery_share_the_real_tree() {
             },
             Operation::SetProperty {
                 id: id(3),
-                property: builtin::KEY,
+                property: builtin::ID,
                 value: Some(SchemaValue::String("increment".into())),
             },
             Operation::SetProperty {
@@ -329,7 +329,7 @@ fn fill_uses_the_native_editor_edit_path() {
             },
             Operation::SetProperty {
                 id: id(1),
-                property: builtin::KEY,
+                property: builtin::ID,
                 value: Some(SchemaValue::String("search".into())),
             },
             Operation::SetProperty {
@@ -368,17 +368,18 @@ fn fill_uses_the_native_editor_edit_path() {
 }
 
 #[test]
-fn scrolling_a_native_flickable_updates_its_position() {
+/// Native scroll input changes the retained scroll view's position.
+fn scrolling_a_native_scroll_view_updates_its_position() {
     let mut driver = Driver::new(Viewport::default()).unwrap();
     driver
         .commit(&[
             Operation::Create {
                 id: id(1),
-                native_type: builtin::FLICKABLE,
+                native_type: builtin::SCROLL_VIEW,
             },
             Operation::SetProperty {
                 id: id(1),
-                property: builtin::KEY,
+                property: builtin::ID,
                 value: Some(SchemaValue::String("list".into())),
             },
             Operation::SetProperty {
@@ -408,7 +409,7 @@ fn scrolling_a_native_flickable_updates_its_position() {
             Operation::SetProperty {
                 id: id(2),
                 property: builtin::MIN_HEIGHT,
-                value: Some(SchemaValue::Float(400.0)),
+                value: Some(SchemaValue::Constraint(LengthPercentageAuto::length(400.0))),
             },
             Operation::Insert {
                 parent: id(1),

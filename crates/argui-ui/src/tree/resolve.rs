@@ -89,6 +89,33 @@ impl UiTree {
         if let Some(direction) = self.index.direction(node) {
             style.writing_direction = direction;
         }
+        if let Some(insets) = style.logical_padding {
+            let (left, right) = insets.horizontal(style.writing_direction);
+            if let Some(left) = left {
+                style.padding.left = crate::LengthPercentage::length(left);
+            }
+            if let Some(right) = right {
+                style.padding.right = crate::LengthPercentage::length(right);
+            }
+        }
+        if let Some(insets) = style.logical_margin {
+            let (left, right) = insets.horizontal(style.writing_direction);
+            if let Some(left) = left {
+                style.margin.left = crate::LengthPercentageAuto::length(left);
+            }
+            if let Some(right) = right {
+                style.margin.right = crate::LengthPercentageAuto::length(right);
+            }
+        }
+        if let Some(insets) = style.logical_inset {
+            let (left, right) = insets.horizontal(style.writing_direction);
+            if let Some(left) = left {
+                style.inset.left = crate::LengthPercentageAuto::length(left);
+            }
+            if let Some(right) = right {
+                style.inset.right = crate::LengthPercentageAuto::length(right);
+            }
+        }
         if let Some(border) = self.resolved_quad(node, element).border {
             style.border = crate::Sides {
                 left: crate::LengthPercentage::length(border.widths.left),

@@ -58,6 +58,7 @@ fn drive(root: &Path, args: &[&str], keys: &[&[u8]]) -> Output {
             &encoded,
         ])
         .args(args)
+        .arg("--no-install")
         .output()
         .unwrap()
 }

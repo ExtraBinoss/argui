@@ -39,7 +39,7 @@ fn text_input_can_expose_search_semantics() {
         .construct(
             builtin::TEXT_INPUT,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("search".into()))
+                .property(builtin::ID, SchemaValue::String("search".into()))
                 .property(builtin::SEARCH_INPUT, SchemaValue::Bool(true)),
         )
         .unwrap();
@@ -66,7 +66,7 @@ fn text_input_clip_property_controls_its_own_paint_boundary() {
         .construct(
             builtin::TEXT_INPUT,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("search".into()))
+                .property(builtin::ID, SchemaValue::String("search".into()))
                 .property(builtin::CLIP, SchemaValue::Bool(false)),
         )
         .unwrap();
@@ -80,13 +80,13 @@ fn text_input_privacy_masks_passwords_and_protects_revealed_text() {
     let registry = builtin::registry().unwrap();
     for (name, expected, privacy) in [
         ("password", "••••••", TextPrivacy::Password),
-        ("revealed_password", "secret", TextPrivacy::RevealedPassword),
+        ("revealedPassword", "secret", TextPrivacy::RevealedPassword),
     ] {
         let editor = registry
             .construct(
                 builtin::TEXT_INPUT,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("login".into()))
+                    .property(builtin::ID, SchemaValue::String("login".into()))
                     .property(builtin::VALUE, SchemaValue::String("secret".into()))
                     .property(builtin::TEXT_PRIVACY, SchemaValue::String(name.into())),
             )
@@ -105,11 +105,11 @@ fn text_input_privacy_masks_passwords_and_protects_revealed_text() {
         .construct(
             builtin::TEXT_INPUT,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("login".into()))
+                .property(builtin::ID, SchemaValue::String("login".into()))
                 .property(builtin::TEXT_PRIVACY, SchemaValue::String("unknown".into())),
         )
         .unwrap_err();
-    assert!(error.to_string().contains("privacy `unknown`"));
+    assert!(matches!(error, SchemaError::InvalidPropertyValue { .. }));
 }
 
 /// TextInput exposes multiline editing without supplying a surrounding frame.
@@ -120,7 +120,7 @@ fn text_input_multiline_uses_the_shared_editing_engine() {
         .construct(
             builtin::TEXT_INPUT,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("notes".into()))
+                .property(builtin::ID, SchemaValue::String("notes".into()))
                 .property(builtin::VALUE, SchemaValue::String("first\nsecond".into()))
                 .property(builtin::MULTILINE, SchemaValue::Bool(true))
                 .property(builtin::LABEL, SchemaValue::String("Notes".into())),
@@ -164,7 +164,7 @@ fn ordinary_text_and_container_accept_selection_styles() {
         .construct(
             builtin::TEXT,
             &NativeElementInput::new()
-                .property(builtin::CONTENT, SchemaValue::String("select me".into()))
+                .property(builtin::TEXT_VALUE, SchemaValue::String("select me".into()))
                 .property(builtin::SELECTION_COLOR, SchemaValue::Color(color)),
         )
         .unwrap();
@@ -204,7 +204,7 @@ fn text_input_composes_rounded_selection_and_repeated_caret_primitives() {
         .construct(
             builtin::TEXT_INPUT,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("caret".into()))
+                .property(builtin::ID, SchemaValue::String("caret".into()))
                 .property(builtin::SELECTION_FILL, SchemaValue::Brush(fill.clone()))
                 .property(builtin::SELECTION_RADIUS, SchemaValue::Float(7.0))
                 .property(builtin::CARET_FILL, SchemaValue::Brush(fill.clone()))
@@ -246,7 +246,7 @@ fn text_input_applies_themeable_selection_and_caret_colors() {
         .construct(
             builtin::TEXT_INPUT,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("query".into()))
+                .property(builtin::ID, SchemaValue::String("query".into()))
                 .property(builtin::VALUE, SchemaValue::String("hello".into()))
                 .property(
                     builtin::SELECTION_COLOR,
@@ -275,8 +275,8 @@ fn text_input_color_schema_rejects_wrong_value_type() {
     let registry = builtin::registry().unwrap();
     let schema = registry.schema(builtin::TEXT_INPUT).unwrap();
     for (id, name) in [
-        (builtin::SELECTION_COLOR, "selection_color"),
-        (builtin::CARET_COLOR, "caret_color"),
+        (builtin::SELECTION_COLOR, "selectionColor"),
+        (builtin::CARET_COLOR, "caretColor"),
     ] {
         assert!(schema.properties.iter().any(|property| {
             property.id == id
@@ -287,7 +287,7 @@ fn text_input_color_schema_rejects_wrong_value_type() {
             .construct(
                 builtin::TEXT_INPUT,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("query".into()))
+                    .property(builtin::ID, SchemaValue::String("query".into()))
                     .property(id, SchemaValue::String("wrong".into())),
             )
             .unwrap_err();

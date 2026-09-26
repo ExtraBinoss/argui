@@ -1,3 +1,5 @@
+mod wire;
+
 use std::{cell::Cell, rc::Rc};
 
 use argui_core::{KeyInput, Point, PointerEvent, PointerId, PointerPhase, Rect, ScrollDelta};

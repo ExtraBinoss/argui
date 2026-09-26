@@ -1,7 +1,17 @@
 import { expect, test } from 'bun:test'
-import { createThemeRuntime, type NativeBridge, type ThemeDefinition, type ThemeWireSnapshot } from '../src'
+import { createThemeRuntime, mergeThemeOverrides, type NativeBridge, type ThemeDefinition, type ThemeWireSnapshot } from '../src'
 
 interface Colors { foreground: string; spacing: number }
+
+test('local theme overrides inherit untouched tokens and validate token names and types', () => {
+  const base: Colors = { foreground: '#ffffff', spacing: 8 }
+  const local = mergeThemeOverrides<Colors>(base, { foreground: '#000000' })
+  expect(local).toEqual({ foreground: '#000000', spacing: 8 })
+  expect(base.foreground).toBe('#ffffff')
+  expect(mergeThemeOverrides<Colors>({ ...base, spacing: 10 }, { foreground: '#000000' }).spacing).toBe(10)
+  expect(() => mergeThemeOverrides(base, { unknown: 'x' } as Partial<Colors>)).toThrow('Unknown theme token')
+  expect(() => mergeThemeOverrides(base, { spacing: 'large' } as unknown as Partial<Colors>)).toThrow('Invalid theme token type')
+})
 
 const definition: ThemeDefinition<Colors> = {
   tokens: {

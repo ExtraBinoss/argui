@@ -95,8 +95,8 @@ executable, set `with_linux_application_id` to that filename.
 ## Tray
 
 ```toml
-argui-platform = { version = "0.3.2", features = ["tray"] }
-argui-runtime = { version = "0.3.2", features = ["tray"] }
+argui-platform = { version = "0.4.0", features = ["tray"] }
+argui-runtime = { version = "0.4.0", features = ["tray"] }
 ```
 
 Windows and macOS use their notification area; Linux uses the
@@ -115,8 +115,8 @@ application-defined ID and a portable accelerator. Modifiers must precede one
 physical key:
 
 ```toml
-argui-platform = { version = "0.3.2", features = ["global-shortcuts"] }
-argui-runtime = { version = "0.3.2", features = ["global-shortcuts"] }
+argui-platform = { version = "0.4.0", features = ["global-shortcuts"] }
+argui-runtime = { version = "0.4.0", features = ["global-shortcuts"] }
 ```
 
 ```rust,ignore

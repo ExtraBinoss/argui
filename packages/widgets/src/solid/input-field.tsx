@@ -1,52 +1,78 @@
-import { createSignal } from '@argui/solid'
+import { createSignal, createUniqueId } from 'solid-js'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { InputEditController } from '../shared/input-edit'
-import { inputText } from '../shared/input-text'
-import { selectionTint } from '../shared/theme'
-import type { InputFieldProps } from '../shared/types'
-import { useWidgetIcons } from './assets'
+import { useTheme } from '@argui/solid'
 import { Button } from './button'
-import { useButtonGroupJoined } from './button-group'
+import { InputEditController, submittedText } from '../shared/input-edit'
+import type { WidgetTheme } from '../shared/theme'
+import type { InputFieldOptions } from '../shared/types'
+import { useButtonGroup } from './button-group'
 
-export { inputText } from '../shared/input-text'
+/** Props for the native Solid InputField. */
+export type InputFieldProps = InputFieldOptions & { leading?: JSX.Element; trailing?: JSX.Element }
 
-/** Renders a themed native text input with an optional embedded search icon. */
+/** Renders a controlled or autonomous native text editor with a visible label. */
 export function InputField(props: InputFieldProps): JSX.Element {
-  const joined = useButtonGroupJoined()
+  const generatedId = `argui-input-${createUniqueId()}`
+  const id = () => props.id ?? generatedId
+  const theme = useTheme<WidgetTheme>()
   const [uncontrolled, setUncontrolled] = createSignal(props.defaultValue ?? '')
   const value = () => props.value ?? uncontrolled()
-  const edits = new InputEditController(value())
-  const [focused, setFocused] = createSignal(false)
   const [revealed, setRevealed] = createSignal(false)
-  const icons = useWidgetIcons()
-  return <column width="fill" gap={6}>
-    {props.showLabel ? <text text={props.label} color={props.theme.muted} font_size={12} /> : null}
-    <rectangle width="fill" height={joined ? 36 : props.theme.inputHeight} clip={true} background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
-      border_color={props.invalid ? props.theme.destructive : focused() ? props.theme.accent : props.theme.border}
-      border_width={joined && !focused() && !props.invalid ? 0 : 1} radius={joined ? 0 : props.theme.controlRadius}>
-      <row width="fill" height="fill" min_width={0} padding_left={props.theme.controlPadding} padding_right={props.theme.controlPadding} gap={8} align_items="center">
-        {props.search && icons.search ? <svg source={icons.search} color={props.theme.muted}
-          width={17} height={17} /> : null}
-        <container grow={1} min_width={0}>
-          <textInput key={props.id} width="fill" height={22} clip={true} value={value()}
-            placeholder={props.placeholder ?? ''} label={props.label} search={!!props.search}
-            privacy={props.password ? revealed() ? 'revealed_password' : 'password' : 'public'}
-            enabled={!props.disabled} read_only={!!props.readOnly} invalid={!!props.invalid} background="#00000000"
-            text_color={props.disabled ? props.theme.muted : props.theme.foreground}
-            placeholder_color={props.theme.muted} caret_color={props.theme.accent}
-            selection_color={props.selectionColor ?? selectionTint(props.theme.accent)}
-            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-            onEdit={(payload) => { edits.apply(payload, value(), (next) => {
-              if (props.value === undefined) setUncontrolled(next)
-              props.onChange?.(next)
-            }) }} onSubmit={(payload) => {
-              const value = inputText(payload)
-              props.onSubmit?.(value ?? (props.value ?? uncontrolled()))
-            }} />
+  const edits = new InputEditController(value())
+  const readOnly = () => !!props.readOnly || (props.value !== undefined && !props.onValueChange)
+  const inputType = () => props.type ?? 'text'
+  const grouped = useButtonGroup() !== null
+
+  return <column width={props.width ?? (grouped ? undefined : '100%')} height={props.height}
+    minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
+    grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf} margin={props.margin} gap={theme().spacing}>
+    {props.label ? <text color={theme().textMuted} fontSize={12}>{props.label}</text> : null}
+    <rectangle
+      width="100%"
+      height={grouped ? 38 : 40}
+      padding={theme().spacing}
+      background={grouped ? '#00000000' : theme().surface}
+      border={{ width: 1, color: props.invalid ? theme().danger : grouped ? '#00000000' : theme().border }}
+      radii={grouped ? 0 : theme().radius}
+      focusBorderColor={grouped ? undefined : props.invalid ? theme().danger : theme().focusRing}
+      opacity={props.disabled ? 0.55 : 1}
+    >
+      <row width="100%" height="100%" gap={theme().spacing} alignItems="center">
+        {props.leading}
+        <container grow={1} minWidth={0}>
+          <textInput
+            id={id()}
+            width="100%"
+            height={20}
+            value={value()}
+            placeholder={props.placeholder ?? ''}
+            label={props.accessibleName ?? props.label}
+            search={inputType() === 'search'}
+            privacy={inputType() === 'password' ? revealed() ? 'revealedPassword' : 'password' : 'public'}
+            enabled={!props.disabled}
+            readOnly={readOnly()}
+            invalid={!!props.invalid}
+            background="#00000000"
+            textColor={props.disabled ? theme().textMuted : theme().text}
+            placeholderColor={theme().textMuted}
+            caretColor={theme().primary}
+            onEdit={(payload) => {
+              edits.apply(payload, value(), (next) => {
+                if (props.value === undefined) setUncontrolled(next)
+                props.onValueChange?.(next)
+              })
+            }}
+            onSubmit={(payload) => props.onSubmit?.(submittedText(payload) ?? value())}
+          />
         </container>
-        {props.password ? <Button id={`${props.id}-visibility`} label={revealed() ? 'Hide' : 'Show'}
-          theme={props.theme} kind="ghost" disabled={props.disabled}
-          onClick={() => setRevealed(!revealed())} /> : null}
+        {props.trailing}
+        {inputType() === 'password' ? <Button
+          id={`${id()}-visibility`}
+          variant="ghost"
+          disabled={props.disabled}
+          accessibleName={revealed() ? 'Hide password' : 'Show password'}
+          onClick={() => setRevealed((current) => !current)}
+        >{revealed() ? 'Hide' : 'Show'}</Button> : null}
       </row>
     </rectangle>
   </column>

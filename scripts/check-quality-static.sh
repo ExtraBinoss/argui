@@ -12,6 +12,11 @@ echo "quality: source structure"
 ./scripts/check-rust-size.sh
 ./scripts/check-test-layout.sh
 ./scripts/check-source-hygiene.sh
+bun packages/solid/scripts/generate-jsx.mjs --check
+bun packages/react/scripts/generate-jsx.mjs --check
+node ./scripts/sync-cli-sdk.mjs --check
+node ./scripts/generate-component-registry.mjs --check
+cmp crates/argui-cli/assets/hosts/native/src/delivery.rs crates/argui-cli/assets/hosts/web/src/delivery.rs
 echo "quality: formatting"
 cargo fmt --all -- --check
 echo "quality: native clippy"

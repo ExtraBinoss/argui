@@ -11,10 +11,7 @@ use std::{
 use argui_automation::{ProcessSample, ProcessSampler};
 use serde_json::{Value, json};
 
-use crate::{
-    project::{self, Target},
-    standalone,
-};
+use crate::standalone;
 
 /// Builds and runs one real TypeScript test against its native TSX app.
 /// `cwd` anchors paths and `args` contains optional app, test file, and output.
@@ -132,41 +129,21 @@ fn resolve_test(cwd: &Path, app: &Path, test: &str) -> PathBuf {
 /// Returns a build, spawn, failed-test, or report error.
 fn run(app: &Path, test: &Path, out: &Path) -> Result<(), String> {
     fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
-    let standalone = standalone::is_project(app);
-    let (root, binary) = if standalone {
-        (app.to_path_buf(), standalone::automation_binary(app)?)
-    } else {
-        if project::load(app)?.target != Target::Native {
-            return Err("argui test currently supports native TSX apps".into());
-        }
-        let root = project::find_root(app)?;
-        project::build_for_automation(app)?;
-        let binary = project::native_target(&root)
-            .join("debug")
-            .join(project::binary_name());
-        (root, binary)
-    };
+    let binary = standalone::automation_binary(app)?;
     let bundle_dir = out.join(".argui-bundle");
     fs::create_dir_all(&bundle_dir).map_err(|error| error.to_string())?;
-    let script = if standalone {
-        let path = app.join("node_modules/.argui-build-test.mjs");
-        fs::write(&path, include_str!("../assets/templates/build-test.mjs"))
-            .map_err(|error| format!("{}: {error}", path.display()))?;
-        path
-    } else {
-        root.join("scripts/build-automation-test.mjs")
-    };
+    let script = app.join("node_modules/.argui-build-test.mjs");
+    fs::write(&script, include_str!("../assets/templates/build-test.mjs"))
+        .map_err(|error| format!("{}: {error}", script.display()))?;
     let build = Command::new("bun")
         .arg(&script)
         .arg(app)
         .arg(test)
         .arg(&bundle_dir)
-        .current_dir(&root)
+        .current_dir(app)
         .status()
         .map_err(|error| format!("Bun could not build the test: {error}"))?;
-    if standalone {
-        let _ = fs::remove_file(&script);
-    }
+    let _ = fs::remove_file(&script);
     if !build.success() {
         return Err(format!("test bundle build failed with {build}"));
     }
@@ -177,9 +154,6 @@ fn run(app: &Path, test: &Path, out: &Path) -> Result<(), String> {
         .env("ARGUI_AUTOMATION_GATE", "1")
         .current_dir(app)
         .stdin(Stdio::piped());
-    if app.canonicalize().ok() == root.join("apps/gallery").canonicalize().ok() {
-        command.env("ARGUI_AUTOMATION_GALLERY_ASSETS", "1");
-    }
     let mut child = command
         .spawn()
         .map_err(|error| format!("{}: {error}", binary.display()))?;

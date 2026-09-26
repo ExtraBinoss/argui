@@ -40,7 +40,7 @@ esac
 /// Creates a version-pinned standalone manifest selected as a fixture release.
 fn app(root: &Path, name: &str) {
     let output = Command::new(env!("CARGO_BIN_EXE_argui"))
-        .args(["init", "solid", "--dir", name, "--yes"])
+        .args(["init", "solid", "--dir", name, "--yes", "--no-install"])
         .current_dir(root)
         .output()
         .unwrap();

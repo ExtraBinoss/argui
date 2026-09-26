@@ -1,11 +1,11 @@
 {
   "name": "@argui/react",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./jsx-runtime": "./src/jsx-runtime.ts",
-    "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts"
+    ".": "./index.ts",
+    "./jsx-runtime": "./jsx-runtime.ts",
+    "./jsx-dev-runtime": "./jsx-dev-runtime.ts"
   },
   "dependencies": {
     "@argui/host": "file:../host",

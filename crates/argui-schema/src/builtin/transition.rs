@@ -12,13 +12,13 @@ pub(super) fn properties() -> [PropertySchema; 2] {
     [
         PropertySchema::new(
             TRANSITION_MS,
-            "transition_ms",
+            "transitionMs",
             ValueType::Float,
             "Duration of native visual transitions when authored target values change.",
         ),
         PropertySchema::new(
             TRANSITION_SPRING,
-            "transition_spring",
+            "transitionSpring",
             ValueType::Bool,
             "Retarget authored visual values with the native damped spring driver.",
         ),

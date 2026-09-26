@@ -3,10 +3,7 @@ use argui_layout::LayoutEngine;
 use argui_paint::{ImageFit, ImageId, ImageSampling, VectorId};
 use argui_schema::{AssetHandle, NativeElementInput, SchemaError, SchemaValue, builtin};
 use argui_text::TextEngine;
-use argui_ui::{
-    CheckedState, Element, ElementKind, Overflow, Role, ScrollbarVisibility, UiTree, length,
-    percent,
-};
+use argui_ui::{CheckedState, Element, ElementKind, Overflow, Role, UiTree, length, percent};
 
 #[test]
 fn alternative_text_names_images_and_empty_alt_hides_decoration() {
@@ -105,34 +102,19 @@ fn image_and_svg_accept_typed_handles_and_reject_wrong_media_kinds() {
 }
 
 #[test]
-fn scrollable_container_and_focus_scope_expose_native_behavior() {
+fn scroll_view_and_focus_scope_expose_native_behavior() {
     let registry = builtin::registry().unwrap();
     let scroll = registry
-        .construct(
-            builtin::COLUMN,
-            &NativeElementInput::new()
-                .property(builtin::SCROLL_Y, SchemaValue::Bool(true))
-                .property(builtin::SCROLLBAR_THUMB, SchemaValue::Color(Color::BLACK)),
-        )
+        .construct(builtin::SCROLL_VIEW, &NativeElementInput::new())
         .unwrap();
-    assert_eq!(
-        scroll
-            .scroll
-            .as_ref()
-            .unwrap()
-            .scrollbar
-            .as_ref()
-            .unwrap()
-            .visibility,
-        ScrollbarVisibility::Always
-    );
+    assert!(scroll.scroll.as_ref().unwrap().scrollbar.is_none());
     assert_eq!(scroll.style.overflow.y, Overflow::Auto);
 
     let toggle_scope = registry
         .construct(
             builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("toggle".into()))
+                .property(builtin::ID, SchemaValue::String("toggle".into()))
                 .property(builtin::SEMANTIC_ROLE, SchemaValue::String("switch".into()))
                 .property(
                     builtin::SEMANTIC_LABEL,
@@ -148,16 +130,18 @@ fn scrollable_container_and_focus_scope_expose_native_behavior() {
 }
 
 #[test]
-fn native_scroll_y_creates_a_scroll_region_that_tracks_viewport_resize() {
+fn native_scroll_view_tracks_viewport_resize() {
     let registry = builtin::registry().unwrap();
     let scroll = registry
         .construct(
-            builtin::COLUMN,
+            builtin::SCROLL_VIEW,
             &NativeElementInput::new()
                 .property(builtin::HEIGHT, SchemaValue::Dimension(percent(1.0)))
                 .property(builtin::WIDTH, SchemaValue::Dimension(percent(1.0)))
-                .property(builtin::MIN_HEIGHT, SchemaValue::Float(0.0))
-                .property(builtin::SCROLL_Y, SchemaValue::Bool(true))
+                .property(
+                    builtin::MIN_HEIGHT,
+                    SchemaValue::Constraint(argui_ui::LengthPercentageAuto::length(0.0)),
+                )
                 .slot(argui_schema::NativeSlotValue::new(
                     builtin::CHILDREN,
                     [Element::container([]).height(length(240.0)).shrink(0.0)],
@@ -173,14 +157,7 @@ fn native_scroll_y_creates_a_scroll_region_that_tracks_viewport_resize() {
         .unwrap();
     assert_eq!(short.scroll_regions.len(), 1);
     assert!(short.scroll_regions[0].max_offset.y > 100.0);
-    assert!(
-        short.scroll_regions[0]
-            .scrollbar
-            .as_ref()
-            .unwrap()
-            .vertical
-            .is_some()
-    );
+    assert!(short.scroll_regions[0].scrollbar.is_none());
     tree.scroll(
         Point::new(10.0, 10.0),
         ScrollDelta::Pixels(Point::new(0.0, -50.0)),
@@ -194,14 +171,7 @@ fn native_scroll_y_creates_a_scroll_region_that_tracks_viewport_resize() {
         .unwrap();
     assert_eq!(tall.scroll_regions.len(), 1);
     assert!(tall.scroll_regions[0].max_offset.y < short.scroll_regions[0].max_offset.y);
-    assert!(
-        tall.scroll_regions[0]
-            .scrollbar
-            .as_ref()
-            .unwrap()
-            .vertical
-            .is_some()
-    );
+    assert!(tall.scroll_regions[0].scrollbar.is_none());
 }
 #[test]
 fn media_fit_modes_and_image_sampling_are_validated() {
@@ -259,7 +229,10 @@ fn media_fit_modes_and_image_sampling_are_validated() {
                 .property(builtin::SOURCE, SchemaValue::Asset(image))
                 .property(property.0, SchemaValue::String(property.1.into())),
         );
-        assert!(matches!(result, Err(SchemaError::Adapter(_))));
+        assert!(matches!(
+            result,
+            Err(SchemaError::InvalidPropertyValue { .. })
+        ));
     }
 }
 
@@ -301,5 +274,8 @@ fn svg_fit_modes_are_independent_of_image_defaults() {
             .property(builtin::SOURCE, SchemaValue::Asset(vector))
             .property(builtin::FIT, SchemaValue::String("stretch".into())),
     );
-    assert!(matches!(invalid, Err(SchemaError::Adapter(_))));
+    assert!(matches!(
+        invalid,
+        Err(SchemaError::InvalidPropertyValue { .. })
+    ));
 }

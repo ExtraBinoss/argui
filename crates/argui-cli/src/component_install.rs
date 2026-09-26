@@ -1,55 +1,37 @@
 //! Atomic installation of versioned Argui widget sources.
 
-use crate::components::{self, ComponentEntry, Registry};
+use crate::components::{self, Registry};
 use crate::project::{self, Framework};
 use sha2::{Digest, Sha256};
 use std::{fs, io::Read, path::Path};
 
 const MAX_FILE: u64 = 256 * 1024;
 
-/// Installs all requested framework/name pairs from one checked-out release.
+/// Installs all requested framework/name pairs into one standalone application.
 /// `requests` may mix adapters; sources and conflicts are validated as one batch.
 ///
 /// # Errors
 /// Returns an error for unknown names, unsafe sources, conflicts, or writes.
 pub fn add_batch(cwd: &Path, requests: &[(Framework, String)]) -> Result<(), String> {
-    if crate::standalone::is_project(cwd) {
-        let app = crate::standalone::load(cwd)?;
-        if app.distribution != "release" {
-            return Err(format!(
-                "Argui {} is an embedded development SDK; no matching published widget source is verified. `argui add` requires a release whose registry and sources exist at the exact tag.",
-                app.argui_version
-            ));
-        }
-        let registry_json = crate::source_cache::registry(&app.argui_version)?;
-        let registry: Registry =
-            serde_json::from_str(&registry_json).map_err(|error| error.to_string())?;
-        if registry.argui_version() != Some(app.argui_version.as_str()) {
-            return Err("release registry version does not match the application SDK".into());
-        }
-        let checksums = registry.files;
-        return install_requests(cwd, requests, &registry_json, |path| {
-            let expected = checksums
-                .get(path)
-                .ok_or_else(|| format!("missing release checksum for `{path}`"))?;
-            crate::source_cache::file(&app.argui_version, path, expected)
-        });
+    let app = crate::standalone::load(cwd)?;
+    if app.distribution != "release" {
+        return Err(format!(
+            "Argui {} is an embedded development SDK; no matching published widget source is verified. `argui add` requires a release whose registry and sources exist at the exact tag.",
+            app.argui_version
+        ));
     }
-    let root = project::find_root(cwd)?;
-    let registry_json = read_bounded(&root.join("components/registry.json"))?;
-    let source_root = root
-        .join("packages/widgets/src")
-        .canonicalize()
-        .map_err(|error| format!("widget source directory: {error}"))?;
+    let registry_json = crate::source_cache::registry(&app.argui_version)?;
+    let registry: Registry =
+        serde_json::from_str(&registry_json).map_err(|error| error.to_string())?;
+    if registry.argui_version() != Some(app.argui_version.as_str()) {
+        return Err("release registry version does not match the application SDK".into());
+    }
+    let checksums = registry.files;
     install_requests(cwd, requests, &registry_json, |path| {
-        let source = source_root.join(path);
-        let resolved = source
-            .canonicalize()
-            .map_err(|error| format!("{}: {error}", source.display()))?;
-        if !resolved.starts_with(&source_root) {
-            return Err(format!("component source escapes widget directory: {path}"));
-        }
-        read_bounded(&resolved)
+        let expected = checksums
+            .get(path)
+            .ok_or_else(|| format!("missing release checksum for `{path}`"))?;
+        crate::source_cache::file(&app.argui_version, path, expected)
     })
 }
 
@@ -68,11 +50,11 @@ pub fn install(
     registry_json: &str,
     source: impl FnMut(&str) -> Result<String, String>,
 ) -> Result<(), String> {
-    let project = project::load(cwd)?;
-    if project.framework != framework {
+    let project = crate::standalone::load(cwd)?;
+    if project.framework != framework.name() {
         return Err(format!(
             "project uses {}; requested {}",
-            project.framework.name(),
+            project.framework,
             framework.name()
         ));
     }
@@ -98,10 +80,14 @@ fn install_requests(
     registry_json: &str,
     mut source: impl FnMut(&str) -> Result<String, String>,
 ) -> Result<(), String> {
-    let mut project = project::load(cwd)?;
-    let package_update = package_dependencies(cwd, project.framework, requests)?;
+    let mut project = crate::standalone::load(cwd)?;
+    let package_update =
+        package_dependencies(cwd, Framework::parse(&project.framework)?, requests)?;
     let registry: Registry =
         serde_json::from_str(registry_json).map_err(|error| error.to_string())?;
+    if registry.argui_version() != Some(project.argui_version.as_str()) {
+        return Err("component registry version does not match the application SDK".into());
+    }
     let mut paths = std::collections::BTreeSet::new();
     for (framework, name) in requests {
         paths.extend(components::files(
@@ -111,9 +97,8 @@ fn install_requests(
         )?);
     }
     let paths: Vec<_> = paths.into_iter().collect();
-    let standalone = crate::standalone::is_project(cwd);
     for path in &paths {
-        let output = output_path(cwd, path, standalone)?;
+        let output = output_path(cwd, path)?;
         if output
             .ancestors()
             .take_while(|parent| *parent != cwd)
@@ -127,7 +112,7 @@ fn install_requests(
                 output.display()
             ));
         }
-        if output.exists() && registry.version == 2 {
+        if output.exists() {
             let body = read_bounded(&output)?;
             let expected = registry
                 .files
@@ -143,32 +128,30 @@ fn install_requests(
     }
     let missing: Vec<_> = paths
         .iter()
-        .filter(|path| output_path(cwd, path, standalone).is_ok_and(|output| !output.exists()))
+        .filter(|path| output_path(cwd, path).is_ok_and(|output| !output.exists()))
         .cloned()
         .collect();
     let mut staged = Vec::new();
     for path in &missing {
         let body = source(path)?;
-        if registry.version == 2
-            && registry
-                .files
-                .get(path)
-                .is_some_and(|expected| hash_body(&body) != *expected)
+        if registry
+            .files
+            .get(path)
+            .is_some_and(|expected| hash_body(&body) != *expected)
         {
             return Err(format!("source checksum mismatch for `{path}`"));
         }
         staged.push((path, body));
     }
     for (framework, name) in requests {
-        let canonical = if name == "input" { "input-field" } else { name };
-        let entry = format!("{}/{canonical}", framework.name());
+        let entry = format!("{}/{name}", framework.name());
         if !project.components.contains(&entry) {
             project.components.push(entry.clone());
         }
-        if let Some(ComponentEntry::Versioned { version, .. }) = registry.components.get(canonical)
-        {
-            project.component_versions.insert(entry, version.clone());
-        }
+        let component = registry.components.get(name).expect("validated component");
+        project
+            .component_versions
+            .insert(entry, component.version.clone());
     }
     for path in paths {
         if !project.component_files.contains(&path) {
@@ -181,17 +164,7 @@ fn install_requests(
     project.components.sort();
     project.component_files.sort();
     let original_manifest = fs::read(cwd.join("argui.json")).map_err(|error| error.to_string())?;
-    let manifest = if standalone {
-        let mut original: serde_json::Value =
-            serde_json::from_slice(&original_manifest).map_err(|error| error.to_string())?;
-        original["components"] = serde_json::json!(project.components);
-        original["componentFiles"] = serde_json::json!(project.component_files);
-        original["componentChecksums"] = serde_json::json!(project.component_checksums);
-        original["componentVersions"] = serde_json::json!(project.component_versions);
-        serde_json::to_string_pretty(&original).map_err(|error| error.to_string())?
-    } else {
-        serde_json::to_string_pretty(&project).map_err(|error| error.to_string())?
-    };
+    let manifest = serde_json::to_string_pretty(&project).map_err(|error| error.to_string())?;
     let stage = cwd.join(format!(".argui-component-stage-{}", std::process::id()));
     fs::create_dir(&stage).map_err(|error| format!("{}: {error}", stage.display()))?;
     let result = (|| {
@@ -203,7 +176,7 @@ fn install_requests(
             project::write(&stage.join("package.json"), package)?;
         }
         for (path, _) in &staged {
-            let output = output_path(cwd, path, standalone)?;
+            let output = output_path(cwd, path)?;
             if output.exists() {
                 return Err(format!(
                     "{} appeared while reading sources; no files overwritten",
@@ -213,7 +186,7 @@ fn install_requests(
         }
         let mut installed = Vec::new();
         for (path, _) in &staged {
-            let output = output_path(cwd, path, standalone)?;
+            let output = output_path(cwd, path)?;
             let write_result = output
                 .parent()
                 .map_or(Ok(()), fs::create_dir_all)
@@ -242,7 +215,7 @@ fn install_requests(
             return Err(format!("package.json: {error}"));
         }
         for (path, _) in &staged {
-            println!("Added {}", output_path(cwd, path, standalone)?.display());
+            println!("Added {}", output_path(cwd, path)?.display());
         }
         Ok(())
     })();
@@ -257,11 +230,8 @@ fn install_requests(
 /// Maps a versioned widget path into the app's editable component tree.
 ///
 /// # Errors
-/// Returns an error when a standalone registry uses an unknown source prefix.
-fn output_path(cwd: &Path, path: &str, standalone: bool) -> Result<std::path::PathBuf, String> {
-    if !standalone {
-        return Ok(cwd.join("src/argui-ui").join(path));
-    }
+/// Returns an error when the registry uses an unknown source prefix.
+fn output_path(cwd: &Path, path: &str) -> Result<std::path::PathBuf, String> {
     let (adapter, file) = path
         .split_once('/')
         .ok_or("widget source has no adapter directory")?;
@@ -291,12 +261,7 @@ fn package_dependencies(
         .map_err(|error| format!("{}: {error}", package_path.display()))?;
     let mut package: serde_json::Value = serde_json::from_str(&body)
         .map_err(|error| format!("{}: {error}", package_path.display()))?;
-    let standalone = crate::standalone::is_project(cwd);
-    let pinned = if standalone {
-        Some(crate::standalone::load(cwd)?.argui_version)
-    } else {
-        None
-    };
+    let pinned = crate::standalone::load(cwd)?.argui_version;
     let dependencies = package
         .get_mut("dependencies")
         .and_then(serde_json::Value::as_object_mut)
@@ -308,7 +273,7 @@ fn package_dependencies(
         };
         dependencies
             .entry(adapter)
-            .or_insert_with(|| pinned.as_deref().unwrap_or("workspace:*").into());
+            .or_insert_with(|| pinned.clone().into());
         dependencies
             .entry(runtime)
             .or_insert_with(|| version.into());
@@ -318,10 +283,9 @@ fn package_dependencies(
                 .or_insert_with(|| "0.33.0".into());
         }
     }
-    if standalone
-        && requests
-            .iter()
-            .any(|(framework, _)| *framework == Framework::React)
+    if requests
+        .iter()
+        .any(|(framework, _)| *framework == Framework::React)
     {
         let dev = package
             .get_mut("devDependencies")
@@ -342,7 +306,7 @@ fn hash_body(body: &str) -> String {
 }
 
 /// Reads a UTF-8 source file with a fixed byte limit.
-/// `path` is a registry or source file within the versioned checkout.
+/// `path` is a downloaded registry or widget source file.
 /// Returns its contents after checking its size and encoding.
 ///
 /// # Errors

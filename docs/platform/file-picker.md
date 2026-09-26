@@ -3,7 +3,7 @@
 The `file-picker` feature exposes system dialogs independently of widgets:
 
 ```toml
-argui-platform = { version = "0.3.2", features = ["file-picker"] }
+argui-platform = { version = "0.4.0", features = ["file-picker"] }
 ```
 
 ```rust

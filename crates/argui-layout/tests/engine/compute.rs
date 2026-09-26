@@ -426,3 +426,115 @@ mod input_latency {
         eprintln!("million-character middle edit input-to-prepared-text slowest {slowest:.2} ms");
     }
 }
+
+/// Computes one Rust scene at a requested logical viewport width.
+fn compute(root: Element, width: f32) -> argui_layout::LayoutOutput {
+    let mut tree = UiTree::new(root);
+    LayoutEngine::new()
+        .compute(
+            &mut tree,
+            &mut TextEngine::from_embedded_fonts([], "sans", "sans", "mono"),
+            Size::new(width, 200.0),
+        )
+        .unwrap()
+}
+
+#[test]
+/// A fixed child keeps its width while its flexible sibling receives the remainder.
+fn flex_growth_uses_remaining_space_and_respects_a_fixed_sidebar() {
+    for (viewport, content) in [(500.0, 248.0), (300.0, 48.0)] {
+        let output = compute(
+            Element::row([
+                Element::container([]).width(length(240.0)).shrink(0.0),
+                Element::container([]).grow(1.0).min_width(length(0.0)),
+            ])
+            .width(percent(1.0))
+            .height(length(80.0))
+            .gap(12.0),
+            viewport,
+        );
+        assert_eq!(output.nodes[1].bounds.size.width, 240.0);
+        assert_eq!(output.nodes[2].bounds.origin.x, 252.0);
+        assert_eq!(output.nodes[2].bounds.size.width, content);
+    }
+}
+
+#[test]
+/// Preferred widths can shrink when a flex parent has less room than requested.
+fn preferred_widths_shrink_in_a_constrained_flex_row() {
+    let output = compute(
+        Element::row([
+            Element::container([]).width(length(240.0)),
+            Element::container([]).width(length(240.0)),
+        ])
+        .width(percent(1.0))
+        .height(length(80.0))
+        .gap(12.0),
+        300.0,
+    );
+
+    assert_eq!(output.nodes[1].bounds.size.width, 144.0);
+    assert_eq!(output.nodes[2].bounds.size.width, 144.0);
+    assert_eq!(output.nodes[2].bounds.origin.x, 156.0);
+}
+
+#[test]
+fn logical_padding_and_positioned_insets_follow_inherited_direction() {
+    use argui_ui::{LayoutInsets, Position, PositionInsets, WritingDirection};
+
+    for (direction, content_x, overlay_x) in [
+        (WritingDirection::Ltr, 20.0, 30.0),
+        (WritingDirection::Rtl, 140.0, 150.0),
+    ] {
+        let output = compute(
+            Element::container([
+                Element::container([])
+                    .width(length(40.0))
+                    .height(length(20.0)),
+                Element::container([])
+                    .position(Position::Absolute)
+                    .layout_inset(PositionInsets {
+                        start: Some(30.0),
+                        top: Some(5.0),
+                        ..PositionInsets::default()
+                    })
+                    .width(length(20.0))
+                    .height(length(20.0)),
+            ])
+            .direction_scope(direction)
+            .layout_padding(LayoutInsets {
+                start: Some(20.0),
+                end: Some(10.0),
+                ..LayoutInsets::default()
+            })
+            .width(length(200.0))
+            .height(length(80.0)),
+            200.0,
+        );
+        assert_eq!(output.nodes[1].bounds.origin.x, content_x);
+        assert_eq!(output.nodes[2].bounds.origin.x, overlay_x);
+        assert_eq!(output.nodes[2].bounds.origin.y, 5.0);
+    }
+}
+
+#[test]
+fn percentage_width_and_flex_growth_remain_distinct_when_resized() {
+    for (viewport, expected_half, expected_remaining) in
+        [(400.0, 200.0, 88.0), (300.0, 150.0, 38.0)]
+    {
+        let output = compute(
+            Element::row([
+                Element::container([]).width(percent(0.5)).shrink(0.0),
+                Element::container([]).grow(1.0).min_width(length(0.0)),
+                Element::container([]).width(length(100.0)).shrink(0.0),
+            ])
+            .gap(6.0)
+            .width(percent(1.0))
+            .height(length(40.0)),
+            viewport,
+        );
+        assert_eq!(output.nodes[1].bounds.size.width, expected_half);
+        assert_eq!(output.nodes[2].bounds.size.width, expected_remaining);
+        assert_eq!(output.nodes[3].bounds.size.width, 100.0);
+    }
+}

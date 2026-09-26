@@ -364,6 +364,7 @@ impl Application {
     }
 
     /// Returns whether the compositor currently provides native backdrop blur.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn desktop_backdrop_available(&self) -> bool {
         self.environment.desktop_backdrop_available
     }

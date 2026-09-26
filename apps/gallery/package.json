@@ -1,11 +1,10 @@
 {
   "name": "@argui/gallery",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "dependencies": {
     "@argui/host": "workspace:*",
-    "@argui/i18n": "workspace:*",
     "@argui/react": "workspace:*",
     "@argui/solid": "workspace:*",
     "@argui/widgets": "workspace:*",

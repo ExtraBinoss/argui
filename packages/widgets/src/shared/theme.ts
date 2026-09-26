@@ -1,87 +1,159 @@
-import type { ThemeDefinition } from '@argui/host'
+import type { ThemeDefinition, ThemeValues } from '@argui/host'
 
-export type Accent = 'blue' | 'violet' | 'emerald'
-export type ThemeMode = 'light' | 'dark' | 'system'
-
-/** Resolved colors shared by Argui widgets and their host application. */
-export type Palette = {
+/** Official shadcn/ui Neutral semantic color names, written in camelCase for TSX. */
+export interface NeutralColors {
   background: string
-  surface: string
-  surfaceRaised: string
-  overlaySurface: string
-  overlayShadow: string
-  border: string
   foreground: string
+  card: string
+  cardForeground: string
+  popover: string
+  popoverForeground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
   muted: string
+  mutedForeground: string
   accent: string
-  accentHover: string
-  accentPressed: string
-  accentText: string
-  surfaceHover: string
-  surfacePressed: string
+  accentForeground: string
   destructive: string
+  border: string
+  input: string
+  ring: string
+  chart1: string
+  chart2: string
+  chart3: string
+  chart4: string
+  chart5: string
+  sidebar: string
+  sidebarForeground: string
+  sidebarPrimary: string
+  sidebarPrimaryForeground: string
+  sidebarAccent: string
+  sidebarAccentForeground: string
+  sidebarBorder: string
+  sidebarRing: string
+}
+
+/** Theme tokens shared by widgets in both framework adapters. */
+export interface WidgetTheme extends ThemeValues, NeutralColors {
+  surface: string
+  surfaceHover: string
+  controlHover: string
+  text: string
+  textMuted: string
+  focusRing: string
+  danger: string
+  primaryHover: string
+  secondaryHover: string
+  ghostHover: string
+  outlineSurface: string
+  outlineBorder: string
+  outlineHover: string
+  destructiveSurface: string
   destructiveHover: string
-  destructivePressed: string
-  controlRadius: number
-  controlPadding: number
-  controlFontSize: number
-  inputHeight: number
+  radius: number
+  spacing: number
+  overlaySurface: string
+  overlayBlur: number
   overlayRadius: number
   overlayPadding: number
+  overlayWidth: number
+  overlayBorderWidth: number
+  overlayShadowColor: string
   overlayShadowBlur: number
-  dialogRadius: number
-  dialogPadding: number
-  dialogShadowBlur: number
+  overlayShadowOffsetY: number
 }
 
-/** Accent overrides applied as one theme transaction when the user changes color. */
-export const accentOverrides: Record<Accent, Pick<Palette, 'accent' | 'accentHover' | 'accentPressed'>> = {
-  blue: { accent: '#2563eb', accentHover: '#1d4ed8', accentPressed: '#1e40af' },
-  violet: { accent: '#7c3aed', accentHover: '#6d28d9', accentPressed: '#5b21b6' },
-  emerald: { accent: '#059669', accentHover: '#047857', accentPressed: '#065f46' },
+/** Official shadcn/ui Neutral light semantic values. */
+export const neutralLight: NeutralColors = {
+  background: 'oklch(1 0 0)', foreground: 'oklch(0.145 0 0)',
+  card: 'oklch(1 0 0)', cardForeground: 'oklch(0.145 0 0)',
+  popover: 'oklch(1 0 0)', popoverForeground: 'oklch(0.145 0 0)',
+  primary: 'oklch(0.205 0 0)', primaryForeground: 'oklch(0.985 0 0)',
+  secondary: 'oklch(0.97 0 0)', secondaryForeground: 'oklch(0.205 0 0)',
+  muted: 'oklch(0.97 0 0)', mutedForeground: 'oklch(0.556 0 0)',
+  accent: 'oklch(0.97 0 0)', accentForeground: 'oklch(0.205 0 0)',
+  destructive: 'oklch(0.577 0.245 27.325)',
+  border: 'oklch(0.922 0 0)', input: 'oklch(0.922 0 0)', ring: 'oklch(0.708 0 0)',
+  chart1: 'oklch(0.87 0 0)', chart2: 'oklch(0.556 0 0)',
+  chart3: 'oklch(0.439 0 0)', chart4: 'oklch(0.371 0 0)',
+  chart5: 'oklch(0.269 0 0)',
+  sidebar: 'oklch(0.985 0 0)', sidebarForeground: 'oklch(0.145 0 0)',
+  sidebarPrimary: 'oklch(0.205 0 0)', sidebarPrimaryForeground: 'oklch(0.985 0 0)',
+  sidebarAccent: 'oklch(0.97 0 0)', sidebarAccentForeground: 'oklch(0.205 0 0)',
+  sidebarBorder: 'oklch(0.922 0 0)', sidebarRing: 'oklch(0.708 0 0)',
 }
 
-const metrics = {
-  controlRadius: 9, controlPadding: 10, controlFontSize: 14, inputHeight: 42,
-  overlayRadius: 10, overlayPadding: 16, overlayShadowBlur: 14,
-  dialogRadius: 16, dialogPadding: 24, dialogShadowBlur: 24,
+/** Official shadcn/ui Neutral dark semantic values. */
+export const neutralDark: NeutralColors = {
+  background: 'oklch(0.145 0 0)', foreground: 'oklch(0.985 0 0)',
+  card: 'oklch(0.205 0 0)', cardForeground: 'oklch(0.985 0 0)',
+  popover: 'oklch(0.205 0 0)', popoverForeground: 'oklch(0.985 0 0)',
+  primary: 'oklch(0.922 0 0)', primaryForeground: 'oklch(0.205 0 0)',
+  secondary: 'oklch(0.269 0 0)', secondaryForeground: 'oklch(0.985 0 0)',
+  muted: 'oklch(0.269 0 0)', mutedForeground: 'oklch(0.708 0 0)',
+  accent: 'oklch(0.269 0 0)', accentForeground: 'oklch(0.985 0 0)',
+  destructive: 'oklch(0.704 0.191 22.216)',
+  border: 'oklch(1 0 0 / 10%)', input: 'oklch(1 0 0 / 15%)', ring: 'oklch(0.556 0 0)',
+  chart1: 'oklch(0.87 0 0)', chart2: 'oklch(0.556 0 0)',
+  chart3: 'oklch(0.439 0 0)', chart4: 'oklch(0.371 0 0)',
+  chart5: 'oklch(0.269 0 0)',
+  sidebar: 'oklch(0.205 0 0)', sidebarForeground: 'oklch(0.985 0 0)',
+  sidebarPrimary: 'oklch(0.488 0.243 264.376)', sidebarPrimaryForeground: 'oklch(0.985 0 0)',
+  sidebarAccent: 'oklch(0.269 0 0)', sidebarAccentForeground: 'oklch(0.985 0 0)',
+  sidebarBorder: 'oklch(1 0 0 / 10%)', sidebarRing: 'oklch(0.556 0 0)',
 }
 
-const light: Palette = {
-  background: '#f5f7fb', surface: '#ffffff', surfaceRaised: '#edf0f7',
-  overlaySurface: '#ffffffc0', overlayShadow: '#17243b38',
-  border: '#d8deea', foreground: '#171a24', muted: '#596377',
-  ...accentOverrides.blue, accentText: '#ffffff',
-  surfaceHover: '#e7ebf4', surfacePressed: '#dce3f0',
-  destructive: '#dc2626', destructiveHover: '#b91c1c', destructivePressed: '#991b1b',
-  ...metrics,
+const light: WidgetTheme = {
+  ...neutralLight,
+  surface: neutralLight.background, surfaceHover: neutralLight.muted,
+  controlHover: neutralLight.muted, text: neutralLight.foreground,
+  textMuted: neutralLight.mutedForeground, focusRing: neutralLight.ring,
+  danger: neutralLight.destructive,
+  primaryHover: 'oklch(0.205 0 0 / 80%)',
+  secondaryHover: 'oklch(0.92875 0 0)',
+  ghostHover: neutralLight.muted,
+  outlineSurface: neutralLight.background, outlineBorder: neutralLight.border,
+  outlineHover: neutralLight.muted,
+  destructiveSurface: 'oklch(0.577 0.245 27.325 / 10%)',
+  destructiveHover: 'oklch(0.577 0.245 27.325 / 20%)',
+  radius: 10, spacing: 8,
+  overlaySurface: 'oklch(1 0 0 / 92%)', overlayBlur: 10,
+  overlayRadius: 10, overlayPadding: 16, overlayWidth: 280,
+  overlayBorderWidth: 1, overlayShadowColor: 'oklch(0 0 0 / 12%)',
+  overlayShadowBlur: 14, overlayShadowOffsetY: 4,
 }
 
-const dark: Palette = {
-  background: '#101116', surface: '#1a1b23', surfaceRaised: '#252735',
-  overlaySurface: '#1a1b23d0', overlayShadow: '#00000066',
-  border: '#383b4b', foreground: '#f5f6fa', muted: '#a3a8b9',
-  ...accentOverrides.blue, accentText: '#ffffff',
-  surfaceHover: '#303345', surfacePressed: '#3a3e52',
-  destructive: '#dc2626', destructiveHover: '#b91c1c', destructivePressed: '#991b1b',
-  ...metrics,
+const dark: WidgetTheme = {
+  ...neutralDark,
+  surface: neutralDark.background, surfaceHover: neutralDark.muted,
+  controlHover: neutralDark.muted, text: neutralDark.foreground,
+  textMuted: neutralDark.mutedForeground, focusRing: neutralDark.ring,
+  danger: neutralDark.destructive,
+  primaryHover: 'oklch(0.922 0 0 / 80%)',
+  secondaryHover: 'oklch(0.3048 0 0)',
+  ghostHover: 'oklch(0.269 0 0 / 50%)',
+  outlineSurface: 'oklch(1 0 0 / 30%)', outlineBorder: neutralDark.input,
+  outlineHover: 'oklch(1 0 0 / 50%)',
+  destructiveSurface: 'oklch(0.704 0.191 22.216 / 20%)',
+  destructiveHover: 'oklch(0.704 0.191 22.216 / 30%)',
+  radius: 10, spacing: 8,
+  overlaySurface: 'oklch(0.205 0 0 / 92%)', overlayBlur: 10,
+  overlayRadius: 10, overlayPadding: 16, overlayWidth: 280,
+  overlayBorderWidth: 1, overlayShadowColor: 'oklch(0 0 0 / 50%)',
+  overlayShadowBlur: 14, overlayShadowOffsetY: 4,
 }
 
-/** Typed token definitions for the built-in widget colors. */
-export const widgetThemeDefinition: ThemeDefinition<Palette> = {
-  tokens: Object.fromEntries(Object.entries(light).map(([key, value]) =>
-    [key, { type: typeof value === 'number' ? key === 'controlFontSize' ? 'FontSize' : 'Length' : 'Color',
-      default: value,
-      impact: ['controlPadding', 'controlFontSize', 'inputHeight', 'overlayPadding', 'dialogPadding'].includes(key)
-        ? 'Layout' : 'Paint' }])) as ThemeDefinition<Palette>['tokens'],
+const layoutTokens = new Set(['spacing', 'overlayPadding', 'overlayWidth'])
+
+/** Default system-aware Neutral theme, with reusable Argui overlay tokens. */
+export const widgetThemeDefinition: ThemeDefinition<WidgetTheme> = {
+  tokens: Object.fromEntries(Object.entries(light).map(([name, value]) => [name, {
+    type: typeof value === 'number' ? 'Length' : 'Color',
+    default: value,
+    impact: layoutTokens.has(name) ? 'Layout' : 'Paint',
+  }])) as ThemeDefinition<WidgetTheme>['tokens'],
   variants: { light, dark },
-  initialVariant: 'system',
   systemVariants: { light: 'light', dark: 'dark' },
-}
-
-/** Gives a hex accent the same 38% alpha as native text selection. */
-export function selectionTint(accent: string): string {
-  if (/^#[0-9a-fA-F]{6}$/.test(accent)) return `${accent}61`
-  if (/^#[0-9a-fA-F]{8}$/.test(accent)) return `${accent.slice(0, 7)}61`
-  return '#337af561'
 }

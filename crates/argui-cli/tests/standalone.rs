@@ -6,18 +6,21 @@ use std::{fs, path::Path, process::Command};
 
 #[path = "standalone/build.rs"]
 mod build;
+#[path = "standalone/init.rs"]
+mod init;
 #[path = "standalone/menu.rs"]
 mod menu;
 
 /// Runs a CLI command against one isolated directory.
 fn run(path: &Path, args: &[&str]) -> Result<(), String> {
-    run_in(
-        path,
-        &args
-            .iter()
-            .map(|argument| (*argument).to_owned())
-            .collect::<Vec<_>>(),
-    )
+    let mut arguments = args
+        .iter()
+        .map(|argument| (*argument).to_owned())
+        .collect::<Vec<_>>();
+    if args.first() == Some(&"init") && args.contains(&"--yes") {
+        arguments.push("--no-install".into());
+    }
+    run_in(path, &arguments)
 }
 
 /// Parses the generated app manifest after a successful init.
@@ -58,6 +61,12 @@ fn init_generates_three_standalone_frameworks() {
             let package = fs::read_to_string(app.join("package.json")).unwrap();
             assert!(!package.contains("workspace:"));
             assert!(!package.contains("/home/"));
+            let package: Value = serde_json::from_str(&package).unwrap();
+            assert_eq!(package["devDependencies"]["oxfmt"], "0.70.0");
+            let formatting = fs::read_to_string(app.join(".oxfmtrc.json")).unwrap();
+            let formatting: Value = serde_json::from_str(&formatting).unwrap();
+            assert_eq!(formatting["singleQuote"], true);
+            assert_eq!(formatting["ignorePatterns"][0], "**/*.generated.ts");
         }
     }
 }
@@ -149,7 +158,7 @@ fn add_is_atomic_while_sources_are_unpublished() {
 }
 
 #[test]
-/// The production catalog exposes all 63 component pairs without a checkout.
+/// The production catalog exposes every v2 widget for each adapter.
 fn list_finds_every_component_pair_outside_checkout() {
     let root = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_argui"))
@@ -164,18 +173,18 @@ fn list_finds_every_component_pair_outside_checkout() {
     );
     let catalog: Value = serde_json::from_slice(&output.stdout).unwrap();
     let rows = catalog.as_array().unwrap();
-    assert_eq!(rows.len(), 126);
+    assert_eq!(rows.len(), 12);
     assert_eq!(
         rows.iter()
             .filter(|row| row["framework"] == "solid")
             .count(),
-        63
+        6
     );
     assert_eq!(
         rows.iter()
             .filter(|row| row["framework"] == "react")
             .count(),
-        63
+        6
     );
     assert!(
         rows.iter()
@@ -267,6 +276,16 @@ fn init_validates_unattended_arguments() {
             .unwrap_err()
             .contains("needs a value")
     );
+}
+
+#[test]
+/// Unattended defaults select Solid and both supported targets.
+fn init_yes_without_framework_uses_solid_defaults() {
+    let root = tempfile::tempdir().unwrap();
+    run(root.path(), &["init", "--dir", "demo", "--yes"]).unwrap();
+    let state = manifest(&root.path().join("demo"));
+    assert_eq!(state["framework"], "solid");
+    assert_eq!(state["targets"], serde_json::json!(["native", "web"]));
 }
 
 #[test]

@@ -1,12 +1,13 @@
 //! Declarative painted rectangle with no control-specific interaction or styling.
 
-use argui_core::Color;
-use argui_paint::{Border, CornerRadii, Shadow};
-use argui_ui::{Element, StateScopeId, StateSelector, StylePatch, VisualState, property};
+use argui_ui::{
+    Element, StateScopeId, StateSelector, StyleCondition, StylePatch, Transform2D, VisualState,
+    property,
+};
 
 use super::{
-    BACKGROUND, BORDER_COLOR, BORDER_WIDTH, CHILDREN, CLIP, CommonProperty, HOVER_BACKGROUND,
-    PRESSED_BACKGROUND, RADIUS, SHADOW_BLUR, SHADOW_COLOR, SHADOW_OFFSET_Y, apply_common,
+    BACKGROUND, BORDER, CHILDREN, CLIP, CommonProperty, FOCUS_BORDER_COLOR, HOVER_BACKGROUND,
+    PRESSED_BACKGROUND, PRESSED_SCALE, RADII, SHADOW, apply_common, apply_container,
     common_property, loop_motion, touch_area::TOUCH_AREA_SCOPE, transition,
 };
 use crate::{
@@ -31,8 +32,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Tooltip))
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::MinWidth))
     .property(common_property(CommonProperty::MinHeight))
     .property(common_property(CommonProperty::Rotation))
@@ -54,6 +55,13 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::DesktopBackdropTint))
     .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
+    .property(common_property(CommonProperty::MaxWidth))
+    .property(common_property(CommonProperty::MaxHeight))
+    .property(common_property(CommonProperty::Grow))
+    .property(common_property(CommonProperty::Shrink))
+    .property(common_property(CommonProperty::AlignSelf))
+    .property(common_property(CommonProperty::Margin))
+    .property(common_property(CommonProperty::Padding))
     .property(crate::PropertySchema::new(
         BACKGROUND,
         "background",
@@ -62,57 +70,51 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     ))
     .property(crate::PropertySchema::new(
         HOVER_BACKGROUND,
-        "hover_background",
+        "hoverBackground",
         ValueType::Brush,
-        "Brush painted while the nearest TouchArea is hovered.",
+        "Brush painted while the nearest TouchArea or FocusScope is hovered.",
     ))
     .property(crate::PropertySchema::new(
         PRESSED_BACKGROUND,
-        "pressed_background",
+        "pressedBackground",
         ValueType::Brush,
-        "Brush painted while the nearest TouchArea is pressed.",
+        "Brush painted while the nearest TouchArea or FocusScope is pressed.",
     ))
     .property(crate::PropertySchema::new(
-        BORDER_COLOR,
-        "border_color",
+        PRESSED_SCALE,
+        "pressedScale",
+        ValueType::Float,
+        "Scale around the center while the nearest TouchArea or FocusScope is pressed.",
+    ))
+    .property(crate::PropertySchema::new(
+        BORDER,
+        "border",
+        ValueType::Border,
+        "Solid border with uniform or per-edge widths.",
+    ))
+    .property(crate::PropertySchema::new(
+        RADII,
+        "radii",
+        ValueType::Radii,
+        "Corner radii in logical pixels.",
+    ))
+    .property(crate::PropertySchema::new(
+        SHADOW,
+        "shadow",
+        ValueType::Shadow,
+        "Drop or inset shadow.",
+    ))
+    .property(crate::PropertySchema::new(
+        FOCUS_BORDER_COLOR,
+        "focusBorderColor",
         ValueType::Color,
-        "Border color.",
-    ))
-    .property(crate::PropertySchema::new(
-        BORDER_WIDTH,
-        "border_width",
-        ValueType::Float,
-        "Uniform border width in logical pixels.",
-    ))
-    .property(crate::PropertySchema::new(
-        RADIUS,
-        "radius",
-        ValueType::Float,
-        "Uniform corner radius in logical pixels.",
+        "Border color while the nearest FocusScope has visible keyboard focus.",
     ))
     .property(crate::PropertySchema::new(
         CLIP,
         "clip",
         ValueType::Bool,
         "Clip descendants to the rounded rectangle bounds.",
-    ))
-    .property(crate::PropertySchema::new(
-        SHADOW_BLUR,
-        "shadow_blur",
-        ValueType::Float,
-        "Drop shadow blur radius in logical pixels.",
-    ))
-    .property(crate::PropertySchema::new(
-        SHADOW_OFFSET_Y,
-        "shadow_offset_y",
-        ValueType::Float,
-        "Vertical drop shadow offset in logical pixels.",
-    ))
-    .property(crate::PropertySchema::new(
-        SHADOW_COLOR,
-        "shadow_color",
-        ValueType::Color,
-        "Drop shadow color.",
     ))
     .slot(SlotSchema {
         id: CHILDREN,
@@ -121,80 +123,101 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         documentation: "Elements painted within the rectangle.".into(),
     });
     registry.register(schema, |input: &NativeElementInput| {
-        let width = finite_nonnegative(input, BORDER_WIDTH, "border_width")?.unwrap_or(0.0);
-        let radius = finite_nonnegative(input, RADIUS, "radius")?.unwrap_or(0.0);
-        let shadow_blur = finite_nonnegative(input, SHADOW_BLUR, "shadow_blur")?.unwrap_or(0.0);
-        let shadow_offset_y = match input.get(SHADOW_OFFSET_Y) {
-            Some(SchemaValue::Float(value)) if value.is_finite() => *value,
-            Some(SchemaValue::Float(_)) => {
-                return Err(SchemaError::Adapter(
-                    "Rectangle requires finite `shadow_offset_y`".into(),
-                ));
-            }
-            _ => 0.0,
-        };
         let mut element = transition::apply(
-            apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?,
+            apply_container(
+                apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?,
+                input,
+            ),
             input,
             "Rectangle",
         )?;
         if let Some(SchemaValue::Brush(brush)) = input.get(BACKGROUND) {
             element = element.fill(brush.clone());
         }
+        let pressed_scale = match input.get(PRESSED_SCALE) {
+            Some(SchemaValue::Float(scale))
+                if scale.is_finite() && *scale > 0.0 && *scale <= 1.0 =>
+            {
+                Some(*scale)
+            }
+            Some(SchemaValue::Float(_)) => {
+                return Err(SchemaError::Adapter(
+                    "Rectangle pressedScale must be finite and in (0, 1]".into(),
+                ));
+            }
+            _ => None,
+        };
         for (id, state) in [
             (HOVER_BACKGROUND, VisualState::Hovered),
             (PRESSED_BACKGROUND, VisualState::Pressed),
         ] {
+            let mut patch = StylePatch::new();
+            let mut has_style = false;
             if let Some(SchemaValue::Brush(brush)) = input.get(id) {
+                patch = patch.set(property::Background, Some(brush.clone()));
+                has_style = true;
+            }
+            if state == VisualState::Pressed
+                && let Some(scale) = pressed_scale
+            {
+                patch = patch.set(
+                    property::Transform,
+                    Transform2D::IDENTITY.scale(scale, scale),
+                );
+                has_style = true;
+            }
+            if has_style {
                 element = element.when(
-                    StateSelector::scope(StateScopeId::new(TOUCH_AREA_SCOPE), state),
-                    StylePatch::new().set(property::Background, Some(brush.clone())),
+                    StyleCondition::any([
+                        StyleCondition::state(StateSelector::scope(
+                            StateScopeId::new(TOUCH_AREA_SCOPE),
+                            state,
+                        )),
+                        StyleCondition::state(StateSelector::scope(
+                            StateScopeId::new(super::focus_scope::FOCUS_SCOPE_SCOPE),
+                            state,
+                        )),
+                    ]),
+                    patch,
                 );
             }
         }
-        if width > 0.0 {
-            let color = match input.get(BORDER_COLOR) {
-                Some(SchemaValue::Color(color)) => *color,
-                _ => Color::BLACK,
-            };
-            element = element.border(Border::all(width, color));
+        if let Some(SchemaValue::Border(border)) = input.get(BORDER) {
+            element = element.border(*border);
         }
-        let radii = CornerRadii::all(radius);
+        let radii = match input.get(RADII) {
+            Some(SchemaValue::Radii(value)) => *value,
+            _ => argui_paint::CornerRadii::all(0.0),
+        };
+        if radii
+            .as_array()
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return Err(SchemaError::Adapter(
+                "Rectangle radii must be finite and nonnegative".into(),
+            ));
+        }
         element = if matches!(input.get(CLIP), Some(SchemaValue::Bool(true))) {
             element.clip(radii)
         } else {
             element.radius(radii)
         };
-        if shadow_blur > 0.0 {
-            let color = match input.get(SHADOW_COLOR) {
-                Some(SchemaValue::Color(color)) => *color,
-                _ => Color::srgba(0.0, 0.0, 0.0, 0.18),
-            };
-            element = element.shadow(Shadow::drop([0.0, shadow_offset_y], shadow_blur, color));
+        if let Some(SchemaValue::Shadow(shadow)) = input.get(SHADOW) {
+            element = element.shadow(*shadow);
+        }
+        if let Some(SchemaValue::Color(color)) = input.get(FOCUS_BORDER_COLOR) {
+            element = element.when(
+                StyleCondition::any([
+                    StyleCondition::state(StateSelector::scope(
+                        StateScopeId::new(super::focus_scope::FOCUS_SCOPE_SCOPE),
+                        VisualState::FocusVisible,
+                    )),
+                    StyleCondition::state(VisualState::FocusWithin),
+                ]),
+                StylePatch::new().set(property::BorderColor, *color),
+            );
         }
         loop_motion::apply(element, input)
     })
-}
-
-/// Reads an optional finite nonnegative scalar from validated input.
-///
-/// * `input` — values supplied for the rectangle.
-/// * `id` — scalar property to read.
-/// * `name` — property spelling included in diagnostics.
-///
-/// # Errors
-///
-/// Returns an adapter error if the scalar is negative or nonfinite.
-fn finite_nonnegative(
-    input: &NativeElementInput,
-    id: crate::PropertyId,
-    name: &str,
-) -> Result<Option<f32>, SchemaError> {
-    match input.get(id) {
-        Some(SchemaValue::Float(value)) if value.is_finite() && *value >= 0.0 => Ok(Some(*value)),
-        Some(SchemaValue::Float(_)) => Err(SchemaError::Adapter(format!(
-            "Rectangle requires finite nonnegative `{name}`"
-        ))),
-        _ => Ok(None),
-    }
 }

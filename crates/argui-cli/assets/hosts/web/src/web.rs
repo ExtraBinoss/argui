@@ -7,13 +7,24 @@ use std::{
 use argui_core::ColorScheme;
 use argui_platform::WindowConfig;
 use argui_render::RendererConfig;
-use argui_runtime::{NativeHost, RuntimeEvent, ThemeBridge, WebHostHandle, WireOperation};
-use js_sys::{Function, JSON};
+use argui_runtime::{
+    NativeHost, NativeHostAssets, RuntimeEvent, ThemeBridge, WebHostHandle, WireOperation,
+};
+use js_sys::{Array, Function, JSON, Reflect, Uint8Array};
 use wasm_bindgen::{JsCast, JsValue, closure::Closure, prelude::wasm_bindgen};
 
 use crate::delivery::event_json;
 
 const CONTRACT_JSON: &str = include_str!("../../../sdk/host/contract.generated.json");
+
+/// Reports Rust panic messages and source locations before WebAssembly aborts.
+#[wasm_bindgen(start)]
+pub fn install_panic_diagnostics() {
+    std::panic::set_hook(Box::new(|info| {
+        web_sys::console::error_1(&JsValue::from_str(&format!("Argui WASM panic: {info}")));
+    }));
+}
+
 /// Callback registrations grouped by application-owned theme session.
 type ThemeSubscribers = Rc<RefCell<HashMap<u32, Vec<(u64, Function)>>>>;
 
@@ -33,13 +44,13 @@ pub struct ArguiWebHost {
 
 #[wasm_bindgen]
 impl ArguiWebHost {
-    /// Mounts a Rust-rendered canvas into the DOM element named by `parent_id`.
+    /// Mounts a Rust-rendered canvas into `parent_id` with app-owned `assets`.
     ///
     /// # Errors
     /// Returns a JavaScript error when the parent is absent, the ABI is stale,
     /// or the browser event loop cannot start.
     #[wasm_bindgen(constructor)]
-    pub fn new(parent_id: &str) -> Result<ArguiWebHost, JsValue> {
+    pub fn new(parent_id: &str, assets: JsValue) -> Result<ArguiWebHost, JsValue> {
         let document = web_sys::window()
             .and_then(|window| window.document())
             .ok_or_else(|| JsValue::from_str("Argui requires a browser document"))?;
@@ -58,13 +69,15 @@ impl ArguiWebHost {
         let subscriber = Rc::<RefCell<Option<(u64, Function)>>>::default();
         let deliveries = subscriber.clone();
         let target = parent_id.to_owned();
-        let runtime = WebHostHandle::start(
+        let assets = decode_web_assets(assets)?;
+        let runtime = WebHostHandle::start_with_assets(
             WindowConfig {
                 append_to_document: false,
                 web_parent_id: Some(parent_id.to_owned()),
                 ..WindowConfig::default()
             },
             RendererConfig::default(),
+            assets,
             move |delivery| {
                 let callback = deliveries
                     .borrow()
@@ -263,6 +276,50 @@ impl Drop for ArguiWebHost {
                 .remove_event_listener_with_callback("change", listener.as_ref().unchecked_ref());
         }
     }
+}
+
+/// Decodes browser-fetched SVG and image buffers into renderer assets.
+///
+/// `entries` is the array produced from the app's generated manifest. Returns
+/// assets with the same JS-safe IDs used by TSX references.
+///
+/// # Errors
+/// Returns a JavaScript error for malformed entries or undecodable media.
+fn decode_web_assets(entries: JsValue) -> Result<NativeHostAssets, JsValue> {
+    if !Array::is_array(&entries) {
+        return Err(JsValue::from_str("web assets must be an array"));
+    }
+    let mut assets = NativeHostAssets::default();
+    for entry in Array::from(&entries).iter() {
+        let field = |name| Reflect::get(&entry, &JsValue::from_str(name));
+        let key = field("key")?
+            .as_string()
+            .ok_or_else(|| JsValue::from_str("web asset key must be a string"))?;
+        let kind = field("kind")?
+            .as_string()
+            .ok_or_else(|| JsValue::from_str("web asset kind must be a string"))?;
+        let id = field("id")?
+            .as_f64()
+            .filter(|id| *id > 0.0 && *id <= 9_007_199_254_740_991.0 && id.fract() == 0.0)
+            .ok_or_else(|| JsValue::from_str(&format!("{key}: invalid asset ID")))?
+            as u64;
+        let bytes = field("bytes")?
+            .dyn_into::<Uint8Array>()
+            .map_err(|_| JsValue::from_str(&format!("{key}: expected Uint8Array bytes")))?
+            .to_vec();
+        match kind.as_str() {
+            "svg" => assets.vectors.push(
+                argui_media::svg::parse_svg(argui_paint::VectorId(id), &bytes)
+                    .map_err(|error| JsValue::from_str(&format!("{key}: {error}")))?,
+            ),
+            "image" => assets.images.push(
+                argui_media::image::decode(argui_paint::ImageId(id), &bytes)
+                    .map_err(|error| JsValue::from_str(&format!("{key}: {error}")))?,
+            ),
+            _ => return Err(JsValue::from_str(&format!("{key}: unsupported asset kind"))),
+        }
+    }
+    Ok(assets)
 }
 
 /// Encodes a browser value as JSON for the Rust theme wire parser.

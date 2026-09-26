@@ -41,7 +41,7 @@ fn controlled_million_character_input_profiles_both_adapters() {
         )
         .expect("host mount");
         let mut tree = UiTree::new(host.root_element().expect("mounted root"));
-        let input_page = callback_for(&initial, "page-input");
+        let input_page = callback_for(&initial, "page-input-field");
         gallery
             .deliver(&input_page.to_string())
             .expect("open Input page");
@@ -77,7 +77,10 @@ fn controlled_million_character_input_profiles_both_adapters() {
             .text_input_value(editor)
             .expect("input value")
             .to_owned();
-        assert!(value.is_empty(), "gallery name input starts empty");
+        assert_eq!(
+            value, "Ada Lovelace",
+            "gallery name input starts with a sample value"
+        );
         for (sample, position) in ["initial", "append", "middle"].iter().enumerate() {
             let (at, insertion) = match *position {
                 "initial" => (0, "a".repeat(1_000_000)),

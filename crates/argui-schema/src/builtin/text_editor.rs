@@ -12,8 +12,8 @@ use argui_ui::{
 
 use super::{
     BLUR, CARET_BLINK, CARET_COLOR, CARET_COUNT, CARET_FILL, CARET_HEIGHT, CARET_OFFSET_Y,
-    CARET_RADIUS, CARET_SPACING, CARET_WIDTH, CLIP, DESCRIPTION, ENABLED, FOCUS, INPUT_CHANGED,
-    INPUT_PLACEHOLDER, INVALID, KEY, LABEL, MAX_DIGITS, MULTILINE, PLACEHOLDER_COLOR, READ_ONLY,
+    CARET_RADIUS, CARET_SPACING, CARET_WIDTH, CLIP, DESCRIPTION, ENABLED, FOCUS, ID, INPUT_CHANGED,
+    INPUT_PLACEHOLDER, INVALID, LABEL, MAX_DIGITS, MULTILINE, PLACEHOLDER_COLOR, READ_ONLY,
     SEARCH_INPUT, SELECTION_COLOR, SUBMIT, TEXT_COLOR, TEXT_EDIT, TEXT_INPUT, TEXT_PRIVACY, VALUE,
     common::{
         CommonProperty, apply_common, apply_events, common_event, common_property, optional_bool,
@@ -65,7 +65,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             READ_ONLY,
-            "read_only",
+            "readOnly",
             ValueType::Bool,
             "Whether the value is read-only.",
         )
@@ -101,7 +101,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             MAX_DIGITS,
-            "max_digits",
+            "maxDigits",
             ValueType::Int,
             "Accept only ASCII digits up to this length when positive.",
         )
@@ -130,8 +130,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
@@ -152,68 +152,68 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::SelectionRadius))
     .property(PropertySchema::new(
         TEXT_COLOR,
-        "text_color",
+        "textColor",
         ValueType::Color,
         "Input text foreground color.",
     ))
     .property(PropertySchema::new(
         PLACEHOLDER_COLOR,
-        "placeholder_color",
+        "placeholderColor",
         ValueType::Color,
         "Placeholder text foreground color.",
     ))
     .property(common_property(CommonProperty::SelectionColor))
     .property(PropertySchema::new(
         CARET_COLOR,
-        "caret_color",
+        "caretColor",
         ValueType::Color,
         "Text caret color.",
     ))
     .property(PropertySchema::new(
         CARET_FILL,
-        "caret_fill",
+        "caretFill",
         ValueType::Brush,
         "GPU fill shared by the caret's composed primitives.",
     ))
     .property(PropertySchema::new(
         CARET_WIDTH,
-        "caret_width",
+        "caretWidth",
         ValueType::Float,
         "Width of each caret primitive.",
     ))
     .property(PropertySchema::new(
         CARET_HEIGHT,
-        "caret_height",
+        "caretHeight",
         ValueType::Float,
         "Fixed caret height; zero uses the text line height.",
     ))
     .property(PropertySchema::new(
         CARET_RADIUS,
-        "caret_radius",
+        "caretRadius",
         ValueType::Float,
         "Corner radius of each caret primitive.",
     ))
     .property(PropertySchema::new(
         CARET_COUNT,
-        "caret_count",
+        "caretCount",
         ValueType::Int,
         "Number of repeated caret primitives.",
     ))
     .property(PropertySchema::new(
         CARET_SPACING,
-        "caret_spacing",
+        "caretSpacing",
         ValueType::Float,
         "Horizontal distance between caret primitives.",
     ))
     .property(PropertySchema::new(
         CARET_OFFSET_Y,
-        "caret_offset_y",
+        "caretOffsetY",
         ValueType::Float,
         "Vertical offset of the caret primitives.",
     ))
     .property(PropertySchema::new(
         CARET_BLINK,
-        "caret_blink",
+        "caretBlink",
         ValueType::Bool,
         "Whether to use the standard blinking timeline.",
     ))
@@ -223,7 +223,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .event(common_event(FOCUS, "focus", EventType::Focus))
     .event(common_event(BLUR, "blur", EventType::Blur));
     registry.register(schema, |input: &NativeElementInput| {
-        let key = required_string(input, KEY, "key")?;
+        let key = required_string(input, ID, "id")?;
         let value = optional_string(input, VALUE).cloned().unwrap_or_default();
         let placeholder = optional_string(input, INPUT_PLACEHOLDER)
             .cloned()
@@ -367,7 +367,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         let privacy = match optional_string(input, TEXT_PRIVACY).map(String::as_str) {
             None | Some("public") => TextPrivacy::Public,
             Some("password") => TextPrivacy::Password,
-            Some("revealed_password") => TextPrivacy::RevealedPassword,
+            Some("revealedPassword") => TextPrivacy::RevealedPassword,
             Some(value) => {
                 return Err(SchemaError::Adapter(format!(
                     "TextInput does not support privacy `{value}`"

@@ -51,6 +51,20 @@ export interface ThemeChange<T extends object> {
   readonly impact: ThemeImpact | null
 }
 
+/** Resolves sparse subtree overrides against one coherent native theme snapshot. */
+export function mergeThemeOverrides<T extends object>(base: Readonly<T>, overrides: Partial<T>): Readonly<T> {
+  const merged = { ...base }
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) continue
+    if (!(key in base)) throw new Error(`Unknown theme token: ${key}`)
+    if (typeof value !== typeof (base as Record<string, unknown>)[key]) {
+      throw new TypeError(`Invalid theme token type: ${key}`)
+    }
+    Object.assign(merged, { [key]: value })
+  }
+  return Object.freeze(merged)
+}
+
 type ThemeListener<T extends object> = (snapshot: ThemeSnapshot<T>, change: ThemeChange<T>) => void
 
 /** One app or window theme session; resolution remains in the host's `argui-theme` runtime. */

@@ -55,7 +55,7 @@ CLI output and generated project documentation are in English.
    ABI hash and operation/event semantics as QuickJS.
 2. Add the browser event-loop entry that connects host commits to the retained
    UI tree and WGPU canvas. Reuse the existing Winit web canvas attachment and
-   WebGPU/WebGL renderer paths. No separate DOM widget implementation.
+   WebGPU renderer path. No separate DOM widget implementation.
 3. Deliver pointer, keyboard, focus, resize, and accessibility events back to
    the TSX callbacks. Reject a stale ABI or invalid transaction with a useful
    browser error. Keep the renderer/runtime independent of the TSX adapters.
@@ -100,9 +100,9 @@ CLI output and generated project documentation are in English.
 - `argui-runtime` already has a WASM event loop and browser canvas attachment,
   but `run_native_host` currently uses native threads/channels and is gated off
   for WASM. The browser bridge must provide an event-loop-safe commit path.
-- Browser builds should prefer WebGPU and use the renderer's existing WebGL
-  support where available; unsupported browser/device states need an explicit
-  error in the generated page.
+- Browser builds require WebGPU. The current vertex-storage-buffer shader does
+  not run on WebGL2; a WebGL fallback requires a separate compatible shader
+  path. Missing adapters produce an explicit error in the generated page.
 - The existing `v0.3.2` GitHub release cannot receive these CLI assets. The
   current `0.3.3` sources must be integrated into `codex/dsl-gallery-live`,
   then merged to `main` with a `[PUBLISH]` commit for CI to create `v0.3.3`.

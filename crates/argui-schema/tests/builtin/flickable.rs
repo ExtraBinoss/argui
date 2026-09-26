@@ -2,7 +2,8 @@ use argui_schema::{
     NativeElementInput, NativeEventValue, ObservationKind, SchemaError, SchemaValue, builtin,
 };
 use argui_ui::{
-    EventHandler, EventHandlerId, EventOwnerId, EventType, Overflow, ScrollAxes, length,
+    Color, EventHandler, EventHandlerId, EventOwnerId, EventType, Overflow, ScrollAxes,
+    ScrollbarSide, ScrollbarVisibility, length,
 };
 
 /// Flickable leaves the scrollbar and effects to surrounding components.
@@ -11,7 +12,7 @@ fn flickable_scrolls_both_axes_without_prescribed_paint() {
     let element = builtin::registry()
         .unwrap()
         .construct(
-            builtin::FLICKABLE,
+            builtin::SCROLL_VIEW,
             &NativeElementInput::new()
                 .property(builtin::SCROLL_X, SchemaValue::Bool(true))
                 .property(builtin::SCROLL_Y, SchemaValue::Bool(true)),
@@ -31,7 +32,7 @@ fn flickable_can_disable_scrolling_without_adding_visual_chrome() {
     let element = builtin::registry()
         .unwrap()
         .construct(
-            builtin::FLICKABLE,
+            builtin::SCROLL_VIEW,
             &NativeElementInput::new()
                 .property(builtin::SCROLL_X, SchemaValue::Bool(false))
                 .property(builtin::SCROLL_Y, SchemaValue::Bool(false)),
@@ -46,14 +47,14 @@ fn flickable_can_disable_scrolling_without_adding_visual_chrome() {
 #[test]
 fn flickable_exposes_read_only_scroll_metrics() {
     let registry = builtin::registry().unwrap();
-    let schema = registry.schema(builtin::FLICKABLE).unwrap();
+    let schema = registry.schema(builtin::SCROLL_VIEW).unwrap();
     for (name, observation) in [
-        ("offset_x", ObservationKind::ScrollX),
-        ("offset_y", ObservationKind::ScrollY),
-        ("viewport_width", ObservationKind::ViewportWidth),
-        ("viewport_height", ObservationKind::ViewportHeight),
-        ("content_width", ObservationKind::ContentWidth),
-        ("content_height", ObservationKind::ContentHeight),
+        ("offsetX", ObservationKind::ScrollX),
+        ("offsetY", ObservationKind::ScrollY),
+        ("viewportWidth", ObservationKind::ViewportWidth),
+        ("viewportHeight", ObservationKind::ViewportHeight),
+        ("contentWidth", ObservationKind::ContentWidth),
+        ("contentHeight", ObservationKind::ContentHeight),
     ] {
         let property = schema
             .properties
@@ -65,7 +66,7 @@ fn flickable_exposes_read_only_scroll_metrics() {
     }
     let error = registry
         .construct(
-            builtin::FLICKABLE,
+            builtin::SCROLL_VIEW,
             &NativeElementInput::new()
                 .property(builtin::OFFSET_Y, SchemaValue::Dimension(length(20.0))),
         )
@@ -79,7 +80,7 @@ fn horizontal_flickable_reserves_only_its_enabled_axis_and_delivers_scroll() {
     let element = builtin::registry()
         .unwrap()
         .construct(
-            builtin::FLICKABLE,
+            builtin::SCROLL_VIEW,
             &NativeElementInput::new()
                 .property(builtin::SCROLL_X, SchemaValue::Bool(true))
                 .property(builtin::SCROLL_Y, SchemaValue::Bool(false))
@@ -96,4 +97,51 @@ fn horizontal_flickable_reserves_only_its_enabled_axis_and_delivers_scroll() {
     assert_eq!(element.style.overflow.y, Overflow::Hidden);
     assert_eq!(element.event_listeners.len(), 1);
     assert_eq!(element.event_listeners[0].event, EventType::Scroll);
+}
+
+#[test]
+fn scroll_view_opt_in_bar_has_a_typed_left_side_and_native_hover_style() {
+    let registry = builtin::registry().unwrap();
+    let thumb = Color::srgb(0.3, 0.4, 0.5);
+    let element = registry
+        .construct(
+            builtin::SCROLL_VIEW,
+            &NativeElementInput::new()
+                .property(builtin::SCROLLBAR_SIDE, SchemaValue::String("left".into()))
+                .property(builtin::SCROLLBAR_WIDTH, SchemaValue::Float(3.0))
+                .property(builtin::SCROLLBAR_THUMB_COLOR, SchemaValue::Color(thumb))
+                .property(
+                    builtin::SCROLLBAR_HOVER_COLOR,
+                    SchemaValue::Color(Color::WHITE),
+                ),
+        )
+        .unwrap();
+    let bar = element.scroll.as_ref().unwrap().scrollbar.as_ref().unwrap();
+    assert_eq!(bar.side, ScrollbarSide::Left);
+    assert_eq!(bar.width, 3.0);
+    assert_eq!(bar.visibility, ScrollbarVisibility::Always);
+    assert_eq!(
+        bar.thumb.base.background,
+        Some(argui_paint::Fill::Solid(thumb))
+    );
+
+    assert!(matches!(
+        registry.construct(
+            builtin::SCROLL_VIEW,
+            &NativeElementInput::new().property(
+                builtin::SCROLLBAR_SIDE,
+                SchemaValue::String("center".into())
+            )
+        ),
+        Err(SchemaError::InvalidPropertyValue { .. })
+    ));
+    assert!(
+        registry
+            .construct(
+                builtin::SCROLL_VIEW,
+                &NativeElementInput::new()
+                    .property(builtin::SCROLLBAR_WIDTH, SchemaValue::Float(0.0)),
+            )
+            .is_err()
+    );
 }

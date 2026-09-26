@@ -1,119 +1,146 @@
-import type { AssetRef, SemanticCurrent } from '@argui/host'
-import type { Palette } from './theme'
-import type { ButtonSize } from './button-size'
-import type { SelectOption } from './select-options'
+import type { ConstraintValue, DimensionValue, InsetsValue } from '@argui/host'
 
-/** Icons injected by an application instead of loaded from its asset catalogue. */
-export interface WidgetIcons {
-  search?: AssetRef
-  check?: AssetRef
-  x?: AssetRef
-  chevronDown?: AssetRef
-  chevronRight?: AssetRef
-  loader?: AssetRef
+/** Self-alignment values supported by native flex layout. */
+export type WidgetAlignSelf = 'start' | 'center' | 'end' | 'stretch'
+
+/** Layout properties accepted by each widget's outer native node. */
+export interface WidgetLayoutProps {
+  /** Optional native identity for anchors, relations, and tests. */
+  id?: string
+  /** Preferred outer width in logical pixels, percent, or intrinsic sizing. */
+  width?: DimensionValue
+  /** Preferred outer height in logical pixels, percent, or intrinsic sizing. */
+  height?: DimensionValue
+  /** Minimum outer width in logical pixels, percent, or intrinsic sizing. */
+  minWidth?: ConstraintValue
+  /** Maximum outer width in logical pixels, percent, or intrinsic sizing. */
+  maxWidth?: ConstraintValue
+  /** Minimum outer height in logical pixels, percent, or intrinsic sizing. */
+  minHeight?: ConstraintValue
+  /** Maximum outer height in logical pixels, percent, or intrinsic sizing. */
+  maxHeight?: ConstraintValue
+  /** Flex growth when the parent has remaining space. */
+  grow?: number
+  /** Flex shrink when the parent is smaller than the preferred size. */
+  shrink?: number
+  /** Cross-axis alignment within the parent flex container. */
+  alignSelf?: WidgetAlignSelf
+  /** Space outside the widget root. */
+  margin?: InsetsValue
 }
 
-/** Props shared by the native button implementations. */
-export interface ButtonProps {
-  id: string
-  label: string
-  /** Spoken button name when the visible label is abbreviated. */
-  accessibleLabel?: string
-  theme: Palette
-  onClick: () => void
+/** Presentation choices shared by both Button adapters. */
+export type ButtonVariant = 'default' | 'outline' | 'secondary' | 'ghost' | 'destructive' | 'link'
+
+/** Sizes used by the shadcn-style button surface. */
+export type ButtonSize = 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg'
+
+/** Sizes that render an icon-sized square and therefore need an accessible name. */
+export type ButtonIconSize = Extract<ButtonSize, `icon${string}`>
+
+/** Props shared by Solid and React buttons, excluding framework-specific children. */
+export type ButtonOptions = WidgetLayoutProps & {
+  variant?: ButtonVariant
+  /** Whether a pointer press gently scales the button; enabled by default. */
+  pressAnimation?: boolean
+  /** Horizontal alignment of the button content. */
+  contentAlign?: 'start' | 'center' | 'end'
+  /** Pressed state exposed to assistive technology for a toggle-style button. */
+  pressed?: boolean
   disabled?: boolean
-  busy?: boolean
-  selected?: boolean
-  size?: ButtonSize
-  role?: 'button' | 'switch'
-  current?: SemanticCurrent
-  kind?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'quiet' | 'link'
-  icon?: AssetRef
-  /** Clockwise icon rotation in degrees. */
-  iconRotation?: number
-  activeIcon?: AssetRef
+  onClick: () => void
   iconOnly?: boolean
   expanded?: boolean
   controls?: string
+} & (
+  | { iconOnly: true; size?: ButtonSize; accessibleName: string }
+  | { iconOnly?: false; size: ButtonIconSize; accessibleName: string }
+  | { iconOnly?: false; size?: Exclude<ButtonSize, ButtonIconSize>; accessibleName?: string }
+)
+
+/** Shared options for a labelled group of adjacent controls. */
+export type ButtonGroupOptions = WidgetLayoutProps & {
+  accessibleName: string
+  orientation?: 'horizontal' | 'vertical'
+  directionScope?: 'ltr' | 'rtl'
 }
 
-/** Props shared by the native selection popup implementations. */
-export interface SelectProps {
-  id: string
-  label: string
-  options: readonly SelectOption[]
+/** Props shared by both native text input implementations. */
+export type InputFieldOptions = WidgetLayoutProps & {
   value?: string
   defaultValue?: string
-  theme: Palette
-  onChange?: (value: string) => void
+  onValueChange?: (value: string) => void
+  onSubmit?: (value: string) => void
   placeholder?: string
-  disabled?: boolean
-  width?: number
-}
-
-/** Props shared by the themed native text input implementations. */
-export interface InputFieldProps {
-  id: string
-  label: string
-  theme: Palette
-  value?: string
-  defaultValue?: string
-  onChange?: (value: string) => void
-  placeholder?: string
+  type?: 'text' | 'search' | 'password'
   disabled?: boolean
   readOnly?: boolean
   invalid?: boolean
-  search?: boolean
-  password?: boolean
-  selectionColor?: string
-  showLabel?: boolean
-  onSubmit?: (value: string) => void
-}
+} & (
+  | { label: string; accessibleName?: string }
+  | { label?: undefined; accessibleName: string }
+)
 
-/** Props shared by the anchored native popover implementations. */
-export interface PopoverProps<TChildren> {
-  id: string
-  label: string
-  theme: Palette
+/** Props shared by both popover implementations, excluding framework children. */
+export type PopoverOptions = WidgetLayoutProps & {
+  trigger: string
+  /** Accessible name for the trigger and popup; defaults to the visible trigger text. */
+  accessibleLabel?: string
+  placement?: 'topStart' | 'top' | 'topEnd' | 'bottomStart' | 'bottom' | 'bottomEnd'
+    | 'leftStart' | 'left' | 'leftEnd' | 'rightStart' | 'right' | 'rightEnd'
+  /** Preferred popup width, independent of the trigger and outer layout. */
+  contentWidth?: DimensionValue
   blur?: boolean
   opaque?: boolean
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-  placement?: 'top_start' | 'top' | 'top_end' | 'bottom_start' | 'bottom' | 'bottom_end' | 'left_start' | 'left' | 'left_end' | 'right_start' | 'right' | 'right_end'
-  width?: number
-  /** Omit the built-in button when an external control with `id` anchors the popover. */
-  trigger?: false
-  /** Native key to focus when the popover opens; defaults to its first focusable child. */
-  initialFocus?: string
-  /** Padding around custom popover content; defaults to the theme overlay padding. */
-  contentPadding?: number
-  /** Mount a bounded native virtual list for fixed-height popup items. */
-  virtualItems?: {
-    /** Total number of popup rows. */ count: number
-    /** Fixed row height in logical pixels. */ itemHeight: number
-    /** Maximum visible list height in logical pixels. */ height: number
-    /** First row shown when the popup opens. */ initialIndex?: number
-    /** Stable key for each row; defaults to its index. */ itemKey?: (index: number) => string | number
-    /** Render one visible row. */ renderItem: (index: number) => TChildren
-  }
   closeLabel?: string | false
-  children?: TChildren
+  /** Focus the first popup control, or leave focus on the trigger. */
+  initialFocus?: 'first' | 'trigger'
+} & (
+  | { open: boolean; onOpenChange: (open: boolean) => void; defaultOpen?: never }
+  | { open?: never; onOpenChange?: (open: boolean) => void; defaultOpen?: boolean }
+)
+
+/** Native option rendered by Select. Values must be unique within one Select. */
+export interface SelectOption {
+  value: string
+  label: string
+  disabled?: boolean
 }
 
-/** Props shared by centered, accessible native modal dialogs. */
-export interface DialogProps<TChildren> {
-  id: string
-  title: string
-  description?: string
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  theme: Palette
-  children: TChildren
-  width?: number
-  radius?: number
-  padding?: number
-  blur?: number
-  scrimColor?: string
-  surfaceColor?: string
-  closeLabel?: string | false
+/** Visual presentations supported by both Select adapters. */
+export type SelectVariant = 'default' | 'shadcn'
+
+/** Shared options for the Solid and React Select implementations. */
+export interface SelectOptions extends WidgetLayoutProps {
+  /** Standard field or compact trigger with its group title inside the open menu. */
+  variant?: SelectVariant
+  options: readonly SelectOption[]
+  value?: string
+  defaultValue?: string
+  onValueChange?: (value: string) => void
+  open?: boolean
+  defaultOpen?: boolean
+  onOpenChange?: (open: boolean) => void
+  label: string
+  placeholder?: string
+  disabled?: boolean
+}
+
+/** Keyboard event names accepted by the native select's key handler. */
+export function keyName(payload: unknown): string | undefined {
+  if (typeof payload === 'string') return payload
+  if (payload && typeof payload === 'object' && 'state' in payload && payload.state !== 'pressed') return undefined
+  if (payload && typeof payload === 'object' && 'key' in payload && typeof payload.key === 'string') {
+    return payload.key
+  }
+  return undefined
+}
+
+/** Finds the next enabled option, wrapping at either end. */
+export function nextEnabledOption(options: readonly SelectOption[], current: number, direction: 1 | -1): number {
+  for (let step = 1; step <= options.length; step++) {
+    const index = (current + direction * step + options.length) % options.length
+    if (!options[index]?.disabled) return index
+  }
+  return -1
 }

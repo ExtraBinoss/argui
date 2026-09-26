@@ -35,8 +35,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Key))
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
-    .property(common_property(CommonProperty::X))
-    .property(common_property(CommonProperty::Y))
+    .property(common_property(CommonProperty::Position))
+    .property(common_property(CommonProperty::Inset))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
@@ -49,14 +49,14 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(PropertySchema::new(
         MOUSE_CURSOR,
-        "mouse_cursor",
+        "mouseCursor",
         ValueType::String,
         "Cursor shown while hovered.",
     ))
     .property(
         PropertySchema::new(
             HAS_HOVER,
-            "has_hover",
+            "hasHover",
             ValueType::Bool,
             "Pointer is over the area.",
         )
@@ -74,7 +74,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             MOUSE_X,
-            "mouse_x",
+            "mouseX",
             ValueType::Dimension,
             "Current local pointer x coordinate.",
         )
@@ -83,7 +83,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             MOUSE_Y,
-            "mouse_y",
+            "mouseY",
             ValueType::Dimension,
             "Current local pointer y coordinate.",
         )
@@ -92,7 +92,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             MOUSE_GLOBAL_X,
-            "mouse_global_x",
+            "mouseGlobalX",
             ValueType::Dimension,
             "Current pointer x in window logical pixels, stable while dragging.",
         )
@@ -101,7 +101,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             MOUSE_GLOBAL_Y,
-            "mouse_global_y",
+            "mouseGlobalY",
             ValueType::Dimension,
             "Current pointer y in window logical pixels, stable while dragging.",
         )
@@ -110,7 +110,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             PRESSED_X,
-            "pressed_x",
+            "pressedX",
             ValueType::Dimension,
             "Local x coordinate of the most recent press.",
         )
@@ -119,7 +119,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(
         PropertySchema::new(
             PRESSED_Y,
-            "pressed_y",
+            "pressedY",
             ValueType::Dimension,
             "Local y coordinate of the most recent press.",
         )
@@ -128,45 +128,45 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .event(common_event(CLICK, "click", EventType::Click))
     .event(common_event(
         CONTEXT_MENU,
-        "context_menu",
+        "contextMenu",
         EventType::ContextMenu,
     ))
     .event(common_event(
         DOUBLE_CLICK,
-        "double_clicked",
+        "doubleClicked",
         EventType::Click,
     ))
     .event(common_event(
         POINTER_ENTER,
-        "pointer_enter",
+        "pointerEnter",
         EventType::PointerEnter,
     ))
     .event(common_event(
         POINTER_LEAVE,
-        "pointer_leave",
+        "pointerLeave",
         EventType::PointerLeave,
     ))
     .event(common_event(
         POINTER_DOWN,
-        "pointer_down",
+        "pointerDown",
         EventType::PointerDown,
     ))
-    .event(common_event(POINTER_UP, "pointer_up", EventType::PointerUp))
+    .event(common_event(POINTER_UP, "pointerUp", EventType::PointerUp))
     .event(common_event(
         POINTER_MOVE,
-        "pointer_move",
+        "pointerMove",
         EventType::PointerMove,
     ))
     .event(common_event(
         POINTER_CANCEL,
-        "pointer_cancel",
+        "pointerCancel",
         EventType::PointerCancel,
     ))
     .event(common_event(MOVED, "moved", EventType::PointerMove))
     .event(
         EventSchema::new(
             DRAG_X,
-            "drag_x",
+            "dragX",
             EventType::Gesture,
             "Frame-coalesced horizontal pan displacement in logical pixels.",
         )
@@ -175,7 +175,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .event(
         EventSchema::new(
             DRAG_Y,
-            "drag_y",
+            "dragY",
             EventType::Gesture,
             "Frame-coalesced vertical pan displacement in logical pixels.",
         )
@@ -258,7 +258,7 @@ fn parse_cursor(name: &str) -> Result<CursorIcon, SchemaError> {
     let cursor = match name {
         "auto" => CursorIcon::Auto,
         "default" => CursorIcon::Default,
-        "context_menu" => CursorIcon::ContextMenu,
+        "contextMenu" => CursorIcon::ContextMenu,
         "help" => CursorIcon::Help,
         "pointer" => CursorIcon::Pointer,
         "progress" => CursorIcon::Progress,
@@ -266,33 +266,33 @@ fn parse_cursor(name: &str) -> Result<CursorIcon, SchemaError> {
         "cell" => CursorIcon::Cell,
         "crosshair" => CursorIcon::Crosshair,
         "text" => CursorIcon::Text,
-        "vertical_text" => CursorIcon::VerticalText,
+        "verticalText" => CursorIcon::VerticalText,
         "alias" => CursorIcon::Alias,
         "copy" => CursorIcon::Copy,
         "move" => CursorIcon::Move,
-        "no_drop" => CursorIcon::NoDrop,
-        "not_allowed" => CursorIcon::NotAllowed,
+        "noDrop" => CursorIcon::NoDrop,
+        "notAllowed" => CursorIcon::NotAllowed,
         "grab" => CursorIcon::Grab,
         "grabbing" => CursorIcon::Grabbing,
-        "e_resize" => CursorIcon::EResize,
-        "n_resize" => CursorIcon::NResize,
-        "ne_resize" => CursorIcon::NeResize,
-        "nw_resize" => CursorIcon::NwResize,
-        "s_resize" => CursorIcon::SResize,
-        "se_resize" => CursorIcon::SeResize,
-        "sw_resize" => CursorIcon::SwResize,
-        "w_resize" => CursorIcon::WResize,
-        "ew_resize" => CursorIcon::EwResize,
-        "ns_resize" => CursorIcon::NsResize,
-        "nesw_resize" => CursorIcon::NeswResize,
-        "nwse_resize" => CursorIcon::NwseResize,
-        "col_resize" => CursorIcon::ColResize,
-        "row_resize" => CursorIcon::RowResize,
-        "all_scroll" => CursorIcon::AllScroll,
-        "zoom_in" => CursorIcon::ZoomIn,
-        "zoom_out" => CursorIcon::ZoomOut,
-        "dnd_ask" => CursorIcon::DndAsk,
-        "all_resize" => CursorIcon::AllResize,
+        "eResize" => CursorIcon::EResize,
+        "nResize" => CursorIcon::NResize,
+        "neResize" => CursorIcon::NeResize,
+        "nwResize" => CursorIcon::NwResize,
+        "sResize" => CursorIcon::SResize,
+        "seResize" => CursorIcon::SeResize,
+        "swResize" => CursorIcon::SwResize,
+        "wResize" => CursorIcon::WResize,
+        "ewResize" => CursorIcon::EwResize,
+        "nsResize" => CursorIcon::NsResize,
+        "neswResize" => CursorIcon::NeswResize,
+        "nwseResize" => CursorIcon::NwseResize,
+        "colResize" => CursorIcon::ColResize,
+        "rowResize" => CursorIcon::RowResize,
+        "allScroll" => CursorIcon::AllScroll,
+        "zoomIn" => CursorIcon::ZoomIn,
+        "zoomOut" => CursorIcon::ZoomOut,
+        "dndAsk" => CursorIcon::DndAsk,
+        "allResize" => CursorIcon::AllResize,
         _ => {
             return Err(SchemaError::Adapter(format!(
                 "TouchArea does not support mouse_cursor `{name}`"

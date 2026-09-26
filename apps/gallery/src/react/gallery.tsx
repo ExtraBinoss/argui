@@ -1,189 +1,114 @@
 /** @jsxImportSource @argui/react */
-import { memo, useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { VirtualList as ReactVirtualList, useThemeSnapshot } from '@argui/react'
-import { Button as ReactButton, InputField as ReactInputField, accentOverrides, type Accent, type Palette } from '@argui/widgets/react'
-import { ReactAnimationLab } from './animation-lab'
-import { ReactOverlayPage } from './overlay-page'
-import { ReactPopoverPage } from './popover-page'
-import { ReactDamageControl } from './damage-control'
-import { ReactAccessibilityPage } from './accessibility-page'
-import { ReactInputsPage } from './input-page'
-import { ReactWgslLab } from './wgsl-lab'
-import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from '../gallery-pages'
-import { ReactI18nPage } from './i18n-page'
-import { ReactServicesPage } from './services-page'
-import { ReactThemingPage } from './theming-page'
-import { ReactDialogPage } from './dialog-page'
-import type { ApplicationServices, ThemeRuntime } from '@argui/host'
-import type { GalleryTokens } from '../theme'
-import { isWidgetPage } from '../widget-pages'
-import { WidgetPage } from './widget-pages'
-import { ReactButtonPage } from './button-page'
-import { ReactSelectPage, choices } from './select-page'
-import { ReactMediaPage } from './media-page'
-import { TypographyPage } from './typography-page'
-import { DatePickerPage } from './date-picker-page'
-import { DataTablePage } from './data-table-page'
+import { useState, type ReactElement } from 'react'
+import type { ThemeRuntime } from '@argui/host'
+import { ThemeScope, useTheme, useThemeSnapshot } from '@argui/react'
+import { Button, ButtonGroup, ButtonGroupSeparator, InputField, Popover, type WidgetTheme } from '@argui/widgets/react'
+import { ButtonPage } from './button-page'
+import { ButtonGroupPage } from './button-group-page'
+import { InputFieldPage } from './input-field-page'
+import { SelectPage } from './select-page'
+import { PopoverPage } from './popover-page'
+import { VirtualListPage } from './virtual-list-page'
+import { LayoutScenarios } from './layout-scenarios'
+import { AnimationPage } from './animation-page'
+import { mediaAssets } from '../../assets.generated'
 
-const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
-const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
+const pages = [
+  { id: 'button', label: 'Button', category: 'Widgets' },
+  { id: 'button-group', label: 'ButtonGroup', category: 'Widgets' },
+  { id: 'input-field', label: 'InputField', category: 'Widgets' },
+  { id: 'select', label: 'Select', category: 'Widgets' },
+  { id: 'popover', label: 'Popover', category: 'Widgets' },
+  { id: 'virtual-list', label: 'VirtualList', category: 'Widgets' },
+  { id: 'layouting', label: 'Layouting', category: 'Examples' },
+  { id: 'animation', label: 'Animation', category: 'Examples' },
+] as const
 
-/** Renders the same native gallery shell and pages through the React adapter. */
-export function ReactGallery(props: { services: ApplicationServices; runtime: ThemeRuntime<GalleryTokens> }): ReactElement {
-  const [page, setPage] = useState<Page>('Button')
-  const [visited, setVisited] = useState<ReadonlySet<Page>>(() => new Set<Page>(['Button']))
-  const snapshot = useThemeSnapshot(props.runtime)
-  const [menuOpen, setMenuOpen] = useState(true)
+type PageId = typeof pages[number]['id']
+
+/** Renders a searchable sidebar, one widget page, and a compact settings popover. */
+export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }): ReactElement {
+  const [page, setPage] = useState<PageId>('button')
   const [search, setSearch] = useState('')
-  const [clicks, setClicks] = useState(0)
-  const [lastUsed, setLastUsed] = useState('None')
-  const [starActive, setStarActive] = useState(false)
-  const [choice, setChoice] = useState<string>(choices[0])
-  const selectPage = useCallback((item: Page) => {
-    setVisited((previous) => new Set(previous).add(item))
-    setPage(item)
-  }, [])
-  useEffect(() => props.services.onEvent((event) => {
-    if (event.type === 'systemScheme') {
-      props.runtime.update({ systemScheme: event.scheme })
-      return
-    }
-    if ((event.type === 'menu' && event.id === 'open-services')
-      || (event.type === 'shortcut' && event.id === 'wake' && event.state === 'pressed')) {
-      selectPage('Services')
-    }
-  }), [props.services, props.runtime, selectPage])
-  const theme = snapshot.values
-  const navigationItems = useMemo(() => filteredNavigation(search), [search])
-  const activate = useCallback((label: string) => {
-    setClicks((value) => value + 1)
-    setLastUsed(label)
-    setStarActive((value) => label === 'Star' ? !value : false)
-  }, [])
-  const menuButton = <ReactButton id="menu" label={menuOpen ? 'Hide navigation' : 'Show navigation'}
-    theme={theme} kind="ghost" onClick={() => setMenuOpen((value) => !value)} />
-  const themeControls = (
-    <row wrap={true} gap={8}>
-      <ReactButton id="theme-toggle" label={snapshot.resolvedVariant === 'light' ? 'Dark theme' : 'Light theme'}
-        theme={theme} kind="secondary" onClick={() => props.runtime.update({ variant: snapshot.resolvedVariant === 'light' ? 'dark' : 'light' })} />
-      <ReactButton id="theme-system" label="System theme" theme={theme} kind="quiet"
-        selected={snapshot.variant === 'system'} onClick={() => props.runtime.update({ variant: 'system' })} />
-      {accents.map((option) => <ReactButton key={option} id={`accent-${option}`} label={option}
-        theme={theme} kind="quiet" selected={theme.accent === accentOverrides[option].accent}
-        onClick={() => props.runtime.update({ overrides: accentOverrides[option] })} />)}
-    </row>
-  )
-  const navigation = menuOpen ? (
-    <focusScope role="navigation" accessible_name="Gallery pages" focusable={false}
-      width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
-      <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
-        gap={8} padding={8}>
-        <ReactInputField id="gallery-search" label="Search gallery" search theme={theme}
-          value={search} placeholder="Search gallery" onChange={setSearch} />
-        <ReactVirtualList id="gallery-navigation" count={navigationItems.length} estimate={mobile ? 112 : 47}
-          itemKey={(index) => navigationKey(navigationItems[index]!)} dataVersion={navigationVersion(search)}
-          variable={true} axis={mobile ? 'horizontal' : 'vertical'} overscan={3}
-          width="fill" height={mobile ? 56 : 'fill'}
-          scrollbarWidth={3} scrollbarColor={snapshot.resolvedVariant === 'dark' ? '#ffffff66' : '#0000003d'}
-          shadow={{ color: theme.background, intensity: 1,
-            width: 36, left: true, right: true, top: true, bottom: true }}
-          renderItem={(index) => {
-            const item = navigationItems[index]!
-            if (item.kind === 'heading') return <column height={mobile ? 56 : 30} padding={7}
-              justify_content="center"><text text={item.label} color={theme.muted} font_size={11} /></column>
-            return <ReactButton id={navigationKey(item)} label={item.page} theme={theme}
-              kind="ghost" selected={page === item.page}
-              current={page === item.page ? 'page' : undefined} onClick={() => selectPage(item.page)} />
-          }} />
-        {navigationItems.length === 0 ? <text text="No pages found" color={theme.muted} font_size={12} /> : null}
-      </column>
-    </focusScope>
-  ) : null
-  // Preserve visited page state without mounting every unseen destination.
-  const panes = pages.map((item) => (
-    <column key={`scroll-${item}`} nativeKey={`scroll-${item}`} visible={page === item}
-      width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
-      {visited.has(item) ? <ReactPageContent item={item} theme={theme} tokens={theme} runtime={props.runtime}
-        services={props.services}
-        selected={page === item}
-        clicks={item === 'Button' ? clicks : undefined}
-        lastUsed={item === 'Button' ? lastUsed : undefined}
-        starActive={item === 'Button' ? starActive : undefined}
-        activate={activate}
-        choice={item === 'Select' ? choice : undefined}
-        onChoiceChange={setChoice}
-        active={item === 'Damage Control' || item === 'WGSL Lab' ? page === item : undefined} /> : null}
-    </column>
-  ))
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const theme = useTheme<WidgetTheme>()
+  const selectedTheme = useThemeSnapshot<WidgetTheme>().variant ?? 'system'
+  const visiblePages = (category: 'Widgets' | 'Examples') => pages.filter((entry) => entry.category === category && entry.label.toLowerCase().includes(search.trim().toLowerCase()))
+  const Content = page === 'button' ? ButtonPage
+    : page === 'button-group' ? ButtonGroupPage
+    : page === 'input-field' ? InputFieldPage
+    : page === 'select' ? SelectPage
+    : page === 'popover' ? PopoverPage
+    : page === 'virtual-list' ? VirtualListPage : undefined
 
-  return (
-    <column width="fill" height="fill" background={theme.background}>
-      {mobile ? (
-        <column width="fill" gap={9} padding={12} background={theme.surface}>
-          <text text="ARGUI / Native Gallery" color={theme.foreground} font_size={18} />
-          <row width="fill" wrap={true} gap={8}>{menuButton}{themeControls}</row>
+  return <row width="100%" height="100%" background={theme.surface}>
+    <column id="gallery-sidebar" width={256} height="100%" shrink={0} padding={16} gap={16} background={theme.sidebar}>
+      <container padding={{ start: 8 }}><text color={theme.text} fontSize={20}>Argui</text></container>
+      <InputField id="gallery-search" accessibleName="Search gallery" type="search"
+        placeholder="Search gallery" value={search} onValueChange={setSearch}
+        leading={<svg source={mediaAssets['tabler/search.svg']} width={16} height={16} color={theme.textMuted} />} />
+      <ThemeScope<WidgetTheme> overrides={{ ghostHover: theme.sidebarAccent }}>
+      <scrollView id="gallery-navigation" width="100%" height="100%" grow={1} scrollY={true}
+        scrollbarSide="left" scrollbarWidth={3} scrollbarThumbColor={theme.border} scrollbarHoverColor={theme.textMuted}>
+        <column width="100%" gap={12}>
+          {(['Widgets', 'Examples'] as const).map((category) => visiblePages(category).length > 0 && <column key={category} width="100%" gap={4}>
+            <container padding={{ start: 8, bottom: 4 }}><text color={theme.textMuted} fontSize={12}>{category}</text></container>
+            {visiblePages(category).map((entry) => <Button
+              key={entry.id}
+              id={`page-${entry.id}`}
+              width="100%"
+              contentAlign="start"
+              variant="ghost"
+              pressed={page === entry.id}
+              onClick={() => setPage(entry.id)}
+            ><text color={page === entry.id ? theme.sidebarPrimary : theme.sidebarForeground}>{entry.label}</text></Button>)}
+          </column>)}
         </column>
-      ) : (
-        <row width="fill" wrap={true} gap={12} padding={12} background={theme.surface}>
-          {menuButton}
-          <text text="ARGUI / Native Gallery" color={theme.foreground} font_size={18} />
-          {themeControls}
-        </row>
-      )}
-      {mobile ? <column width="fill" height="fill" shrink={1} min_height={0} gap={16}>
-        {navigation}
-        <column width="fill" grow={1} shrink={1} min_height={0}
-          padding_left={12} padding_right={12} padding_bottom={12}>{panes}</column>
-      </column> : <row width="fill" height="fill" shrink={1} min_height={0} gap={16} padding={16}>
-        {navigation}
-        {panes}
-      </row>}
+      </scrollView>
+      </ThemeScope>
     </column>
-  )
-}
-
-interface ReactPageContentProps {
-  item: Page
-  theme: Palette
-  tokens: GalleryTokens
-  runtime: ThemeRuntime<GalleryTokens>
-  services: ApplicationServices
-  clicks?: number
-  lastUsed?: string
-  starActive?: boolean
-  activate: (label: string) => void
-  choice?: string
-  onChoiceChange: (value: string) => void
-  active?: boolean
-  selected: boolean
-}
-
-/** Keeps retained page content stable while the shell changes native visibility. */
-const ReactPageContent = memo(function ReactPageContent(props: ReactPageContentProps): ReactElement {
-  const { item, theme } = props
-  return (
-    <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
-      <text text={item} color={theme.foreground} font_size={26} />
-      {item === 'Input' ? <ReactInputsPage theme={theme} /> : null}
-      {item === 'Internationalization' && props.selected ? <ReactI18nPage theme={theme} /> : null}
-      {item === 'Button' ? <ReactButtonPage theme={theme} clicks={props.clicks ?? 0}
-        lastUsed={props.lastUsed ?? 'None'} starActive={props.starActive ?? false} activate={props.activate} /> : null}
-      {item === 'Select' ? <ReactSelectPage theme={theme} value={props.choice ?? choices[0]}
-        onChange={props.onChoiceChange} /> : null}
-      {item === 'Popover' ? <ReactPopoverPage theme={theme} /> : null}
-      {item === 'Dialog' ? <ReactDialogPage theme={theme} /> : null}
-      {isWidgetPage(item) ? <WidgetPage name={item} theme={theme} /> : null}
-      {item === 'Animation Lab' ? <ReactAnimationLab theme={theme} /> : null}
-      {item === 'Media' ? <ReactMediaPage theme={theme} /> : null}
-      {item === 'Services' ? <ReactServicesPage services={props.services} theme={theme} /> : null}
-      {item === 'Theming' ? <ReactThemingPage theme={theme} tokens={props.tokens} runtime={props.runtime} /> : null}
-      {item === 'Typography' ? <TypographyPage theme={theme} /> : null}
-      {item === 'Date Picker' ? <DatePickerPage theme={theme} /> : null}
-      {item === 'Data Table' ? <DataTablePage theme={theme} /> : null}
-      {item === 'Accessibility' ? <ReactAccessibilityPage theme={theme} /> : null}
-      {item === 'Overlay' ? <ReactOverlayPage theme={theme} /> : null}
-      {item === 'Damage Control' ? <ReactDamageControl theme={theme} active={props.active ?? false} /> : null}
-      {item === 'WGSL Lab' ? <ReactWgslLab theme={theme} active={props.active ?? false} /> : null}
+    <column width="100%" height="100%" grow={1} minWidth={0}>
+      <row width="100%" padding={{ top: 12, right: 16, bottom: 4, left: 16 }} justifyContent="end">
+        <Popover id="gallery-settings" trigger="Settings" placement="bottomEnd" contentWidth={280} blur={true}
+          open={settingsOpen} onOpenChange={setSettingsOpen}
+          leading={<svg source={mediaAssets['gallery/settings.svg']} width={16} height={16} color={settingsOpen ? theme.primary : theme.text} />}>
+          <text color={theme.text} fontSize={14}>Appearance</text>
+          <ButtonGroup accessibleName="Theme">
+            <Button id="theme-light" pressed={selectedTheme === 'light'} variant="ghost"
+              onClick={() => props.runtime.update({ variant: 'light' })}>
+              <row gap={6} alignItems="center">
+                <svg source={mediaAssets['gallery/sun.svg']} width={16} height={16} color={selectedTheme === 'light' ? theme.primary : theme.text} />
+                <text color={selectedTheme === 'light' ? theme.primary : theme.text}>Light</text>
+              </row>
+            </Button>
+            <ButtonGroupSeparator />
+            <Button id="theme-dark" pressed={selectedTheme === 'dark'} variant="ghost"
+              onClick={() => props.runtime.update({ variant: 'dark' })}>
+              <row gap={6} alignItems="center">
+                <svg source={mediaAssets['gallery/moon.svg']} width={16} height={16} color={selectedTheme === 'dark' ? theme.primary : theme.text} />
+                <text color={selectedTheme === 'dark' ? theme.primary : theme.text}>Dark</text>
+              </row>
+            </Button>
+            <ButtonGroupSeparator />
+            <Button id="theme-system" pressed={selectedTheme === 'system'} variant="ghost"
+              onClick={() => props.runtime.update({ variant: 'system' })}>
+              <row gap={6} alignItems="center">
+                <svg source={mediaAssets['gallery/system.svg']} width={16} height={16} color={selectedTheme === 'system' ? theme.primary : theme.text} />
+                <text color={selectedTheme === 'system' ? theme.primary : theme.text}>System</text>
+              </row>
+            </Button>
+          </ButtonGroup>
+        </Popover>
+      </row>
+      <scrollView id="gallery-content" width="100%" height="100%" grow={1} scrollY={true}
+        scrollbarSide="left" scrollbarWidth={3} scrollbarThumbColor={theme.border} scrollbarHoverColor={theme.textMuted}>
+        <column width="100%" padding={24} gap={16}>
+          {page === 'layouting'
+            ? <column width="100%" gap={16}><text color={theme.text} fontSize={24}>Layouting</text><LayoutScenarios /></column>
+            : page === 'animation' ? <AnimationPage />
+            : Content && <Content />}
+        </column>
+      </scrollView>
     </column>
-  )
-}) as (props: ReactPageContentProps) => ReactElement
+  </row>
+}

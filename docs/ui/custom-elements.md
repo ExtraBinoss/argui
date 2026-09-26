@@ -1,5 +1,28 @@
 # Custom elements
 
+## Custom TSX primitives
+
+A TSX application can register a native schema alongside Argui's built-ins.
+Export the complete registry with `SchemaRegistry::contract()` using the Rust
+`serde` feature, then generate both framework declarations from that JSON:
+
+```sh
+bunx --bun argui-generate-jsx contract.json src/generated
+```
+
+The command writes `react-custom.d.ts`, `solid-custom.d.ts`, and the exact
+`contract.generated.json` fingerprint. Include the declaration matching the
+application's framework in its TypeScript project and pass the same complete
+registry to the native host. The generator refuses a custom contract that
+changes or omits a built-in primitive. The host also validates custom property
+names and values when loading the schema, so a generated type never replaces
+native validation. Keep the JSON and host registration together: an ABI hash
+mismatch stops mounting before a partially interpreted UI is displayed.
+
+The Rust `CustomElement` layout/paint API below is separate from registering a
+TSX primitive. A custom TSX primitive may adapt any retained `Element` built
+with ordinary Argui facilities, including a `CustomElement`.
+
 `Element::custom(properties)` installs a consumer-defined leaf;
 `Element::custom_container(properties, children)` installs a custom layout with
 ordinary Argui children. Both use `CustomElement` and the same retained layout,

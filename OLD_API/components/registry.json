@@ -1,0 +1,1362 @@
+{
+  "version": 2,
+  "arguiVersion": "0.3.3",
+  "files": {
+    "react/accordion.tsx": "6ec195bf67ebb65241ee29d2d15418ecb7083f6837ab692ed295c160525d3579",
+    "react/alert-dialog.tsx": "a2244bd21c3892ed44df6a0bf08035ff81ca1d52fbb3baf1857c0d07b7575a69",
+    "react/alert.tsx": "64b93923db1d31a102533307b844f8a551e1d3cd485f12bfc23503eddf2a39b3",
+    "react/aspect-ratio.tsx": "05826b26aa8b8b2db8c57785c7eca1a094e28e9c9385b0da8b3481d1c1b2f110",
+    "react/assets.tsx": "e9d1371cc0b8a6f2c1988a61e7451c5477f21f7c347888ade404b259d3950ef2",
+    "react/attachment.tsx": "8859eca8408e8242d35ce262cb7b0abb25f69bc8bddb62c2dab31ea65fc2e3e3",
+    "react/avatar.tsx": "dccb501a54ee7a651fe3ae4a578f136723ff89be368be365221e90997046313c",
+    "react/badge.tsx": "b262754f5a651d6d13027b07cd1457071f895d5c390929239e0c84e900917567",
+    "react/breadcrumb.tsx": "a789f7020beece18b9c67222585c5a404f7571fa4a1c1a6fc41259c17332d913",
+    "react/bubble.tsx": "dcccc11262154a2c7d73c4d6464c866099e22a84fe89d7e507a48728a50ce4d5",
+    "react/button-group.tsx": "4cc3b748f68b103a028e518cac8ae65c026f37b0421c140cece96af648f323dc",
+    "react/button.tsx": "48e832e3f4b3baa26799dd3f105cc56651db722b0e3e4d338605b4396b71047b",
+    "react/calendar.tsx": "56be5aab15c29c8c1eb5c983c9f4fd4132d306dccb5993c861a0cb6b9bdbc42b",
+    "react/card.tsx": "66adc618d25b974cbdb2a0d0b8c871bee1d5afac60a4e8607bd030375824b760",
+    "react/carousel.tsx": "060b032116318ee084e8cd29746dfc4e82762cba69c44ea87ddb8241357daa1b",
+    "react/chart.tsx": "7e4a78931bf119a3de43442bf8fca4eff857990285116b675410f5753ff48626",
+    "react/checkbox.tsx": "353bba7f431568762470e1f28eb7439886a74a88b9020881b55c5e68f5e89c05",
+    "react/collapsible.tsx": "55fa9724130c34759a5d23212bea872c5165bc4ed013a83b8c37125e91f6d525",
+    "react/combobox.tsx": "241d04cac61108a898acc49a6ff6d7612909d0ab57a6e07b4c2388fb377907a3",
+    "react/command.tsx": "31927ff8c1e86957ad8ee8ea32b747a57d114310f91109dac9ad9dd30156afbd",
+    "react/context-menu.tsx": "b1a40d2bb1c279f2918b8020c08baaaa3258fc35cc87566c84b5a89348380495",
+    "react/dialog.tsx": "de74881909f44691c97a3517ce56fb81e0f913f82851d4f944d79fbf474849a1",
+    "react/direction.tsx": "9e1e8253e4caa8eca09033a8a944339840bc9b3ddc3973a2256a52354cd90918",
+    "react/drawer.tsx": "c1b03669fe505dcf6b675165082d118405e460aaee6874b78a1a06cb0d0faa69",
+    "react/dropdown-menu.tsx": "62c1e7ab60d333555452603aeb558bc6762dded5e64b860d3d17cbabf8329856",
+    "react/empty.tsx": "1e58d8ad3a5637780773c8a48663b6332f78dbd6ca9832555ffd774778f0223d",
+    "react/field.tsx": "7752012c69f79fb8fa7384bac374f28796692616124a48a789bcec1448855ae2",
+    "react/form.tsx": "35344de9f5b522e4daca1931445e5e305c93bf350d0954a828e5c323bcf08e54",
+    "react/hover-card.tsx": "9730ef7f1fc2f033eb04b5d878b368c23296de8523b769e07b8178bfae0e5d70",
+    "react/input-field.tsx": "b161b9d3e41f6adfd01d05f0f313287d249d2904ac50cb5604e4c0c0e3330c44",
+    "react/input-group.tsx": "31d630f338e21b453b27f1c355884686a790d6b045f033d4e13e4d02fc918565",
+    "react/input-otp.tsx": "f55f3a7cd5070500445b4baea803a560a2940b0414a32f927a9a324533805bbc",
+    "react/item.tsx": "381f25b2e0aa499fbe9cd2595c04a2ddcf2fbe0279e7cf0e5fdb1663da5922bb",
+    "react/kbd.tsx": "9a68abda065b08c20e34cf622175ef79892e19d1f4513651ac0bbdbafb6d5ea6",
+    "react/label.tsx": "72e4685ef287781f85a79709df1ce5ea9bc59816a98c90dfe190dba948d9627c",
+    "react/marker.tsx": "1c5a3646a6c10dc6046eaf0ae0b507ec704a079c2de1e17a64bf81ad147196ed",
+    "react/menubar.tsx": "9831e74a779bf38fbb73fbdd1665e879c30521b481b63739d2766a7a039e660d",
+    "react/message-scroller.tsx": "a8486d6d4509c224279fd966297e28d99c8f5caa7b2765383ee55f206456f70a",
+    "react/message.tsx": "3b94ecd9139fea1767b4c11f50f4566d839a090f604c53ce7d5ad52c909c8cb1",
+    "react/native-select.tsx": "77e40ae80c932cd00ca86ad6b0f6325e2b2c12bc7b9a5c4c985e62651c2f6ce7",
+    "react/navigation-menu.tsx": "7dcbf28f6b5d0616699ba0885a1f3a1fd05bdf828a596a5f54e85868458eaf08",
+    "react/pagination.tsx": "0275a2c696d56efa882637cfd95b9874b7c5fed2541eed3f7f591e2b82a1e95d",
+    "react/popover.tsx": "08530866a1bdeed596f203f5d609ee018bec6d8141ea3ac58018f7469fcdcaa8",
+    "react/progress.tsx": "482a149d4c110a7e6041fe50f52894babdcb8f65436400a5892ee37ba1872dda",
+    "react/questionnaire.tsx": "d48060d5245e7668249d24670e9dd447181e50a13cca8b38bad62a38c94cc4b5",
+    "react/radio-group.tsx": "22fc1ad821956f04f134c8bd376d9de1da065ccfc28a02b275f65ceb81a349fe",
+    "react/resizable.tsx": "cda93dc6328b200897081e4976d60fc1d4e8dc434a96a4892de45913eedfa90d",
+    "react/scroll-area.tsx": "3184f1d8545f88035429549f17fe763baf30e97a993af3a67a1d495dc284f66d",
+    "react/select.tsx": "6a2c894223332a2f48567b439b974465656e3a09030a4bf75be4716ed906c3cb",
+    "react/separator.tsx": "670562cd8ef12387a9b7c0bac3ae712108963cdaa40d1683f9e91e606abbe081",
+    "react/sheet.tsx": "5c7312eb8b343969068da8a4d6195c2484770a494aa534ae3b9e87c66774879a",
+    "react/sidebar.tsx": "fcc8723a3e40401026c3bfc6aecb0a2fa67862a10af80a8765026af29c43f3ad",
+    "react/skeleton.tsx": "f60f7e624bf0931d576e782c197d083c3a730cb2ec9cc57cb25a72fa202ae9b7",
+    "react/slider.tsx": "7bc6f097df141bd8f99d6f5c741e940d5dbb51aec78a811f12b191a37f3570e9",
+    "react/sonner.tsx": "80c3faec41f7dd8341bfeadb7d0f4255b9da9a0c9475ac9ad1c0e3e30e8bb377",
+    "react/spinner.tsx": "9890eec1ada556cafa37e6e3ff572f190fa07dbd3a42609c13381d26585cc796",
+    "react/switch.tsx": "9ccd3a402b82eac0fd1d155c28d540036d110eb90e9c15f16979322d40a9b251",
+    "react/table.tsx": "0aebe5ed40d25516b6b23a34d5a7e979f50b2f3bd9e5ebd0e422152b277095f2",
+    "react/tabs.tsx": "a62da2ff76d05f70687045e5688d5023b3e4fee5f4aefefeeba6b8e0798c1dc0",
+    "react/textarea.tsx": "7e9c75e38753be82e0b71e5d357c0becf129d60b56f2b7028e7949249059526b",
+    "react/toast.tsx": "08b125a514ea582953932279ce8e60b75746389d27302451dddf0e191b1e8c1f",
+    "react/toggle-group.tsx": "87ea1e7556236369a73a309bb0f066b93686e6343c109f3e28e9d773c08705dc",
+    "react/toggle.tsx": "71bbeb49661952795ece368abc00065db662c87335ce70117303d62f894d6044",
+    "react/tooltip.tsx": "915901489ffa803048736be81aafce86b05ada89a22f50211b9d5d40beca5174",
+    "shared/button-size.ts": "8addacaf994c5e5301702a1e2ecd6573d2281b390558f44e134c7fa3c8c36b18",
+    "shared/chat-components.ts": "3097cd7e59206fabe3da5b8c039e508869dd0f57cd1c8e9898b56ec7444d6057",
+    "shared/foundation-b.ts": "ffc94d4335e7ade7865bf6faff2c02ef42e33d9b62c2cdeae5216439f562db32",
+    "shared/foundation-e.ts": "cf46a5e934eb1866060d38df7b3adefe62d4d9d0598910ef19c0b3bae0283ff0",
+    "shared/foundation-g.ts": "7b7c29449dfa21ae6f46e54d651f1eb7f9b2ba2db92baf844a7ca9fc72afdde8",
+    "shared/foundation-h.ts": "e97e99e2c2203352414ba0e9463d7868efc70cec89ae2a1d593c82cf2b325081",
+    "shared/foundation-i.ts": "507352fa1b69ca8bc8d2995af0b575e243d89883e930d6b27cbfc6e5068c4298",
+    "shared/foundation-j.ts": "43d44d1c9bce59bdac21385d7191a5308943b7dd945e7e69562855346f274967",
+    "shared/foundation-k.ts": "5b506a72cba7d90aa262076a53be669cae9a9da0dee854d762e9ee12fb66ddff",
+    "shared/input-edit.ts": "b10a441347ecd603662b94cc9f6e5d68cd5d025d3eb5026062edf70f9298a4e3",
+    "shared/input-text.ts": "7306ca281916e09b8b15236995918c44f59ec1cc47c06fd7dd1504a77a352ebb",
+    "shared/notification-stack.ts": "ec364473997ee3f9627bbbec46f9c37d3404b8db3a7ba8fe9e066a06bbeb8b41",
+    "shared/select-options.ts": "7ef3f2fb44173f45181743d0b662c99ed4523d2781612f368a4fddf67e2e8761",
+    "shared/surface-a.ts": "8364a9d134c9aab01a23955ac8cbd4650fee08d693f86c0eb9c36c1be2ed78b4",
+    "shared/surface-b.ts": "2e2645ea2997a80898cf4c0823f685cc4b087d6361207ed783b4060bf7ab4028",
+    "shared/surface-c.ts": "b39475ce05209c486c22b25fa300fb4b13ea5051c7c3be650e2759aa10cd584e",
+    "shared/surface-d.ts": "e80eb3ab4decddc43296a6f4c53ecd5a00e29d9a815fd810737502c0112eca4c",
+    "shared/surface-e.ts": "be825b59c382aeec899ad3e7418004f07ba1515f0aaadc1930d57f5c253d9cc4",
+    "shared/surface-navigation-sidebar.ts": "9aaac072a9b4f34ecb20e0611993b9f3fc37b3c74c4f5511b8fe5b8972c8cec4",
+    "shared/theme.ts": "ebc1e7caff4152993214dd672855c4c8827424d4b219eb58f8ca90ee2b1c8764",
+    "shared/types.ts": "fc11ec900c9a606128bc8d1b4a7b0f9bc001e044ccc9370d0e01bb11940605c2",
+    "solid/accordion.tsx": "ab9265d5ee6ad78522951b329a1e7a372e2f7ba97af5d126a5a767fd575458cb",
+    "solid/alert-dialog.tsx": "73b385200cd1219a384c1f771ab7b8f66c7b375f6d1e1719874227f012198a82",
+    "solid/alert.tsx": "3de7ae4a07f1cdaeaa14a6ae2214cf370b6ba42fa28789c12830d17a1730b33a",
+    "solid/aspect-ratio.tsx": "49ebe5686f5d2f2fdcbf56f1ed0b092d8b121c446bd3a993c7ddda0d02edef67",
+    "solid/assets.tsx": "87a3cb677c3a0a3706bfca802f2ce47294df4eb98764a68ea15b569d94f72e47",
+    "solid/attachment.tsx": "e73bb1be4e38c3cf1b349386190507d99b7a7483ae2e2d24b738cc7966f4e64a",
+    "solid/avatar.tsx": "af2214a9cd05b05edba428e5227ccd44d6ca09988c6c66f44f9254923e51f0b4",
+    "solid/badge.tsx": "9acf699913a2f70e434d5168c711f59cac4284a66fcbede749790dc84f5ee18f",
+    "solid/breadcrumb.tsx": "3b0edb9b19ba26226e841859152a6bc660b96f95d553138eb9149733cd4e4254",
+    "solid/bubble.tsx": "47a744e180ee9daabcd122aaef0d17e0c4fc8f3a1a14beca7dee32e388ae64c7",
+    "solid/button-group.tsx": "2110e7d55e0814a96e4dc967e3d9d74d8e9b62496faa5543acddd49628d4eed4",
+    "solid/button.tsx": "31e86b5591a98c20fc4216574b9c6f5f70df3adfcfb0f4bfeed8fc2d47a4f6ab",
+    "solid/calendar.tsx": "5517390a312c174c214e11eac478ec55596b8d9e01a2e4c4f5109765d7bf541b",
+    "solid/card.tsx": "bd34292a37209bb7288e632236919a90c10420838ac5bda0d63f392dd167f55b",
+    "solid/carousel.tsx": "feee310c61801e2442bce8222c6aaca97dd969b904ddeeedae70e0efa1147f9b",
+    "solid/chart.tsx": "b6181f151aaaf9f8415bc4722ffd79a739011663916ff10065521883698fbd9a",
+    "solid/checkbox.tsx": "2ec0a730ea0f76d3c33060aface89469610f57293e1093f1384e6c2ede89a447",
+    "solid/collapsible.tsx": "bdea15b5a22c352966263e6d88fbc3048d9cc67fa166fdf83983626dc41f88cc",
+    "solid/combobox.tsx": "bde2dff6eca08a4cc7e8c18c4810c50594540d59eed0def2239f09ec3c5799a0",
+    "solid/command.tsx": "c503fc167778713607237f97c03160e70f7881c8459d9a95bf57a341278013fb",
+    "solid/context-menu.tsx": "a0a2eacb29b80587b28748ca07a2589029aa06219fc3a956576df899ad8ea62d",
+    "solid/dialog.tsx": "00e624d6aef1f416d67d26b6994e4e7ba2be7331dd30852032fc2fa61817cc9a",
+    "solid/direction.tsx": "274f7005d47c075f8a0142d6b5208286b677cb15c489b754d6e214c5ea0ab5c8",
+    "solid/drawer.tsx": "9a8817e4f0c1a2e6b4421703382cec9f6a55484e49f0a4db0343132b2cdd8236",
+    "solid/dropdown-menu.tsx": "a0ac92857f0eca9469fc4321547fd2117efd1c6fdb7fddaa8c00f04a3c572d2a",
+    "solid/empty.tsx": "9172d3b8a7294b4b771322c7006646170cf9657c2a8445e2ca0bad9f6c567551",
+    "solid/field.tsx": "4264a74f2d0a2076cde211436d1623967844a1016548cf2c1f7e5e0bc1f0240f",
+    "solid/form.tsx": "7b27c1c9cfbfcddf57faf7fb313a0098d9f8230dbec0d18faecc71017cf7a508",
+    "solid/hover-card.tsx": "8d52dd2a4b8ee5d51032d307218064a08056f29fbabb802347d7415bf1aad9e0",
+    "solid/input-field.tsx": "f03f753d5b20dc4590adf626b1a09d0d5371c30f6041086a9b794cee162fab22",
+    "solid/input-group.tsx": "15ad9c051afee51c9cbc8d57d4513a69040ccc2f797f8158235a50625f3a4865",
+    "solid/input-otp.tsx": "34f998771a1e09d23addcc20ba2da156e6a022228a19018e3b9e52bf37fa592f",
+    "solid/item.tsx": "23f01f3dcfc02cfd80218f1340aedd210cee8906db7223d3f03877e7fcbde651",
+    "solid/kbd.tsx": "3c78b8494d52a76420391a08c6b5a52bc7ee5ab5d341c4b7a79de2083af2f311",
+    "solid/label.tsx": "70bd5fbd845d4e4e53db9a337ab4d67be51ba7a093b31dfe4471e65e3304825e",
+    "solid/marker.tsx": "db4bd8755f7a2205ad26ec725ff90a19d2b96d4ee0981520042f912d9beea0e9",
+    "solid/menubar.tsx": "1fa272f81f5f7e09b5e2c493e390c12df543eec016051ea2dee297c1f0567041",
+    "solid/message-scroller.tsx": "ee9f2a062077b9dc34ffc78c98507d872a845a3de215e1c1dc91cb9a66fc4ad7",
+    "solid/message.tsx": "34c3fed31a662eb6604953a63f58234fdf315c2185d7d21b0588ce63b73b34af",
+    "solid/native-select.tsx": "6ba22ec7dee76a758c2f1e6ec273c7b83fcf708730c5c5204fbdd44c26172588",
+    "solid/navigation-menu.tsx": "56f1e9802004a0f0cd0cb8d6ed55146338bffde21f0cf09e72d2652d5b0dfade",
+    "solid/pagination.tsx": "0bd44e88a37583cc0236d3cf1e95b94bf0431da117be07fa97097ec7d1af19a8",
+    "solid/popover.tsx": "16bd8e47547cd144ff39a9e7bf13ae7f18565aa334af8af26d5fe41eb53ffeeb",
+    "solid/progress.tsx": "e1b6d226776ca4206c30afd29ea773f0314da95cd55c13a98777914d005ba531",
+    "solid/questionnaire.tsx": "94c83df6e4e8fe94eabee8fd2236e17a072f63cb0699b02590d125db409afd9e",
+    "solid/radio-group.tsx": "e2c1e2b0110b40a551dc0985a030fc51e80b57ebb9c7683cf590bbaf624c9cae",
+    "solid/resizable.tsx": "85fb1e66e7cbacf2d967476311cb71e423c4ed8e2b2f9ac250f0e5abe5399dba",
+    "solid/scroll-area.tsx": "6fb19959dbfe030a003d8d108849e54975c438bf8ced9859c0b48d8c407fad4d",
+    "solid/select.tsx": "d143824987890e6472b430003fd34c0627ac8f3819143bedde30e63d97cb3747",
+    "solid/separator.tsx": "9ef051d54757f04e2347c0d19622ab803b54010a31b92d1e2ec39c81b3d89c4c",
+    "solid/sheet.tsx": "5fea32765f34abca24eafc1489f7cae27a32d9adf62e66e5aba442aab876522b",
+    "solid/sidebar.tsx": "9c5bb0db060fe51f0856f3ef198dd301217afdea297e7140a730fe1f9c5f63b9",
+    "solid/skeleton.tsx": "44e635d36e8fed2966c03a78b09bf90e1da0e90eff18a592b1f99d1d42c63f68",
+    "solid/slider.tsx": "69f25736ab17cb95dcaaabc553be164a788efc6b544ac6a50ad21ee8182d0d16",
+    "solid/sonner.tsx": "ad93f686870c4536042f46bb06ffe5a3df41de6e8ebde9a76b2e35ab197b376c",
+    "solid/spinner.tsx": "8550524a1b14212cbd0e3b95f7f3d95a36e1c836a469e723021cd9f5299f617b",
+    "solid/switch.tsx": "09e2ff665d8a267894a49ff3fdc70683a29c57d14c8febaf844fb5cd7adf03a7",
+    "solid/table.tsx": "68552081c5c8dda900dfe9a70819751007768b7d769157b0cd44e918515e0493",
+    "solid/tabs.tsx": "d814bfce46681fe6abecd11d15623c769eaef2ec5f56d6303812557bf36f9b4e",
+    "solid/textarea.tsx": "14b0061f4312316754a7144faf9758b274a52262516031698db44e2a6676449c",
+    "solid/toast.tsx": "13c3bb4a90d8f34741f8c803ebeb580f2716acd1b2afa07f6dce6f196ba72c12",
+    "solid/toggle-group.tsx": "cc0f0d44062843ab029ea42c17ff08f02d37b07491d77fb6da9a1e744a2d77aa",
+    "solid/toggle.tsx": "4af8614151d60f6afa0f263491738bf2c7017ba7feed270b0b085371c81162c4",
+    "solid/tooltip.tsx": "c1359761d23aaf5c6aadbde778aa38fcee1c8ca46d1ff06f2a52c8ee3aafedb2"
+  },
+  "components": {
+    "accordion": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/accordion.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/accordion.tsx"
+      },
+      "solid": [
+        "shared/surface-a.ts",
+        "shared/theme.ts",
+        "solid/accordion.tsx"
+      ],
+      "react": [
+        "react/accordion.tsx",
+        "shared/surface-a.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "alert": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/alert.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/alert.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/alert.tsx"
+      ],
+      "react": [
+        "react/alert.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "alert-dialog": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/alert-dialog.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/alert-dialog.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-d.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/alert-dialog.tsx",
+        "solid/assets.tsx",
+        "solid/button.tsx"
+      ],
+      "react": [
+        "react/alert-dialog.tsx",
+        "react/assets.tsx",
+        "react/button.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-d.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "aspect-ratio": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/aspect-ratio.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/aspect-ratio.tsx"
+      },
+      "solid": [
+        "shared/foundation-b.ts",
+        "shared/theme.ts",
+        "solid/aspect-ratio.tsx"
+      ],
+      "react": [
+        "react/aspect-ratio.tsx",
+        "shared/foundation-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "attachment": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/attachment.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/attachment.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/chat-components.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/attachment.tsx",
+        "solid/button.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/attachment.tsx",
+        "react/button.tsx",
+        "shared/button-size.ts",
+        "shared/chat-components.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "avatar": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/avatar.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/avatar.tsx"
+      },
+      "solid": [
+        "shared/foundation-b.ts",
+        "shared/theme.ts",
+        "solid/avatar.tsx"
+      ],
+      "react": [
+        "react/avatar.tsx",
+        "shared/foundation-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "badge": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/badge.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/badge.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/badge.tsx"
+      ],
+      "react": [
+        "react/badge.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "breadcrumb": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/breadcrumb.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/breadcrumb.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/breadcrumb.tsx"
+      ],
+      "react": [
+        "react/breadcrumb.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "bubble": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/bubble.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/bubble.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/bubble.tsx"
+      ],
+      "react": [
+        "react/bubble.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "button": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/button.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/button.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "button-group": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/button-group.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/button-group.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/button-group.tsx"
+      ],
+      "react": [
+        "react/button-group.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "calendar": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/calendar.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/calendar.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-e.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/calendar.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/calendar.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-e.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "card": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/card.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/card.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/card.tsx"
+      ],
+      "react": [
+        "react/card.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "carousel": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/carousel.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/carousel.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-e.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/carousel.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/carousel.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-e.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "chart": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/chart.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/chart.tsx"
+      },
+      "solid": [
+        "shared/foundation-k.ts",
+        "shared/theme.ts",
+        "solid/chart.tsx"
+      ],
+      "react": [
+        "react/chart.tsx",
+        "shared/foundation-k.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "checkbox": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/checkbox.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/checkbox.tsx"
+      },
+      "solid": [
+        "shared/foundation-g.ts",
+        "shared/theme.ts",
+        "solid/checkbox.tsx"
+      ],
+      "react": [
+        "react/checkbox.tsx",
+        "shared/foundation-g.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "collapsible": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/collapsible.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/collapsible.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/collapsible.tsx"
+      ],
+      "react": [
+        "react/collapsible.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "combobox": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/combobox.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/combobox.tsx"
+      },
+      "solid": [
+        "shared/foundation-i.ts",
+        "shared/input-edit.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "solid/combobox.tsx"
+      ],
+      "react": [
+        "react/combobox.tsx",
+        "shared/foundation-i.ts",
+        "shared/input-edit.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "command": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/command.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/command.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/foundation-i.ts",
+        "shared/foundation-j.ts",
+        "shared/input-edit.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/command.tsx",
+        "solid/dialog.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/command.tsx",
+        "react/dialog.tsx",
+        "shared/button-size.ts",
+        "shared/foundation-i.ts",
+        "shared/foundation-j.ts",
+        "shared/input-edit.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "context-menu": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/context-menu.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/context-menu.tsx"
+      },
+      "solid": [
+        "shared/surface-b.ts",
+        "shared/theme.ts",
+        "solid/context-menu.tsx",
+        "solid/dropdown-menu.tsx"
+      ],
+      "react": [
+        "react/context-menu.tsx",
+        "react/dropdown-menu.tsx",
+        "shared/surface-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "dialog": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/dialog.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/dialog.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/dialog.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/dialog.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "direction": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/direction.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/direction.tsx"
+      },
+      "solid": [
+        "solid/direction.tsx"
+      ],
+      "react": [
+        "react/direction.tsx"
+      ]
+    },
+    "drawer": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/drawer.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/drawer.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-d.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/drawer.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/drawer.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-d.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "dropdown-menu": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/dropdown-menu.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/dropdown-menu.tsx"
+      },
+      "solid": [
+        "shared/surface-b.ts",
+        "shared/theme.ts",
+        "solid/dropdown-menu.tsx"
+      ],
+      "react": [
+        "react/dropdown-menu.tsx",
+        "shared/surface-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "empty": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/empty.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/empty.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/empty.tsx"
+      ],
+      "react": [
+        "react/empty.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "field": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/field.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/field.tsx"
+      },
+      "solid": [
+        "shared/foundation-h.ts",
+        "shared/theme.ts",
+        "solid/field.tsx"
+      ],
+      "react": [
+        "react/field.tsx",
+        "shared/foundation-h.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "form": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/form.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/form.tsx"
+      },
+      "solid": [
+        "shared/foundation-i.ts",
+        "shared/input-edit.ts",
+        "shared/theme.ts",
+        "solid/form.tsx"
+      ],
+      "react": [
+        "react/form.tsx",
+        "shared/foundation-i.ts",
+        "shared/input-edit.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "hover-card": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/hover-card.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/hover-card.tsx"
+      },
+      "solid": [
+        "shared/surface-c.ts",
+        "shared/theme.ts",
+        "solid/hover-card.tsx"
+      ],
+      "react": [
+        "react/hover-card.tsx",
+        "shared/surface-c.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "input-field": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/input-field.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/input-field.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/input-edit.ts",
+        "shared/input-text.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/input-field.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/input-field.tsx",
+        "shared/button-size.ts",
+        "shared/input-edit.ts",
+        "shared/input-text.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "input-group": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/input-group.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/input-group.tsx"
+      },
+      "solid": [
+        "shared/input-edit.ts",
+        "shared/theme.ts",
+        "solid/input-group.tsx"
+      ],
+      "react": [
+        "react/input-group.tsx",
+        "shared/input-edit.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "input-otp": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/input-otp.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/input-otp.tsx"
+      },
+      "solid": [
+        "shared/foundation-h.ts",
+        "shared/input-edit.ts",
+        "shared/theme.ts",
+        "solid/input-otp.tsx"
+      ],
+      "react": [
+        "react/input-otp.tsx",
+        "shared/foundation-h.ts",
+        "shared/input-edit.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "item": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/item.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/item.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/item.tsx"
+      ],
+      "react": [
+        "react/item.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "kbd": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/kbd.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/kbd.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/kbd.tsx"
+      ],
+      "react": [
+        "react/kbd.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "label": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/label.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/label.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/label.tsx"
+      ],
+      "react": [
+        "react/label.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "marker": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/marker.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/marker.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/marker.tsx"
+      ],
+      "react": [
+        "react/marker.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "menubar": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/menubar.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/menubar.tsx"
+      },
+      "solid": [
+        "shared/surface-b.ts",
+        "shared/theme.ts",
+        "solid/dropdown-menu.tsx",
+        "solid/menubar.tsx"
+      ],
+      "react": [
+        "react/dropdown-menu.tsx",
+        "react/menubar.tsx",
+        "shared/surface-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "message": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/message.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/message.tsx"
+      },
+      "solid": [
+        "shared/chat-components.ts",
+        "shared/foundation-b.ts",
+        "shared/theme.ts",
+        "solid/avatar.tsx",
+        "solid/message.tsx"
+      ],
+      "react": [
+        "react/avatar.tsx",
+        "react/message.tsx",
+        "shared/chat-components.ts",
+        "shared/foundation-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "message-scroller": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/message-scroller.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/message-scroller.tsx"
+      },
+      "solid": [
+        "shared/chat-components.ts",
+        "shared/theme.ts",
+        "solid/message-scroller.tsx"
+      ],
+      "react": [
+        "react/message-scroller.tsx",
+        "shared/chat-components.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "native-select": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/native-select.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/native-select.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/native-select.tsx",
+        "solid/select.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/native-select.tsx",
+        "react/select.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "navigation-menu": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/navigation-menu.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/navigation-menu.tsx"
+      },
+      "solid": [
+        "shared/surface-navigation-sidebar.ts",
+        "shared/theme.ts",
+        "solid/navigation-menu.tsx"
+      ],
+      "react": [
+        "react/navigation-menu.tsx",
+        "shared/surface-navigation-sidebar.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "pagination": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/pagination.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/pagination.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/pagination.tsx"
+      ],
+      "react": [
+        "react/pagination.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "popover": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/popover.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/popover.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/popover.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/popover.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "progress": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/progress.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/progress.tsx"
+      },
+      "solid": [
+        "shared/foundation-e.ts",
+        "shared/theme.ts",
+        "solid/progress.tsx"
+      ],
+      "react": [
+        "react/progress.tsx",
+        "shared/foundation-e.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "questionnaire": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/questionnaire.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/questionnaire.tsx"
+      },
+      "solid": [
+        "shared/foundation-k.ts",
+        "shared/input-edit.ts",
+        "shared/theme.ts",
+        "solid/questionnaire.tsx"
+      ],
+      "react": [
+        "react/questionnaire.tsx",
+        "shared/foundation-k.ts",
+        "shared/input-edit.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "radio-group": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/radio-group.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/radio-group.tsx"
+      },
+      "solid": [
+        "shared/foundation-g.ts",
+        "shared/theme.ts",
+        "solid/radio-group.tsx"
+      ],
+      "react": [
+        "react/radio-group.tsx",
+        "shared/foundation-g.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "resizable": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/resizable.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/resizable.tsx"
+      },
+      "solid": [
+        "shared/surface-e.ts",
+        "shared/theme.ts",
+        "solid/resizable.tsx"
+      ],
+      "react": [
+        "react/resizable.tsx",
+        "shared/surface-e.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "scroll-area": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/scroll-area.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/scroll-area.tsx"
+      },
+      "solid": [
+        "shared/surface-c.ts",
+        "shared/theme.ts",
+        "solid/scroll-area.tsx"
+      ],
+      "react": [
+        "react/scroll-area.tsx",
+        "shared/surface-c.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "select": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/select.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/select.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/select.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/select.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "separator": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/separator.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/separator.tsx"
+      },
+      "solid": [
+        "shared/foundation-b.ts",
+        "shared/theme.ts",
+        "solid/separator.tsx"
+      ],
+      "react": [
+        "react/separator.tsx",
+        "shared/foundation-b.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "sheet": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/sheet.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/sheet.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-d.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/sheet.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/sheet.tsx",
+        "shared/button-size.ts",
+        "shared/select-options.ts",
+        "shared/surface-d.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "sidebar": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/sidebar.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/sidebar.tsx"
+      },
+      "solid": [
+        "shared/surface-navigation-sidebar.ts",
+        "shared/theme.ts",
+        "solid/sidebar.tsx"
+      ],
+      "react": [
+        "react/sidebar.tsx",
+        "shared/surface-navigation-sidebar.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "skeleton": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/skeleton.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/skeleton.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/skeleton.tsx"
+      ],
+      "react": [
+        "react/skeleton.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "slider": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/slider.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/slider.tsx"
+      },
+      "solid": [
+        "shared/foundation-e.ts",
+        "shared/theme.ts",
+        "solid/slider.tsx"
+      ],
+      "react": [
+        "react/slider.tsx",
+        "shared/foundation-e.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "sonner": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/sonner.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/sonner.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/notification-stack.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/sonner.tsx",
+        "solid/toast.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/sonner.tsx",
+        "react/toast.tsx",
+        "shared/button-size.ts",
+        "shared/notification-stack.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "spinner": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/spinner.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/spinner.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "solid/spinner.tsx"
+      ],
+      "react": [
+        "react/spinner.tsx",
+        "shared/theme.ts"
+      ]
+    },
+    "switch": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/switch.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/switch.tsx"
+      },
+      "solid": [
+        "shared/foundation-e.ts",
+        "shared/theme.ts",
+        "solid/switch.tsx"
+      ],
+      "react": [
+        "react/switch.tsx",
+        "shared/foundation-e.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "table": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/table.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/table.tsx"
+      },
+      "solid": [
+        "shared/foundation-k.ts",
+        "shared/theme.ts",
+        "solid/table.tsx"
+      ],
+      "react": [
+        "react/table.tsx",
+        "shared/foundation-k.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "tabs": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/tabs.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/tabs.tsx"
+      },
+      "solid": [
+        "shared/surface-a.ts",
+        "shared/theme.ts",
+        "solid/tabs.tsx"
+      ],
+      "react": [
+        "react/tabs.tsx",
+        "shared/surface-a.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "textarea": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/textarea.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/textarea.tsx"
+      },
+      "solid": [
+        "shared/input-edit.ts",
+        "shared/theme.ts",
+        "solid/label.tsx",
+        "solid/textarea.tsx"
+      ],
+      "react": [
+        "react/label.tsx",
+        "react/textarea.tsx",
+        "shared/input-edit.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "toast": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/toast.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/toast.tsx"
+      },
+      "solid": [
+        "shared/button-size.ts",
+        "shared/notification-stack.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/assets.tsx",
+        "solid/button.tsx",
+        "solid/toast.tsx"
+      ],
+      "react": [
+        "react/assets.tsx",
+        "react/button.tsx",
+        "react/toast.tsx",
+        "shared/button-size.ts",
+        "shared/notification-stack.ts",
+        "shared/select-options.ts",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "toggle": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/toggle.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/toggle.tsx"
+      },
+      "solid": [
+        "shared/foundation-g.ts",
+        "shared/theme.ts",
+        "solid/toggle.tsx"
+      ],
+      "react": [
+        "react/toggle.tsx",
+        "shared/foundation-g.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "toggle-group": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/toggle-group.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/toggle-group.tsx"
+      },
+      "solid": [
+        "shared/foundation-g.ts",
+        "shared/foundation-i.ts",
+        "shared/theme.ts",
+        "solid/toggle-group.tsx"
+      ],
+      "react": [
+        "react/toggle-group.tsx",
+        "shared/foundation-g.ts",
+        "shared/foundation-i.ts",
+        "shared/theme.ts"
+      ]
+    },
+    "tooltip": {
+      "version": "0.3.3",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/solid/tooltip.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.3.3/packages/widgets/src/react/tooltip.tsx"
+      },
+      "solid": [
+        "shared/surface-c.ts",
+        "shared/theme.ts",
+        "solid/tooltip.tsx"
+      ],
+      "react": [
+        "react/tooltip.tsx",
+        "shared/surface-c.ts",
+        "shared/theme.ts"
+      ]
+    }
+  }
+}

@@ -46,6 +46,17 @@ pub(super) struct Popups {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
+    /// Requests another frame from the top native popup, if one is open.
+    ///
+    /// Returns whether a popup received the redraw request.
+    pub(crate) fn request_top_popup_redraw(&self) -> bool {
+        let Some(popup) = self.popups.entries.last() else {
+            return false;
+        };
+        popup.native.window().request_redraw();
+        true
+    }
+
     pub(crate) fn is_popup_window(&self, id: WindowId) -> bool {
         self.popups
             .entries

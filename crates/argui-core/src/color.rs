@@ -19,7 +19,7 @@ pub enum ColorInterpolation {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Error returned when parsing a hexadecimal color string fails.
+/// Error returned when parsing a supported color literal fails.
 pub enum ParseColorError {
     /// The input does not start with `#`.
     MissingHash,
@@ -27,6 +27,10 @@ pub enum ParseColorError {
     InvalidLength,
     /// One or more digits are not hexadecimal.
     InvalidDigit,
+    /// An `oklch()` function has invalid channels or syntax.
+    InvalidOklch,
+    /// An `rgb()` or `rgba()` function has invalid channels or syntax.
+    InvalidRgb,
 }
 
 impl fmt::Display for ParseColorError {
@@ -39,6 +43,10 @@ impl fmt::Display for ParseColorError {
             Self::InvalidDigit => {
                 formatter.write_str("a hexadecimal color contains a non-hexadecimal digit")
             }
+            Self::InvalidOklch => {
+                formatter.write_str("an oklch color has invalid channels or syntax")
+            }
+            Self::InvalidRgb => formatter.write_str("an rgb color has invalid channels or syntax"),
         }
     }
 }
@@ -178,14 +186,19 @@ impl Color {
         ))
     }
 
-    /// Parses a hexadecimal color or the CSS `transparent` keyword.
+    /// Parses a hexadecimal color, CSS `oklch()`, `rgb()`, `rgba()`, or `transparent`.
     /// * `value` — color literal to parse; other named colors are unsupported.
     ///
     /// # Errors
     /// Returns [`ParseColorError`] for an unsupported or invalid literal.
     pub fn from_literal(value: &str) -> Result<Self, ParseColorError> {
+        let value = value.trim();
         if value.eq_ignore_ascii_case("transparent") {
             Ok(Self::TRANSPARENT)
+        } else if value.starts_with("oklch(") {
+            parse_oklch(value)
+        } else if value.starts_with("rgb(") || value.starts_with("rgba(") {
+            parse_rgb(value)
         } else {
             Self::from_hex(value)
         }
@@ -291,6 +304,132 @@ impl Color {
             ColorScheme::Dark
         }
     }
+}
+
+/// Parses CSS comma or space separated RGB channels, with an optional alpha.
+///
+/// `value` includes the function name. Numeric channels use 0–255 and
+/// percentage channels use 0–100%. Alpha is normalized or a percentage.
+/// Returns an error for malformed, nonfinite, or out-of-range input.
+fn parse_rgb(value: &str) -> Result<Color, ParseColorError> {
+    let (body, legacy_alpha) = if let Some(body) = value.strip_prefix("rgb(") {
+        (body, false)
+    } else if let Some(body) = value.strip_prefix("rgba(") {
+        (body, true)
+    } else {
+        return Err(ParseColorError::InvalidRgb);
+    };
+    let body = body.strip_suffix(')').ok_or(ParseColorError::InvalidRgb)?;
+    let (channels, alpha) = if body.contains(',') {
+        if body.contains('/') {
+            return Err(ParseColorError::InvalidRgb);
+        }
+        let parts = body.split(',').map(str::trim).collect::<Vec<_>>();
+        let expected = if legacy_alpha { 4 } else { 3 };
+        if parts.len() != expected {
+            return Err(ParseColorError::InvalidRgb);
+        }
+        ([parts[0], parts[1], parts[2]], parts.get(3).copied())
+    } else {
+        let (channels, alpha) = body
+            .split_once('/')
+            .map_or((body, None), |(channels, alpha)| {
+                (channels, Some(alpha.trim()))
+            });
+        let parts = channels.split_whitespace().collect::<Vec<_>>();
+        if parts.len() != 3 || (legacy_alpha && alpha.is_none()) {
+            return Err(ParseColorError::InvalidRgb);
+        }
+        ([parts[0], parts[1], parts[2]], alpha)
+    };
+    let parse_channel = |part: &str| -> Result<f32, ParseColorError> {
+        let (number, maximum) = part
+            .strip_suffix('%')
+            .map_or((part, 255.0), |number| (number, 100.0));
+        let value = number
+            .trim()
+            .parse::<f32>()
+            .map_err(|_| ParseColorError::InvalidRgb)?;
+        if !value.is_finite() || !(0.0..=maximum).contains(&value) {
+            return Err(ParseColorError::InvalidRgb);
+        }
+        Ok(value / maximum)
+    };
+    let parse_alpha = |part: &str| -> Result<f32, ParseColorError> {
+        let (number, maximum) = part
+            .strip_suffix('%')
+            .map_or((part, 1.0), |number| (number, 100.0));
+        let value = number
+            .trim()
+            .parse::<f32>()
+            .map_err(|_| ParseColorError::InvalidRgb)?;
+        if !value.is_finite() || !(0.0..=maximum).contains(&value) {
+            return Err(ParseColorError::InvalidRgb);
+        }
+        Ok(value / maximum)
+    };
+    Ok(Color::srgba(
+        parse_channel(channels[0])?,
+        parse_channel(channels[1])?,
+        parse_channel(channels[2])?,
+        alpha.map(parse_alpha).transpose()?.unwrap_or(1.0),
+    ))
+}
+
+/// Parses the whitespace-separated CSS `oklch(L C H / alpha)` notation.
+/// `value` includes the function name and parentheses; percentage alpha is
+/// accepted. Returns an error for malformed, nonfinite, or out-of-range input.
+fn parse_oklch(value: &str) -> Result<Color, ParseColorError> {
+    let body = value
+        .strip_prefix("oklch(")
+        .and_then(|body| body.strip_suffix(')'))
+        .ok_or(ParseColorError::InvalidOklch)?;
+    let (channels, alpha) = body.split_once('/').unwrap_or((body, "1"));
+    let mut parts = channels.split_whitespace();
+    let parse = |part: Option<&str>| {
+        part.and_then(|part| part.parse::<f32>().ok())
+            .filter(|value| value.is_finite())
+            .ok_or(ParseColorError::InvalidOklch)
+    };
+    let lightness_part = parts.next().ok_or(ParseColorError::InvalidOklch)?;
+    let lightness = if let Some(percent) = lightness_part.strip_suffix('%') {
+        parse(Some(percent))? / 100.0
+    } else {
+        parse(Some(lightness_part))?
+    };
+    let chroma = parse(parts.next())?;
+    let hue_part = parts.next().ok_or(ParseColorError::InvalidOklch)?;
+    let hue = if let Some(degrees) = hue_part.strip_suffix("deg") {
+        parse(Some(degrees))?
+    } else if let Some(turns) = hue_part.strip_suffix("turn") {
+        parse(Some(turns))? * 360.0
+    } else if let Some(radians) = hue_part.strip_suffix("rad") {
+        parse(Some(radians))?.to_degrees()
+    } else {
+        parse(Some(hue_part))?
+    };
+    if parts.next().is_some()
+        || !(0.0..=1.0).contains(&lightness)
+        || chroma < 0.0
+        || !hue.is_finite()
+    {
+        return Err(ParseColorError::InvalidOklch);
+    }
+    let alpha = alpha.trim();
+    let alpha = if let Some(percent) = alpha.strip_suffix('%') {
+        parse(Some(percent.trim()))? / 100.0
+    } else {
+        parse(Some(alpha))?
+    };
+    if !(0.0..=1.0).contains(&alpha) {
+        return Err(ParseColorError::InvalidOklch);
+    }
+    let radians = hue.to_radians();
+    let (sin, cos) = radians.sin_cos();
+    Ok(Color::from_interpolation_components(
+        [lightness, chroma * cos, chroma * sin, alpha],
+        ColorInterpolation::Oklab,
+    ))
 }
 
 fn coordinates(color: Color, space: ColorInterpolation) -> [f32; 3] {

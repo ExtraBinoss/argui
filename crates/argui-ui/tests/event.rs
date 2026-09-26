@@ -1,3 +1,6 @@
+#[path = "event/wire.rs"]
+mod wire_tests;
+
 use argui_core::{
     Affine2D, Key, KeyInput, KeyState, Point, PointerEvent, PointerId, PointerPhase, Rect,
     ScrollDelta, Size,

@@ -32,19 +32,32 @@ pub struct TextEngine {
 
 impl Default for TextEngine {
     fn default() -> Self {
-        Self {
-            fonts: FontSystem::new(),
-            font_generation: FONT_GENERATION.fetch_add(1, Ordering::Relaxed),
-            rasterizer: RasterCache::default(),
-            stats: crate::TextStats::default(),
-            input_buffers: Vec::new(),
-            cache: TextCache::default(),
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self::from_embedded_fonts(
+                [include_bytes!("../assets/fonts/NotoSans-Regular.ttf").as_slice()],
+                "Noto Sans",
+                "Noto Sans",
+                "Noto Sans",
+            )
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self {
+                fonts: FontSystem::new(),
+                font_generation: FONT_GENERATION.fetch_add(1, Ordering::Relaxed),
+                rasterizer: RasterCache::default(),
+                stats: crate::TextStats::default(),
+                input_buffers: Vec::new(),
+                cache: TextCache::default(),
+            }
         }
     }
 }
 
 impl TextEngine {
-    /// Creates a text engine using the system font database.
+    /// Creates a text engine using system fonts on native targets and a bundled
+    /// fallback font on WebAssembly, where system fonts are unavailable.
     #[must_use]
     pub fn new() -> Self {
         Self::default()

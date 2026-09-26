@@ -1,12 +1,21 @@
 //! Sendable JSON transport for schema-typed presentation operations.
 
-use argui_core::{Color, Insets, Name, Transform2D};
+use argui_core::{Color, Name, Transform2D};
 use argui_host::{CallbackId, HostId, Operation};
-use argui_paint::{CornerRadii, Fill, ImageId, VectorId};
-use argui_schema::{AssetHandle, EventId, NativeTypeId, PropertyId, SchemaValue};
-use argui_ui::Dimension;
+use argui_paint::{Border, BorderWidths, CornerRadii, Fill, ImageId, Shadow, VectorId};
+use argui_schema::{
+    AssetHandle, ContainerRule, ContainerRuleStyle, EventId, NativeTypeId, PropertyId, SchemaValue,
+};
+use argui_ui::{
+    AlignItems, ContainerQuery, ContainerScopeId, Dimension, GridTemplateComponent, JustifyContent,
+    LayoutInsets, LengthPercentage, LengthPercentageAuto, PositionInsets, RepetitionCount,
+    TrackSizingFunction, auto, fr, length, minmax, repeat,
+};
 use serde::Deserialize;
 use serde_json::Value;
+
+mod grid;
+use grid::{container_rules, grid_tracks};
 
 /// An ID transported between the JavaScript actor and native host.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -53,10 +62,16 @@ impl WireValue {
                 .and_then(|s| Color::from_literal(s).ok())
                 .map(|c| SchemaValue::Brush(Fill::Solid(c))),
             "Dimension" => dimension(value).map(SchemaValue::Dimension),
+            "Constraint" => constraint(value).map(SchemaValue::Constraint),
             "Insets" => insets(value).map(SchemaValue::Insets),
+            "PositionInsets" => position_insets(value).map(SchemaValue::PositionInsets),
             "Radii" => radii(value).map(SchemaValue::Radii),
+            "Border" => border(value).map(SchemaValue::Border),
+            "Shadow" => shadow(value).map(SchemaValue::Shadow),
             "Transform" => transform(value).map(SchemaValue::Transform),
             "Asset" => asset(value).map(SchemaValue::Asset),
+            "GridTracks" => grid_tracks(value).map(SchemaValue::GridTracks),
+            "ContainerRules" => container_rules(value).map(SchemaValue::ContainerRules),
             _ => None,
         }
         .ok_or_else(|| {
@@ -166,35 +181,144 @@ fn dimension(value: &Value) -> Option<Dimension> {
         return Some(Dimension::length(number));
     }
     let text = value.as_str()?;
-    if text == "auto" || text == "fit" {
+    if text == "auto" {
         return Some(Dimension::auto());
     }
-    if text == "fill" {
-        return Some(Dimension::percent(1.0));
+    if text == "minContent" {
+        return Some(Dimension::min_content());
+    }
+    if text == "maxContent" {
+        return Some(Dimension::max_content());
+    }
+    if text == "fitContent" {
+        return Some(Dimension::fit_content());
     }
     if let Some(percent) = text.strip_suffix('%') {
         return percent
             .parse::<f32>()
             .ok()
-            .map(|p| Dimension::percent(p / 100.0));
+            .filter(|percent| percent.is_finite())
+            .map(|percent| Dimension::percent(percent / 100.0));
     }
     text.strip_suffix("px")?
         .parse::<f32>()
         .ok()
+        .filter(|pixels| pixels.is_finite())
         .map(Dimension::length)
 }
 
-fn insets(value: &Value) -> Option<Insets> {
+/// Decodes a nonnegative min/max constraint with pixel, percent, or auto semantics.
+///
+/// `value` is a JSON number or supported string. Returns `None` for invalid
+/// geometry or unsupported keywords.
+fn constraint(value: &Value) -> Option<LengthPercentageAuto> {
+    if let Some(pixels) = number(value).filter(|value| *value >= 0.0) {
+        return Some(LengthPercentageAuto::length(pixels));
+    }
+    let text = value.as_str()?;
+    if text == "auto" {
+        return Some(LengthPercentageAuto::auto());
+    }
+    let percent = text.strip_suffix('%')?.parse::<f32>().ok()?;
+    (percent.is_finite() && percent >= 0.0)
+        .then_some(LengthPercentageAuto::percent(percent / 100.0))
+}
+
+fn insets(value: &Value) -> Option<LayoutInsets> {
     if let Some(n) = number(value) {
-        return Some(Insets::new(n, n, n, n));
+        return Some(LayoutInsets {
+            top: n,
+            right: n,
+            bottom: n,
+            left: n,
+            start: None,
+            end: None,
+        });
     }
     let obj = value.as_object()?;
-    Some(Insets::new(
-        number(obj.get("top")?)?,
-        number(obj.get("right")?)?,
-        number(obj.get("bottom")?)?,
-        number(obj.get("left")?)?,
-    ))
+    if obj.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "top" | "right" | "bottom" | "left" | "start" | "end"
+        )
+    }) {
+        return None;
+    }
+    if (obj.contains_key("start") || obj.contains_key("end"))
+        && (obj.contains_key("left") || obj.contains_key("right"))
+    {
+        return None;
+    }
+    Some(LayoutInsets {
+        top: obj.get("top").map(number).unwrap_or(Some(0.0))?,
+        right: obj.get("right").map(number).unwrap_or(Some(0.0))?,
+        bottom: obj.get("bottom").map(number).unwrap_or(Some(0.0))?,
+        left: obj.get("left").map(number).unwrap_or(Some(0.0))?,
+        start: if let Some(value) = obj.get("start") {
+            Some(number(value)?)
+        } else {
+            None
+        },
+        end: if let Some(value) = obj.get("end") {
+            Some(number(value)?)
+        } else {
+            None
+        },
+    })
+}
+
+/// Decodes positioned edges while preserving omitted sides as `auto`.
+///
+/// `value` is a number for all four physical sides or a partial edge object.
+/// Returns `None` for an invalid edge or a logical/physical horizontal mix.
+fn position_insets(value: &Value) -> Option<PositionInsets> {
+    if let Some(n) = number(value) {
+        return Some(PositionInsets {
+            top: Some(n),
+            right: Some(n),
+            bottom: Some(n),
+            left: Some(n),
+            start: None,
+            end: None,
+        });
+    }
+    let object = value.as_object()?;
+    if object.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "top" | "right" | "bottom" | "left" | "start" | "end"
+        )
+    }) {
+        return None;
+    }
+    if (object.contains_key("start") || object.contains_key("end"))
+        && (object.contains_key("left") || object.contains_key("right"))
+    {
+        return None;
+    }
+    Some(PositionInsets {
+        top: optional(object, "top", number)?,
+        right: optional(object, "right", number)?,
+        bottom: optional(object, "bottom", number)?,
+        left: optional(object, "left", number)?,
+        start: optional(object, "start", number)?,
+        end: optional(object, "end", number)?,
+    })
+}
+
+/// Decodes an optional object field without losing a malformed present value.
+///
+/// `object` is the inspected JSON map, `key` names the field, and `decode`
+/// converts a present value. Returns `None` when conversion fails.
+fn optional<T>(
+    object: &serde_json::Map<String, Value>,
+    key: &str,
+    decode: impl FnOnce(&Value) -> Option<T>,
+) -> Option<Option<T>> {
+    match object.get(key) {
+        Some(value) => decode(value).map(Some),
+        None => Some(None),
+    }
 }
 
 fn radii(value: &Value) -> Option<CornerRadii> {
@@ -202,26 +326,118 @@ fn radii(value: &Value) -> Option<CornerRadii> {
         return Some(CornerRadii::all(n));
     }
     let obj = value.as_object()?;
+    if obj.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "topLeft" | "topRight" | "bottomRight" | "bottomLeft"
+        )
+    }) {
+        return None;
+    }
     Some(CornerRadii {
-        top_left: number(obj.get("topLeft")?)?,
-        top_right: number(obj.get("topRight")?)?,
-        bottom_right: number(obj.get("bottomRight")?)?,
-        bottom_left: number(obj.get("bottomLeft")?)?,
+        top_left: obj.get("topLeft").map(number).unwrap_or(Some(0.0))?,
+        top_right: obj.get("topRight").map(number).unwrap_or(Some(0.0))?,
+        bottom_right: obj.get("bottomRight").map(number).unwrap_or(Some(0.0))?,
+        bottom_left: obj.get("bottomLeft").map(number).unwrap_or(Some(0.0))?,
     })
+}
+
+/// Decodes a solid-colored border with a uniform or per-edge width.
+///
+/// * `value` — object containing `width` and `color`.
+///
+/// Returns `None` when a required field, color, or width is invalid.
+fn border(value: &Value) -> Option<Border> {
+    let obj = value.as_object()?;
+    if obj
+        .keys()
+        .any(|key| !matches!(key.as_str(), "width" | "color"))
+    {
+        return None;
+    }
+    let color = Color::from_literal(obj.get("color")?.as_str()?).ok()?;
+    let width = obj.get("width")?;
+    let widths = if let Some(width) = number(width) {
+        let width = nonnegative(width)?;
+        BorderWidths::all(width)
+    } else {
+        let edges = width.as_object()?;
+        if edges
+            .keys()
+            .any(|key| !matches!(key.as_str(), "top" | "right" | "bottom" | "left"))
+        {
+            return None;
+        }
+        BorderWidths {
+            top: nonnegative(number(edges.get("top")?)?)?,
+            right: nonnegative(number(edges.get("right")?)?)?,
+            bottom: nonnegative(number(edges.get("bottom")?)?)?,
+            left: nonnegative(number(edges.get("left")?)?)?,
+        }
+    };
+    Some(Border { widths, color })
+}
+
+/// Decodes a typed shadow using logical pixels and a solid color.
+///
+/// * `value` — object with required `blur` and `color`, plus optional offsets, spread, and inset.
+///
+/// Returns `None` for unknown fields or invalid geometry.
+fn shadow(value: &Value) -> Option<Shadow> {
+    let obj = value.as_object()?;
+    if obj.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "offsetX" | "offsetY" | "blur" | "spread" | "color" | "inset"
+        )
+    }) {
+        return None;
+    }
+    let blur = nonnegative(number(obj.get("blur")?)?)?;
+    let color = Color::from_literal(obj.get("color")?.as_str()?).ok()?;
+    let x = obj.get("offsetX").map(number).unwrap_or(Some(0.0))?;
+    let y = obj.get("offsetY").map(number).unwrap_or(Some(0.0))?;
+    let spread = obj.get("spread").map(number).unwrap_or(Some(0.0))?;
+    let inset = obj
+        .get("inset")
+        .map(Value::as_bool)
+        .unwrap_or(Some(false))?;
+    Some(
+        Shadow::drop([x, y], blur, color)
+            .spread(spread)
+            .inset(inset),
+    )
+}
+
+/// Accepts finite nonnegative geometry, preserving zero.
+///
+/// * `value` — decoded scalar.
+///
+/// Returns the scalar when nonnegative.
+fn nonnegative(value: f32) -> Option<f32> {
+    (value >= 0.0).then_some(value)
 }
 
 fn transform(value: &Value) -> Option<Transform2D> {
     let obj = value.as_object()?;
-    let x = obj.get("x").and_then(number).unwrap_or(0.0);
-    let y = obj.get("y").and_then(number).unwrap_or(0.0);
-    let scale_x = obj.get("scaleX").and_then(number).unwrap_or(1.0);
-    let scale_y = obj.get("scaleY").and_then(number).unwrap_or(1.0);
-    let radians = obj.get("rotation").and_then(number).unwrap_or(0.0);
+    if obj.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "translateX" | "translateY" | "scaleX" | "scaleY" | "rotation"
+        )
+    }) {
+        return None;
+    }
+    let x = obj.get("translateX").map(number).unwrap_or(Some(0.0))?;
+    let y = obj.get("translateY").map(number).unwrap_or(Some(0.0))?;
+    let scale_x = obj.get("scaleX").map(number).unwrap_or(Some(1.0))?;
+    let scale_y = obj.get("scaleY").map(number).unwrap_or(Some(1.0))?;
+    let degrees = obj.get("rotation").map(number).unwrap_or(Some(0.0))?;
     Some(
         Transform2D::IDENTITY
             .translate(x, y)
             .scale(scale_x, scale_y)
-            .rotate(radians),
+            .rotate(degrees.to_radians()),
     )
 }
 

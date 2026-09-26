@@ -58,5 +58,12 @@ const components = Object.fromEntries(names.map((name) => [name, {
 }]))
 const files = Object.fromEntries([...sourceFiles].sort(([a], [b]) => a.localeCompare(b)))
 const registry = { version: 2, arguiVersion: version, files, components }
-writeFileSync(join(root, 'components/registry.json'), `${JSON.stringify(registry, null, 2)}\n`)
+const output = `${JSON.stringify(registry, null, 2)}\n`
+if (process.argv.includes('--check')) {
+  if (readFileSync(join(root, 'components/registry.json'), 'utf8') !== output) {
+    throw new Error('Component registry is stale; run node scripts/generate-component-registry.mjs')
+  }
+} else {
+  writeFileSync(join(root, 'components/registry.json'), output)
+}
 console.log(`Registered ${names.length} paired components and ${sourceFiles.size} source files`)

@@ -10,7 +10,7 @@ fn layout_gap_and_text_color_retarget_through_native_transitions() {
             .construct(
                 builtin::ROW,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("gap".into()))
+                    .property(builtin::ID, SchemaValue::String("gap".into()))
                     .property(builtin::GAP, SchemaValue::Float(gap))
                     .property(builtin::TRANSITION_MS, SchemaValue::Float(480.0)),
             )
@@ -25,7 +25,7 @@ fn layout_gap_and_text_color_retarget_through_native_transitions() {
             .construct(
                 builtin::TEXT,
                 &NativeElementInput::new()
-                    .property(builtin::KEY, SchemaValue::String("color".into()))
+                    .property(builtin::ID, SchemaValue::String("color".into()))
                     .property(builtin::TEXT_VALUE, SchemaValue::String("Argui".into()))
                     .property(builtin::TEXT_COLOR, SchemaValue::Color(color))
                     .property(builtin::TRANSITION_MS, SchemaValue::Float(500.0)),

@@ -53,6 +53,32 @@ fn transparent_literal_decodes_for_color_and_brush() {
 }
 
 #[test]
+fn css_color_literals_decode_through_native_wire() {
+    for literal in [
+        "#ff008080",
+        "oklch(0.65 0.2 20 / 50%)",
+        "rgb(255 0 128 / 50%)",
+        "rgba(255, 0, 128, 0.5)",
+    ] {
+        for value_type in ["Color", "Brush"] {
+            let wire = serde_json::from_value(serde_json::json!({
+                "type": value_type, "value": literal
+            }))
+            .unwrap();
+            assert!(
+                argui_runtime::WireValue::into_native(wire).is_ok(),
+                "{value_type}: {literal}"
+            );
+        }
+    }
+    let invalid = serde_json::from_value(serde_json::json!({
+        "type": "Color", "value": "rgba(300, 0, 0, 0.5)"
+    }))
+    .unwrap();
+    assert!(argui_runtime::WireValue::into_native(invalid).is_err());
+}
+
+#[test]
 fn invalid_dimension_reports_node_property_and_value() {
     let operation: WireOperation = serde_json::from_value(serde_json::json!({
         "kind":"setProperty","id":{"slot":14,"generation":2},"property":5,
@@ -69,8 +95,11 @@ fn dimension_and_semantic_values_decode_without_cross_thread_schema_objects() {
     for value in [
         serde_json::json!({"type":"Dimension","value":"75%"}),
         serde_json::json!({"type":"Dimension","value":"auto"}),
-        serde_json::json!({"type":"Dimension","value":"fit"}),
-        serde_json::json!({"type":"Dimension","value":"fill"}),
+        serde_json::json!({"type":"Dimension","value":"minContent"}),
+        serde_json::json!({"type":"Dimension","value":"maxContent"}),
+        serde_json::json!({"type":"Dimension","value":"fitContent"}),
+        serde_json::json!({"type":"Constraint","value":"50%"}),
+        serde_json::json!({"type":"Constraint","value":"auto"}),
         serde_json::json!({"type":"Name","value":"page"}),
         serde_json::json!({"type":"Bool","value":true}),
     ] {
@@ -118,6 +147,8 @@ fn all_typed_wire_families_accept_valid_payloads() {
         ("Dimension", serde_json::json!(24)),
         ("Dimension", serde_json::json!("24px")),
         ("Insets", serde_json::json!(8)),
+        ("PositionInsets", serde_json::json!(8)),
+        ("PositionInsets", serde_json::json!({"start":12})),
         (
             "Insets",
             serde_json::json!({"top":1,"right":2,"bottom":3,"left":4}),
@@ -128,10 +159,27 @@ fn all_typed_wire_families_accept_valid_payloads() {
             serde_json::json!({"topLeft":1,"topRight":2,"bottomRight":3,"bottomLeft":4}),
         ),
         (
+            "Border",
+            serde_json::json!({"width":{"top":1,"right":2,"bottom":3,"left":4},"color":"#123456"}),
+        ),
+        (
+            "Shadow",
+            serde_json::json!({"offsetX":2,"offsetY":3,"blur":8,"spread":1,"color":"#123456","inset":false}),
+        ),
+        (
             "Transform",
-            serde_json::json!({"x":1,"y":2,"scaleX":2,"scaleY":3,"rotation":0.5}),
+            serde_json::json!({"translateX":1,"translateY":2,"scaleX":2,"scaleY":3,"rotation":30}),
         ),
         ("Transform", serde_json::json!({})),
+        ("Insets", serde_json::json!({"top":4,"start":8,"end":10})),
+        (
+            "GridTracks",
+            serde_json::json!([240,{"fr":1},{"repeat":{"count":"autoFit","tracks":[{"minmax":{"min":160,"max":{"fr":1}}}]}}]),
+        ),
+        (
+            "ContainerRules",
+            serde_json::json!([{"scope":"cards","when":{"minWidth":320,"maxWidth":900},"style":{"gridColumns":[{"fr":1}],"gap":8}}]),
+        ),
     ] {
         let wire = serde_json::from_value(serde_json::json!({"type":kind,"value":value})).unwrap();
         assert!(
@@ -151,12 +199,25 @@ fn malformed_wire_families_fail_without_partial_decoding() {
         ("Color", serde_json::json!("red")),
         ("Brush", serde_json::json!("red")),
         ("Dimension", serde_json::json!("bad")),
-        ("Insets", serde_json::json!({"top":1,"right":2,"bottom":3})),
-        (
-            "Radii",
-            serde_json::json!({"topLeft":1,"topRight":2,"bottomRight":3}),
-        ),
+        ("Insets", serde_json::json!({"start":1,"left":2})),
+        ("PositionInsets", serde_json::json!({"start":1,"left":2})),
+        ("Radii", serde_json::json!({"topLeft":1,"unexpected":2})),
+        ("Border", serde_json::json!({"width":-1,"color":"#123456"})),
+        ("Shadow", serde_json::json!({"blur":-1,"color":"#123456"})),
         ("Transform", serde_json::json!([])),
+        ("Transform", serde_json::json!({"x":1})),
+        ("Dimension", serde_json::json!("fill")),
+        ("Dimension", serde_json::json!("fit")),
+        ("Constraint", serde_json::json!("minContent")),
+        ("Constraint", serde_json::json!(-2)),
+        (
+            "GridTracks",
+            serde_json::json!([{"repeat":{"count":0,"tracks":[100]}}]),
+        ),
+        (
+            "ContainerRules",
+            serde_json::json!([{"scope":"cards","when":{"minWidth":700,"maxWidth":500},"style":{"gap":8}}]),
+        ),
         ("Unsupported", serde_json::json!(1)),
     ] {
         let wire = serde_json::from_value(serde_json::json!({"type":kind,"value":value})).unwrap();

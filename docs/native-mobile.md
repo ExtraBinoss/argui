@@ -46,14 +46,14 @@ the engine and platform features it uses:
 
 ```toml
 [dependencies]
-argui-core = "0.3.3"
-argui-runtime = "0.3.3"
+argui-core = "0.4.0"
+argui-runtime = "0.4.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
-argui-runtime = { version = "0.3.3", features = ["android"] }
+argui-runtime = { version = "0.4.0", features = ["android"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
-argui-runtime = { version = "0.3.3", features = ["ios"] }
+argui-runtime = { version = "0.4.0", features = ["ios"] }
 ```
 
 The TSX application path is separate: `apps/gallery` shares the Rust host and

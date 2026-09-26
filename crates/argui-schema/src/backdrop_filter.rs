@@ -294,15 +294,12 @@ fn drop_shadow(text: &str) -> Result<Shadow, String> {
     ))
 }
 
-/// Parses a CSS hex, named, or rgb/rgba color in `text`.
+/// Parses a named or core-supported CSS color in `text`.
 ///
 /// # Errors
 ///
 /// Returns an error when the color syntax is unsupported or invalid.
 fn css_color(text: &str) -> Result<Color, String> {
-    if text.starts_with('#') {
-        return Color::from_hex(text).map_err(|error| error.to_string());
-    }
     match text {
         "transparent" => return Ok(Color::TRANSPARENT),
         "black" => return Ok(Color::BLACK),
@@ -312,44 +309,7 @@ fn css_color(text: &str) -> Result<Color, String> {
         "blue" => return Ok(Color::srgb(0.0, 0.0, 1.0)),
         _ => {}
     }
-    let body = if let Some(body) = text
-        .strip_prefix("rgba(")
-        .and_then(|body| body.strip_suffix(')'))
-    {
-        body
-    } else if let Some(body) = text
-        .strip_prefix("rgb(")
-        .and_then(|body| body.strip_suffix(')'))
-    {
-        body
-    } else {
-        return Err(format!("unsupported CSS color `{text}`"));
-    };
-    let parts: Vec<_> = if body.contains(',') {
-        body.split(',').map(str::trim).collect()
-    } else {
-        body.split_whitespace()
-            .filter(|part| *part != "/")
-            .collect()
-    };
-    if !(3..=4).contains(&parts.len()) {
-        return Err(format!("invalid RGB color `{text}`"));
-    }
-    let mut channels = [0.0; 3];
-    for (index, channel) in channels.iter_mut().enumerate() {
-        let value = if let Some(percent) = parts[index].strip_suffix('%') {
-            finite(percent)? / 100.0
-        } else {
-            finite(parts[index])? / 255.0
-        };
-        *channel = value.clamp(0.0, 1.0);
-    }
-    let alpha = if parts.len() == 4 {
-        ratio(parts[3], true)?
-    } else {
-        1.0
-    };
-    Ok(Color::srgba(channels[0], channels[1], channels[2], alpha))
+    Color::from_literal(text).map_err(|error| error.to_string())
 }
 
 /// Parses an Argui refraction strength, optional chromatic amount, and optional edge.

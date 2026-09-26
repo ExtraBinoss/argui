@@ -1,11 +1,52 @@
+use argui_core::{Affine2D, Color, Point, PointerButton, PointerEvent, PointerPhase, Rect, Size};
+use argui_paint::{ClipChain, Fill};
 use argui_schema::{
     NativeElementInput, NativeEventValue, NativeSlotValue, ObservationKind, SchemaError,
     SchemaValue, builtin,
 };
 use argui_ui::{
-    Current, Element, EventHandler, EventHandlerId, EventOwnerId, FocusContainment, FocusPolicy,
-    InitialFocus, KeyboardActivation, Role, SemanticValue, TreeUpdate, UiTree, UserSelect,
+    Current, CursorIcon, Element, EventHandler, EventHandlerId, EventOwnerId, FocusContainment,
+    FocusPolicy, HitRegion, HitShape, InitialFocus, KeyboardActivation, Role, SemanticValue, Sides,
+    TreeUpdate, UiTree, UserSelect,
 };
+
+#[test]
+fn focus_scope_exposes_widget_root_layout_without_a_wrapper() {
+    let scope = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(
+                    builtin::MIN_WIDTH,
+                    SchemaValue::Constraint(argui_ui::LengthPercentageAuto::length(0.0)),
+                )
+                .property(
+                    builtin::MAX_WIDTH,
+                    SchemaValue::Constraint(argui_ui::LengthPercentageAuto::percent(0.8)),
+                )
+                .property(builtin::GROW, SchemaValue::Float(1.0))
+                .property(builtin::SHRINK, SchemaValue::Float(0.0))
+                .property(builtin::ALIGN_SELF, SchemaValue::String("center".into()))
+                .property(
+                    builtin::MARGIN,
+                    SchemaValue::Insets(argui_ui::LayoutInsets::all(6.0)),
+                ),
+        )
+        .unwrap();
+    assert_eq!(
+        scope.style.min_size.width,
+        argui_ui::LengthPercentageAuto::length(0.0)
+    );
+    assert_eq!(
+        scope.style.max_size.width,
+        argui_ui::LengthPercentageAuto::percent(0.8)
+    );
+    assert_eq!(scope.style.flex_grow, 1.0);
+    assert_eq!(scope.style.flex_shrink, 0.0);
+    assert_eq!(scope.style.align_self, Some(argui_ui::AlignSelf::CENTER));
+    assert_eq!(scope.style.margin.left, argui_ui::length(6.0));
+}
 
 #[test]
 fn focus_scope_exposes_keyboard_focus_without_painting_a_control() {
@@ -16,7 +57,7 @@ fn focus_scope_exposes_keyboard_focus_without_painting_a_control() {
             &NativeElementInput::new()
                 .property(
                     builtin::KEYBOARD_ACTIVATION,
-                    SchemaValue::String("enter_or_space".into()),
+                    SchemaValue::String("enterOrSpace".into()),
                 )
                 .property(builtin::SEMANTIC_ROLE, SchemaValue::String("button".into()))
                 .property(
@@ -62,7 +103,7 @@ fn clickable_combo_scope_prevents_text_selection_without_keyboard_activation() {
             &NativeElementInput::new()
                 .property(
                     builtin::SEMANTIC_ROLE,
-                    SchemaValue::String("combo_box".into()),
+                    SchemaValue::String("comboBox".into()),
                 )
                 .event(NativeEventValue::new(builtin::CLICK, handler))
                 .slot(NativeSlotValue::new(
@@ -84,7 +125,7 @@ fn radio_group_scope_exposes_its_native_semantic_role() {
             &NativeElementInput::new()
                 .property(
                     builtin::SEMANTIC_ROLE,
-                    SchemaValue::String("radio_group".into()),
+                    SchemaValue::String("radioGroup".into()),
                 )
                 .property(
                     builtin::SEMANTIC_LABEL,
@@ -168,8 +209,8 @@ fn focus_scope_validates_policies_and_exposes_disabled_semantics() {
 
     for (property, value) in [
         (builtin::FOCUS_CONTAINMENT, "unknown"),
-        (builtin::KEYBOARD_ACTIVATION, "space_only"),
-        (builtin::SEMANTIC_ROLE, "unknown_role"),
+        (builtin::KEYBOARD_ACTIVATION, "spaceOnly"),
+        (builtin::SEMANTIC_ROLE, "unknownRole"),
     ] {
         let error = registry
             .construct(
@@ -179,7 +220,10 @@ fn focus_scope_validates_policies_and_exposes_disabled_semantics() {
                     .property(builtin::SEMANTIC_LABEL, SchemaValue::String("label".into())),
             )
             .unwrap_err();
-        assert!(matches!(error, SchemaError::Adapter(_)), "{value}");
+        assert!(
+            matches!(error, SchemaError::InvalidPropertyValue { .. }),
+            "{value}"
+        );
     }
 }
 
@@ -190,19 +234,19 @@ fn focus_scope_exposes_current_page_select_value_and_key_relations() {
         .construct(
             builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("options".into()))
+                .property(builtin::ID, SchemaValue::String("options".into()))
                 .property(
                     builtin::SEMANTIC_ROLE,
-                    SchemaValue::String("list_box".into()),
+                    SchemaValue::String("listBox".into()),
                 ),
         )
         .unwrap();
     let control = |current: bool| {
         let mut input = NativeElementInput::new()
-            .property(builtin::KEY, SchemaValue::String("select".into()))
+            .property(builtin::ID, SchemaValue::String("select".into()))
             .property(
                 builtin::SEMANTIC_ROLE,
-                SchemaValue::String("combo_box".into()),
+                SchemaValue::String("comboBox".into()),
             )
             .property(
                 builtin::SEMANTIC_LABEL,
@@ -253,4 +297,62 @@ fn focus_scope_exposes_current_page_select_value_and_key_relations() {
         tree.update(Element::column([control(false), target])),
         TreeUpdate::Semantics
     );
+}
+
+#[test]
+fn rectangle_uses_focus_scope_hover_and_press_colors_for_buttons() {
+    let registry = builtin::registry().unwrap();
+    let base = Fill::Solid(Color::BLACK);
+    let hover = Fill::Solid(Color::srgb(0.2, 0.4, 0.6));
+    let pressed = Fill::Solid(Color::WHITE);
+    let rectangle = registry
+        .construct(
+            builtin::RECTANGLE,
+            &NativeElementInput::new()
+                .property(builtin::BACKGROUND, SchemaValue::Brush(base.clone()))
+                .property(builtin::HOVER_BACKGROUND, SchemaValue::Brush(hover.clone()))
+                .property(
+                    builtin::PRESSED_BACKGROUND,
+                    SchemaValue::Brush(pressed.clone()),
+                ),
+        )
+        .unwrap();
+    let scope = registry
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new().slot(NativeSlotValue::new(builtin::CHILDREN, [rectangle])),
+        )
+        .unwrap();
+    let mut tree = UiTree::new(scope);
+    let scope_node = tree.node_ids()[0];
+    let rectangle_node = tree.node_ids()[1];
+    let region = HitRegion {
+        node: scope_node,
+        bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+        shape: HitShape::Bounds,
+        slop: Sides::default(),
+        enabled: true,
+        focus_policy: FocusPolicy::TabStop,
+        cursor: CursorIcon::Default,
+        gestures: Default::default(),
+        window_drag: None,
+    };
+    let color = |tree: &UiTree| {
+        tree.resolved_quad(rectangle_node, tree.element_for(rectangle_node).unwrap())
+            .background
+    };
+    assert_eq!(color(&tree), Some(base));
+    tree.pointer_moved(Point::new(10.0, 10.0), std::slice::from_ref(&region));
+    assert_eq!(color(&tree), Some(hover));
+    tree.pointer_event(
+        PointerEvent {
+            button: Some(PointerButton::Primary),
+            buttons: 1,
+            ..PointerEvent::mouse(PointerPhase::Pressed, Point::new(10.0, 10.0))
+        },
+        &[region],
+    );
+    assert_eq!(color(&tree), Some(pressed));
 }

@@ -13,13 +13,13 @@ test('React retains a native viewport and changes only its controls', () => {
   }
   const host = new NativeHost(bridge, contract.abiHash)
   const root = createRoot(host)
-  root.render(<gpuCanvas canvas_id={1} revision={0} width={320} height={180} alt="Preview" />)
+  root.render(<gpuCanvas canvasId={1} revision={0} width={320} height={180} alt="Preview" />)
   const node = root.nativeRoot().children[0]!
   expect(node.type.name).toBe('GpuCanvas')
   const initial = batches.flat().filter((operation) => operation.kind === 'setProperty')
   expect(initial.some((operation) => operation.value?.type === 'Int' && operation.value.value === 1)).toBe(true)
   const before = batches.length
-  root.render(<gpuCanvas canvas_id={1} revision={1} width={320} height={180} alt="Preview" />)
+  root.render(<gpuCanvas canvasId={1} revision={1} width={320} height={180} alt="Preview" />)
   expect(root.nativeRoot().children[0]).toBe(node)
   expect(batches.length).toBe(before + 1)
   expect(batches.at(-1)).toEqual([{

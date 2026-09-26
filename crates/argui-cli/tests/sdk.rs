@@ -26,6 +26,7 @@ fn fixture(root: &Path) -> String {
             "--targets",
             "native",
             "--yes",
+            "--no-install",
         ])
         .current_dir(root)
         .output()

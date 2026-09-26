@@ -24,5 +24,6 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true
   },
-  "include": ["packages/**/*.ts", "packages/**/*.tsx", "apps/**/*.ts", "apps/**/*.tsx"]
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "apps/**/*.ts", "apps/**/*.tsx"],
+  "exclude": ["OLD_API/**"]
 }

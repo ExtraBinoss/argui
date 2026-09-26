@@ -24,6 +24,31 @@ pub struct PortalSnapshot {
     pub constrained_height: bool,
 }
 
+/// Authored sizing inputs beside the computed geometry of an inspected node.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LayoutSnapshot {
+    /// Preferred width, including its unit or intrinsic keyword.
+    pub preferred_width: String,
+    /// Preferred height, including its unit or intrinsic keyword.
+    pub preferred_height: String,
+    /// Authored minimum width constraint.
+    pub min_width: String,
+    /// Authored maximum width constraint.
+    pub max_width: String,
+    /// Authored minimum height constraint.
+    pub min_height: String,
+    /// Authored maximum height constraint.
+    pub max_height: String,
+    /// Flex growth factor used when this node is a flex item.
+    pub grow: f32,
+    /// Flex shrink factor used when this node is a flex item.
+    pub shrink: f32,
+    /// Untransformed layout rectangle produced by the engine.
+    pub computed: Rect,
+    /// Actionable descriptions of potentially surprising sizing inputs.
+    pub notes: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 /// Captured geometry, semantics, and style summary for one UI node.
 pub struct NodeSnapshot {
@@ -34,6 +59,7 @@ pub struct NodeSnapshot {
     pub kind: String,
     pub summary: Option<String>,
     pub bounds: Rect,
+    pub layout: LayoutSnapshot,
     pub clip: Option<Rect>,
     pub z_index: i32,
     pub portal: Option<PortalSnapshot>,

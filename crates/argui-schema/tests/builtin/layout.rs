@@ -1,8 +1,9 @@
-use argui_core::Size;
-use argui_schema::{NativeElementInput, SchemaValue, builtin};
+use argui_core::{Color, Size, Transform2D};
+use argui_paint::{Border, BorderWidths, CornerRadii, Shadow};
+use argui_schema::{ContainerRule, ContainerRuleStyle, NativeElementInput, SchemaValue, builtin};
 use argui_ui::{
-    GridPlacement, GridTemplateComponent, LengthPercentageAuto, Line, TreeUpdate, UiTree,
-    WritingDirection, length,
+    ContainerQuery, ContainerScopeId, GridPlacement, GridTemplateComponent, LayoutInsets,
+    LengthPercentageAuto, Line, TreeUpdate, UiTree, WritingDirection, auto, fr, length, minmax,
 };
 
 #[test]
@@ -45,17 +46,44 @@ fn grid_tracks_placement_and_common_layout_reach_the_element() {
             &NativeElementInput::new()
                 .property(
                     builtin::GRID_COLUMNS,
-                    SchemaValue::String("minmax(120px,1fr) 2fr".into()),
+                    SchemaValue::GridTracks(vec![
+                        GridTemplateComponent::Single(minmax(length(120.0), fr(1.0))),
+                        GridTemplateComponent::Single(fr(2.0)),
+                    ]),
                 )
-                .property(builtin::GRID_ROWS, SchemaValue::String("auto 36px".into()))
-                .property(builtin::MAX_WIDTH, SchemaValue::Float(800.0))
+                .property(
+                    builtin::GRID_ROWS,
+                    SchemaValue::GridTracks(vec![
+                        GridTemplateComponent::Single(auto()),
+                        GridTemplateComponent::Single(length(36.0)),
+                    ]),
+                )
+                .property(
+                    builtin::MAX_WIDTH,
+                    SchemaValue::Constraint(LengthPercentageAuto::length(800.0)),
+                )
                 .property(builtin::ASPECT_RATIO, SchemaValue::Float(1.5))
-                .property(builtin::PADDING_LEFT, SchemaValue::Float(14.0))
-                .property(builtin::MARGIN_TOP, SchemaValue::Float(7.0))
+                .property(
+                    builtin::PADDING,
+                    SchemaValue::Insets(LayoutInsets {
+                        left: 14.0,
+                        ..LayoutInsets::default()
+                    }),
+                )
+                .property(
+                    builtin::MARGIN,
+                    SchemaValue::Insets(LayoutInsets {
+                        top: 7.0,
+                        ..LayoutInsets::default()
+                    }),
+                )
                 .property(builtin::COLUMN_GAP, SchemaValue::Float(12.0))
-                .property(builtin::SCALE_X, SchemaValue::Float(1.25))
-                .property(builtin::TRANSLATE_Y, SchemaValue::Float(9.0))
-                .property(builtin::ORIGIN_X, SchemaValue::Float(0.0)),
+                .property(
+                    builtin::TRANSFORM,
+                    SchemaValue::Transform(
+                        Transform2D::IDENTITY.translate(0.0, 9.0).scale(1.25, 1.0),
+                    ),
+                ),
         )
         .unwrap();
     assert_eq!(grid.style.grid_template_columns.len(), 2);
@@ -70,7 +98,6 @@ fn grid_tracks_placement_and_common_layout_reach_the_element() {
     assert_eq!(grid.style.gap.width, length(12.0));
     assert_eq!(grid.transform.scale.x, 1.25);
     assert_eq!(grid.transform.translation.y, 9.0);
-    assert_eq!(grid.transform_origin.x, 0.0);
     assert!(matches!(
         grid.style.grid_template_columns[0],
         GridTemplateComponent::Single(_)
@@ -78,16 +105,19 @@ fn grid_tracks_placement_and_common_layout_reach_the_element() {
 }
 
 #[test]
-fn independent_layout_limits_and_origin_reach_the_element() {
+fn independent_layout_limits_and_basis_reach_the_element() {
     let panel = builtin::registry()
         .unwrap()
         .construct(
             builtin::CONTAINER,
             &NativeElementInput::new()
-                .property(builtin::MAX_HEIGHT, SchemaValue::Float(240.0))
+                .property(
+                    builtin::MAX_HEIGHT,
+                    SchemaValue::Constraint(LengthPercentageAuto::length(240.0)),
+                )
                 .property(builtin::FLEX_BASIS, SchemaValue::Dimension(length(40.0)))
                 .property(builtin::ROW_GAP, SchemaValue::Float(11.0))
-                .property(builtin::ORIGIN_Y, SchemaValue::Float(0.25)),
+                .property(builtin::SHRINK, SchemaValue::Float(0.0)),
         )
         .unwrap();
     assert_eq!(
@@ -96,7 +126,42 @@ fn independent_layout_limits_and_origin_reach_the_element() {
     );
     assert_eq!(panel.style.flex_basis, length(40.0));
     assert_eq!(panel.style.gap.height, length(11.0));
-    assert_eq!(panel.transform_origin.y, 0.25);
+    assert_eq!(panel.style.flex_shrink, 0.0);
+}
+
+#[test]
+fn min_max_constraints_accept_percent_and_auto_and_reject_negative_values() {
+    let registry = builtin::registry().unwrap();
+    let element = registry
+        .construct(
+            builtin::ROW,
+            &NativeElementInput::new()
+                .property(
+                    builtin::MIN_WIDTH,
+                    SchemaValue::Constraint(LengthPercentageAuto::percent(0.5)),
+                )
+                .property(
+                    builtin::MAX_WIDTH,
+                    SchemaValue::Constraint(LengthPercentageAuto::auto()),
+                ),
+        )
+        .unwrap();
+    assert_eq!(
+        element.style.min_size.width,
+        LengthPercentageAuto::percent(0.5)
+    );
+    assert_eq!(element.style.max_size.width, LengthPercentageAuto::auto());
+    assert!(
+        registry
+            .construct(
+                builtin::ROW,
+                &NativeElementInput::new().property(
+                    builtin::MIN_WIDTH,
+                    SchemaValue::Constraint(LengthPercentageAuto::length(-1.0)),
+                ),
+            )
+            .is_err()
+    );
 }
 
 #[test]
@@ -152,10 +217,21 @@ fn container_breakpoint_registers_a_layout_query() {
                     builtin::QUERY_SCOPE,
                     SchemaValue::String("dashboard".into()),
                 )
-                .property(builtin::QUERY_MIN_WIDTH, SchemaValue::Float(520.0))
                 .property(
-                    builtin::QUERY_COLUMNS,
-                    SchemaValue::String("1fr 2fr".into()),
+                    builtin::CONTAINER_RULES,
+                    SchemaValue::ContainerRules(vec![ContainerRule {
+                        conditions: vec![ContainerQuery::min_width(
+                            ContainerScopeId::from_owned("dashboard".into()),
+                            520.0,
+                        )],
+                        style: ContainerRuleStyle {
+                            grid_columns: Some(vec![
+                                GridTemplateComponent::Single(fr(1.0)),
+                                GridTemplateComponent::Single(fr(2.0)),
+                            ]),
+                            ..ContainerRuleStyle::default()
+                        },
+                    }]),
                 ),
         )
         .unwrap();
@@ -177,14 +253,31 @@ fn independent_edges_and_clip_reach_paint_and_layout() {
         .construct(
             builtin::CONTAINER,
             &NativeElementInput::new()
-                .property(builtin::RADIUS, SchemaValue::Float(4.0))
-                .property(builtin::RADIUS_TOP_LEFT, SchemaValue::Float(12.0))
-                .property(builtin::BORDER_LEFT, SchemaValue::Float(3.0))
-                .property(builtin::BORDER_TOP, SchemaValue::Float(2.0))
+                .property(
+                    builtin::RADII,
+                    SchemaValue::Radii(CornerRadii {
+                        top_left: 12.0,
+                        top_right: 4.0,
+                        bottom_right: 4.0,
+                        bottom_left: 4.0,
+                    }),
+                )
+                .property(
+                    builtin::BORDER,
+                    SchemaValue::Border(Border {
+                        widths: BorderWidths {
+                            left: 3.0,
+                            top: 2.0,
+                            ..BorderWidths::default()
+                        },
+                        color: Color::BLACK,
+                    }),
+                )
                 .property(builtin::CLIP, SchemaValue::Bool(true))
-                .property(builtin::SHADOW_BLUR, SchemaValue::Float(8.0))
-                .property(builtin::SHADOW_OFFSET_X, SchemaValue::Float(5.0))
-                .property(builtin::SHADOW_SPREAD, SchemaValue::Float(2.0))
+                .property(
+                    builtin::SHADOW,
+                    SchemaValue::Shadow(Shadow::drop([5.0, 0.0], 8.0, Color::BLACK).spread(2.0)),
+                )
                 .property(builtin::ALIGN_SELF, SchemaValue::String("center".into())),
         )
         .unwrap();
@@ -207,8 +300,14 @@ fn positioning_and_standalone_rotation_reach_the_element() {
             builtin::CONTAINER,
             &NativeElementInput::new()
                 .property(builtin::POSITION, SchemaValue::String("absolute".into()))
-                .property(builtin::INSET_LEFT, SchemaValue::Float(12.0))
-                .property(builtin::INSET_TOP, SchemaValue::Float(8.0))
+                .property(
+                    builtin::INSET,
+                    SchemaValue::PositionInsets(argui_ui::PositionInsets {
+                        left: Some(12.0),
+                        top: Some(8.0),
+                        ..argui_ui::PositionInsets::default()
+                    }),
+                )
                 .property(builtin::Z_INDEX, SchemaValue::Int(4))
                 .property(builtin::ROTATION, SchemaValue::Float(30.0)),
         )

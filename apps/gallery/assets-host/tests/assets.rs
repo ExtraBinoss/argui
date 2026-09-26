@@ -3,12 +3,17 @@ use argui_gallery_assets::{AssetInput, AssetKind, decode_assets, load};
 #[test]
 fn embedded_assets_decode_for_native_image_and_svg_primitives() {
     let assets = load().expect("every embedded asset should decode");
-    assert_eq!(assets.images.len(), 2);
-    assert_eq!(assets.vectors.len(), 9);
-    assert!(assets.vectors.iter().any(|asset| asset.tintable));
-    assert!(assets.vectors.iter().any(|asset| !asset.tintable));
-    assert!(assets.images[0].width > 0);
-    assert!(assets.images[0].height > 0);
+    if cfg!(debug_assertions) {
+        assert_eq!(assets.images.len(), 2);
+        assert_eq!(assets.vectors.len(), 18);
+        assert!(assets.vectors.iter().any(|asset| asset.tintable));
+        assert!(assets.vectors.iter().any(|asset| !asset.tintable));
+        assert!(assets.images[0].width > 0);
+        assert!(assets.images[0].height > 0);
+    } else {
+        assert!(assets.images.is_empty());
+        assert!(assets.vectors.iter().all(|asset| asset.tintable));
+    }
 }
 
 #[test]

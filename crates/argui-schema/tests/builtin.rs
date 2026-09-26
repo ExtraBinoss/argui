@@ -43,7 +43,7 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
         (builtin::TOUCH_AREA, "TouchArea"),
         (builtin::FOCUS_SCOPE, "FocusScope"),
         (builtin::PATH, "Path"),
-        (builtin::FLICKABLE, "Flickable"),
+        (builtin::SCROLL_VIEW, "ScrollView"),
         (builtin::KEY_BINDING, "KeyBinding"),
         (builtin::POPUP_WINDOW, "PopupWindow"),
         (builtin::VIRTUAL_WINDOW, "VirtualWindow"),
@@ -102,14 +102,14 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
     }
 }
 use argui_core::Color;
-use argui_paint::{Fill, Filter};
+use argui_paint::{Border, CornerRadii, Fill, Filter};
 use argui_schema::{NativeElementInput, NativeSlotValue, SchemaValue, builtin};
 use argui_text::{
     EllipsisPosition, FontStyle, LetterSpacing, TextAlign, TextOverflow, TextWrap, UnderlineStyle,
 };
 use argui_ui::{
     AlignItems, DesktopBackdropState, Display, Element, ElementKind, FlexWrap, JustifyContent,
-    Overflow, UiTree, length,
+    LayoutInsets, UiTree, length,
 };
 
 #[test]
@@ -133,7 +133,7 @@ fn ordered_backdrop_filters_apply_to_text_and_layout_surfaces() {
             SchemaValue::String("blur(4px) brightness(60%)".into()),
         );
         let input = if id == builtin::TEXT {
-            input.property(builtin::CONTENT, SchemaValue::String("Glass".into()))
+            input.property(builtin::TEXT_VALUE, SchemaValue::String("Glass".into()))
         } else {
             input
         };
@@ -194,8 +194,11 @@ fn text_accepts_runtime_padding_and_corner_radius() {
         .construct(
             builtin::TEXT,
             &NativeElementInput::new()
-                .property(builtin::CONTENT, SchemaValue::String("Theme".into()))
-                .property(builtin::PADDING, SchemaValue::Float(14.0))
+                .property(builtin::TEXT_VALUE, SchemaValue::String("Theme".into()))
+                .property(
+                    builtin::PADDING,
+                    SchemaValue::Insets(argui_ui::LayoutInsets::all(14.0)),
+                )
                 .property(builtin::RADIUS, SchemaValue::Float(11.0)),
         )
         .unwrap();
@@ -204,13 +207,12 @@ fn text_accepts_runtime_padding_and_corner_radius() {
 }
 
 #[test]
-fn text_alias_takes_precedence_and_clamps_font_weight() {
+fn text_prop_and_font_weight_clamping_reach_the_element() {
     let registry = builtin::registry().unwrap();
     let text = registry
         .construct(
             builtin::TEXT,
             &NativeElementInput::new()
-                .property(builtin::CONTENT, SchemaValue::String("old".into()))
                 .property(builtin::TEXT_VALUE, SchemaValue::String("new".into()))
                 .property(builtin::NO_WRAP, SchemaValue::Bool(true))
                 .property(builtin::TEXT_WEIGHT, SchemaValue::Int(2000))
@@ -226,7 +228,7 @@ fn text_alias_takes_precedence_and_clamps_font_weight() {
         .construct(
             builtin::TEXT,
             &NativeElementInput::new()
-                .property(builtin::CONTENT, SchemaValue::String("low".into()))
+                .property(builtin::TEXT_VALUE, SchemaValue::String("low".into()))
                 .property(builtin::TEXT_WEIGHT, SchemaValue::Int(-3)),
         )
         .unwrap();
@@ -256,7 +258,7 @@ fn optional_text_typography_reaches_the_text_style() {
                 .property(builtin::TEXT_LINE_CLAMP, SchemaValue::Int(2))
                 .property(
                     builtin::TEXT_OVERFLOW,
-                    SchemaValue::String("ellipsis_end".into()),
+                    SchemaValue::String("ellipsisEnd".into()),
                 ),
         )
         .unwrap();
@@ -277,7 +279,7 @@ fn optional_text_typography_reaches_the_text_style() {
 }
 
 #[test]
-fn layout_primitives_apply_optional_spacing_shape_and_scroll_policy() {
+fn layout_primitives_apply_optional_spacing_and_shape() {
     let registry = builtin::registry().unwrap();
     for id in [builtin::CONTAINER, builtin::ROW, builtin::COLUMN] {
         let element = registry
@@ -285,17 +287,22 @@ fn layout_primitives_apply_optional_spacing_shape_and_scroll_policy() {
                 id,
                 &NativeElementInput::new()
                     .property(builtin::GAP, SchemaValue::Float(6.0))
-                    .property(builtin::PADDING, SchemaValue::Float(4.0))
+                    .property(
+                        builtin::PADDING,
+                        SchemaValue::Insets(LayoutInsets::all(4.0)),
+                    )
                     .property(builtin::WRAP, SchemaValue::Bool(true))
                     .property(builtin::GROW, SchemaValue::Float(2.0))
-                    .property(builtin::BORDER_COLOR, SchemaValue::Color(Color::BLACK))
-                    .property(builtin::RADIUS, SchemaValue::Float(5.0))
+                    .property(
+                        builtin::BORDER,
+                        SchemaValue::Border(Border::all(1.0, Color::BLACK)),
+                    )
+                    .property(builtin::RADII, SchemaValue::Radii(CornerRadii::all(5.0)))
                     .property(builtin::ALIGN_ITEMS, SchemaValue::String("center".into()))
                     .property(
                         builtin::JUSTIFY_CONTENT,
                         SchemaValue::String("center".into()),
                     )
-                    .property(builtin::SCROLL_Y, SchemaValue::Bool(true))
                     .slot(NativeSlotValue::new(
                         builtin::CHILDREN,
                         [Element::text("child")],
@@ -312,7 +319,7 @@ fn layout_primitives_apply_optional_spacing_shape_and_scroll_policy() {
         let border = element.paint.quad.border.unwrap();
         assert_eq!(border.widths.left, 1.0);
         assert_eq!(border.color, Color::BLACK);
-        assert_eq!(element.style.overflow.y, Overflow::Auto);
+        assert_eq!(element.paint.quad.radii.top_left, 5.0);
     }
 }
 #[path = "builtin/accessibility.rs"]
