@@ -19,6 +19,8 @@ mod path;
 mod popup_window;
 #[path = "builtin/rectangle.rs"]
 mod rectangle;
+#[path = "builtin/rectangle/press.rs"]
+mod rectangle_press;
 #[path = "builtin/text_editor.rs"]
 mod text_editor;
 #[path = "builtin/touch_area.rs"]

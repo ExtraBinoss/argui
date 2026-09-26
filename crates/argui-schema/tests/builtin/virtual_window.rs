@@ -2,8 +2,8 @@ use argui_schema::{
     NativeElementInput, NativeEventValue, NativeSlotValue, SchemaError, SchemaValue, builtin,
 };
 use argui_ui::{
-    Element, EventHandler, EventHandlerId, EventOwnerId, EventType, RetainedIdentity, UiTree,
-    VirtualList,
+    Element, EventHandler, EventHandlerId, EventOwnerId, EventType, RetainedIdentity,
+    ScrollPhysics, ScrollbarVisibility, UiTree, VirtualList,
 };
 
 /// Builds the compiler-shaped input for a keyed million-row model.
@@ -53,7 +53,7 @@ fn row_id(tree: &UiTree, key: &str) -> argui_ui::NodeId {
 }
 
 #[test]
-fn virtual_window_mounts_only_visible_rows_without_visual_policy() {
+fn virtual_window_mounts_only_visible_rows_with_default_growing_scrollbar() {
     let registry = builtin::registry().unwrap();
     let schema = registry.schema(builtin::VIRTUAL_WINDOW).unwrap();
     assert_eq!(schema.name.as_str(), "VirtualWindow");
@@ -70,8 +70,41 @@ fn virtual_window_mounts_only_visible_rows_without_visual_policy() {
     assert!(root.children[0].children.len() < 25);
     assert!(root.paint.quad.background.is_none());
     let scroll = root.scroll.as_ref().unwrap();
-    assert!(scroll.scrollbar.is_none());
+    let scrollbar = scroll.scrollbar.as_ref().unwrap();
+    assert_eq!(scrollbar.width, 8.0);
+    assert_eq!(scrollbar.hover_width, Some(12.0));
+    assert_eq!(scrollbar.visibility, ScrollbarVisibility::Always);
     assert!(scroll.effects.is_empty());
+}
+
+/// The native virtualizer can explicitly hide its overflow scrollbar.
+#[test]
+fn virtual_window_can_hide_its_default_scrollbar() {
+    let root = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::VIRTUAL_WINDOW,
+            &input(100, 600.0)
+                .property(builtin::VIRTUAL_SCROLLBAR_VISIBLE, SchemaValue::Bool(false)),
+        )
+        .unwrap();
+    assert!(root.scroll.as_ref().unwrap().scrollbar.is_none());
+}
+
+/// Virtualized and ordinary viewports share the same momentum contract.
+#[test]
+fn virtual_window_accepts_light_native_scroll_momentum() {
+    let root = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::VIRTUAL_WINDOW,
+            &input(1_000_000, 600.0).property(builtin::SCROLL_MOMENTUM, SchemaValue::Float(0.35)),
+        )
+        .unwrap();
+    assert!(matches!(
+        root.scroll.as_ref().unwrap().physics,
+        ScrollPhysics::Inertial(config) if config.decay > 10.0
+    ));
 }
 
 #[test]

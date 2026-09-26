@@ -241,6 +241,41 @@ fn rectangle_alternating_loop_slows_before_reversing_without_slipping() {
 }
 
 #[test]
+fn rectangle_step_loop_holds_between_discrete_jumps() {
+    let registry = builtin::registry().unwrap();
+    let rectangle = registry
+        .construct(
+            builtin::RECTANGLE,
+            &NativeElementInput::new()
+                .property(builtin::LOOP_MS, SchemaValue::Float(1200.0))
+                .property(builtin::LOOP_TRANSLATE_X, SchemaValue::Float(120.0))
+                .property(builtin::LOOP_STEPS, SchemaValue::Int(6)),
+        )
+        .unwrap();
+    let PropertyBinding::Transform(binding) = &rectangle.bindings[0] else {
+        panic!("step loop must bind a native transform");
+    };
+    let motion = binding.motion.clone();
+    let mut tree = UiTree::new(rectangle);
+    tree.advance_animations(argui_animation::Time::from_nanos(1));
+    tree.advance_animations(argui_animation::Time::from_nanos(199_000_001));
+    assert_eq!(motion.value().translation.x, 0.0);
+    tree.advance_animations(argui_animation::Time::from_nanos(200_000_001));
+    assert!((motion.value().translation.x - 20.0).abs() < 0.001);
+    tree.advance_animations(argui_animation::Time::from_nanos(399_000_001));
+    assert!((motion.value().translation.x - 20.0).abs() < 0.001);
+
+    for input in [
+        NativeElementInput::new().property(builtin::LOOP_STEPS, SchemaValue::Int(6)),
+        NativeElementInput::new()
+            .property(builtin::LOOP_MS, SchemaValue::Float(1200.0))
+            .property(builtin::LOOP_STEPS, SchemaValue::Int(0)),
+    ] {
+        assert!(registry.construct(builtin::RECTANGLE, &input).is_err());
+    }
+}
+
+#[test]
 fn rectangle_rotation_loop_rejects_invalid_duration() {
     let registry = builtin::registry().unwrap();
     for duration in [0.0, -1.0, f32::NAN, f32::INFINITY, 60_001.0] {

@@ -72,7 +72,7 @@ fn controlled_million_character_input_profiles_both_adapters() {
         let editor = tree
             .resolve_node(&FocusTarget::Key("input-name".into()))
             .expect("named input is mounted");
-        let (input_id, callback) = listener_for(&initial, "input-name", 23);
+        let (input_id, callback) = listener_for(&navigation, "input-name", 23);
         let mut value = tree
             .text_input_value(editor)
             .expect("input value")
@@ -164,7 +164,7 @@ fn controlled_million_character_input_profiles_both_adapters() {
                 delivery.len(),
             );
         }
-        let (submit_id, submit_callback) = listener_for(&initial, "input-name", 5);
+        let (submit_id, submit_callback) = listener_for(&navigation, "input-name", 5);
         gallery
             .deliver(
                 &json!({

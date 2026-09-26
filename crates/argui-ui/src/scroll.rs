@@ -6,6 +6,9 @@ use crate::{
     VisualState, VisualStates, scroll_physics::ScrollPhysicsState,
 };
 
+mod hover_width;
+use hover_width::HoverWidths;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarRegion {
     pub horizontal: Option<ScrollbarGeometry>,
@@ -133,6 +136,8 @@ pub(crate) struct ScrollState {
     offsets: Vec<(NodeId, Point)>,
     drag: Option<ScrollDrag>,
     hover: Option<ScrollHover>,
+    hover_width_node: Option<NodeId>,
+    hover_widths: HoverWidths,
     physics: ScrollPhysicsState,
 }
 
@@ -162,7 +167,12 @@ impl ScrollState {
         self.physics.scrollbar_opacity(node, visibility)
     }
 
-    pub fn update_hover(&mut self, point: Option<Point>, regions: &[ScrollRegion]) -> bool {
+    pub fn update_hover(
+        &mut self,
+        point: Option<Point>,
+        regions: &[ScrollRegion],
+        reduced_motion: bool,
+    ) -> (bool, bool) {
         let hover = point.and_then(|point| {
             let region = regions
                 .iter()
@@ -181,10 +191,17 @@ impl ScrollState {
                 },
             })
         });
-        if self.hover == hover {
-            return false;
+        let previous_node = self.hover_width_node;
+        let next_node = self
+            .drag
+            .map(|drag| drag.node)
+            .or(hover.map(|next| next.node));
+        let changed = self.hover != hover || previous_node != next_node;
+        if !changed {
+            return (false, false);
         }
         self.hover = hover;
+        self.hover_width_node = next_node;
         if let Some(hover) = hover {
             let visibility = regions
                 .iter()
@@ -193,7 +210,27 @@ impl ScrollState {
                 .map(|style| style.visibility);
             self.physics.activate_scrollbar(hover.node, visibility);
         }
-        true
+        let mut geometry_changed = false;
+        if previous_node != next_node {
+            for node in [previous_node, next_node].into_iter().flatten() {
+                let duration = regions
+                    .iter()
+                    .find(|region| region.node == node)
+                    .and_then(|region| region.config.scrollbar.as_ref())
+                    .filter(|style| style.hover_width.is_some())
+                    .map(|style| style.hover_duration.as_secs_f64() as f32)
+                    .or_else(|| self.hover_widths.duration(node));
+                if let Some(duration) = duration {
+                    geometry_changed |= self.hover_widths.retarget(
+                        node,
+                        next_node == Some(node),
+                        duration,
+                        reduced_motion,
+                    );
+                }
+            }
+        }
+        (true, geometry_changed)
     }
 
     pub fn offset(&self, node: NodeId) -> Point {
@@ -443,6 +480,8 @@ impl ScrollState {
 
     pub fn retain(&mut self, ids: &[NodeId]) {
         self.offsets.retain(|(node, _)| ids.contains(node));
+        self.hover_widths.retain(ids);
+        self.hover_width_node = self.hover_width_node.filter(|node| ids.contains(node));
         self.physics.retain(ids);
         if self.drag.is_some_and(|drag| !ids.contains(&drag.node)) {
             self.drag = None;

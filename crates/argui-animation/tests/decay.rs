@@ -17,6 +17,14 @@ fn exponential_decay_is_frame_partition_independent() {
 }
 
 #[test]
+fn subpixel_decay_step_does_not_report_a_value_change() {
+    let mut decay = Decay::new(1.0e9_f32, 1.0, DecayConfig::default()).unwrap();
+    assert!(!decay.advance(Duration::from_nanos(1)));
+    assert_eq!(decay.value(), 1.0e9);
+    assert!(decay.is_active());
+}
+
+#[test]
 fn decay_kicks_and_stops_at_its_rest_threshold() {
     let mut decay = Decay::new(4.0_f32, 0.0, DecayConfig::default()).unwrap();
     assert!(!decay.is_active());

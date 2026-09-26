@@ -22,6 +22,7 @@ web-time = { workspace = true, optional = true }
 
 [dev-dependencies]
 argui-animation = { path = "../argui-animation" }
+web-time.workspace = true
 
 [lints]
 workspace = true

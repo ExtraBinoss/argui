@@ -24,11 +24,11 @@ export function ButtonGroupPage() {
       <text color={theme().text} fontSize={16}>Related actions</text>
       <text color={theme().textMuted}>The shared border and separators keep three independent actions visually connected.</text>
       <ButtonGroup id="group-actions" accessibleName="Document actions">
-        <Button variant="ghost" onClick={() => setAction('Archived')}>Archive</Button>
+        <Button variant="outline" onClick={() => setAction('Archived')}>Archive</Button>
         <ButtonGroupSeparator />
-        <Button variant="ghost" onClick={() => setAction('Reported')}>Report</Button>
+        <Button variant="outline" onClick={() => setAction('Reported')}>Report</Button>
         <ButtonGroupSeparator />
-        <Button variant="ghost" onClick={() => setAction('Snoozed')}>Snooze</Button>
+        <Button variant="outline" onClick={() => setAction('Snoozed')}>Snooze</Button>
       </ButtonGroup>
       <text color={theme().text}>{action()}</text>
     </column>
@@ -41,7 +41,7 @@ export function ButtonGroupPage() {
           onValueChange={setQuery} onSubmit={search} placeholder="Search examples"
           leading={<svg source={mediaAssets['tabler/search.svg']} width={16} height={16} color={theme().textMuted} />} />
         <ButtonGroupSeparator />
-        <Button variant="ghost" onClick={search}>Search</Button>
+        <Button variant="outline" onClick={search}>Search</Button>
       </ButtonGroup>
       <text color={theme().text}>{results().length ? `Matches: ${results().join(', ')}` : 'Type a term, then press Search.'}</text>
     </column>
@@ -64,9 +64,9 @@ export function ButtonGroupPage() {
     <column width="100%" gap={8}>
       <text color={theme().text} fontSize={16}>Vertical orientation</text>
       <ButtonGroup id="group-vertical" accessibleName="View modes" orientation="vertical" width={150}>
-        <Button width="100%" contentAlign="start" variant="ghost" onClick={() => setAction('List view')}>List</Button>
+        <Button width="100%" contentAlign="start" variant="outline" onClick={() => setAction('List view')}>List</Button>
         <ButtonGroupSeparator />
-        <Button width="100%" contentAlign="start" variant="ghost" onClick={() => setAction('Grid view')}>Grid</Button>
+        <Button width="100%" contentAlign="start" variant="outline" onClick={() => setAction('Grid view')}>Grid</Button>
       </ButtonGroup>
     </column>
 
@@ -74,11 +74,11 @@ export function ButtonGroupPage() {
       <text color={theme().text} fontSize={16}>Right to left</text>
       <text color={theme().textMuted}>directionScope changes logical start and end while the same components remain usable.</text>
       <ButtonGroup id="group-rtl" accessibleName="إجراءات المستند" directionScope="rtl">
-        <Button variant="ghost" onClick={() => setAction('أرشفة')}>أرشفة</Button>
+        <Button variant="outline" onClick={() => setAction('أرشفة')}>أرشفة</Button>
         <ButtonGroupSeparator />
-        <Button variant="ghost" onClick={() => setAction('تقرير')}>تقرير</Button>
+        <Button variant="outline" onClick={() => setAction('تقرير')}>تقرير</Button>
         <ButtonGroupSeparator />
-        <Button variant="ghost" onClick={() => setAction('تأجيل')}>تأجيل</Button>
+        <Button variant="outline" onClick={() => setAction('تأجيل')}>تأجيل</Button>
       </ButtonGroup>
     </column>
   </column>

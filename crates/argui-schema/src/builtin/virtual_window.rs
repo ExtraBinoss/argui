@@ -8,8 +8,8 @@ use argui_ui::{
 
 use super::{
     CHILDREN, CONTENT_HEIGHT, CONTENT_WIDTH, CommonProperty, GROW, ID, ITEM_COUNT, OFFSET_X,
-    OFFSET_Y, OVERSCAN, ROW_HEIGHT, SCROLL, SCROLL_OFFSET, SCROLLBAR_THUMB, VARIABLE_HEIGHT,
-    VIEWPORT_HEIGHT, VIRTUAL_DATA_VERSION, VIRTUAL_HORIZONTAL, VIRTUAL_MEASURE,
+    OFFSET_Y, OVERSCAN, ROW_HEIGHT, SCROLL, SCROLL_MOMENTUM, SCROLL_OFFSET, SCROLLBAR_THUMB,
+    VARIABLE_HEIGHT, VIEWPORT_HEIGHT, VIRTUAL_DATA_VERSION, VIRTUAL_HORIZONTAL, VIRTUAL_MEASURE,
     VIRTUAL_SCROLLBAR_VISIBLE, VIRTUAL_SCROLLBAR_WIDTH, VIRTUAL_SHADOW_COLOR, VIRTUAL_SHADOW_END,
     VIRTUAL_SHADOW_INTENSITY, VIRTUAL_SHADOW_START, VIRTUAL_SHADOW_WIDTH, VIRTUAL_VIEWPORT_WIDTH,
     VIRTUAL_VISIBLE_WIDTH, VIRTUAL_WINDOW, VIRTUAL_WINDOW_CHANGE, VISIBLE_HEIGHT, WINDOW_START,
@@ -122,14 +122,17 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         SCROLLBAR_THUMB,
         "scrollbarThumb",
         ValueType::Color,
-        "Optional thumb color; omitted windows remain visually neutral.",
+        "Optional thumb color; the default scrollbar remains visible on overflow.",
     ))
-    .property(PropertySchema::new(
-        VIRTUAL_SCROLLBAR_VISIBLE,
-        "scrollbarVisible",
-        ValueType::Bool,
-        "Show a native scrollbar for this window.",
-    ))
+    .property(
+        PropertySchema::new(
+            VIRTUAL_SCROLLBAR_VISIBLE,
+            "scrollbarVisible",
+            ValueType::Bool,
+            "Show a native scrollbar when content overflows; true by default.",
+        )
+        .default_value(SchemaValue::Bool(true)),
+    )
     .property(PropertySchema::new(
         VIRTUAL_SCROLLBAR_WIDTH,
         "scrollbarWidth",
@@ -231,6 +234,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .not_animatable(),
     )
     .property(PropertySchema::new(
+        SCROLL_MOMENTUM,
+        "scrollMomentum",
+        ValueType::Float,
+        "Scroll glide strength from zero (direct) to one (longest glide).",
+    ))
+    .property(PropertySchema::new(
         ITEM_COUNT,
         "itemCount",
         ValueType::Int,
@@ -315,9 +324,10 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 rows[index - first].clone()
             });
         let mut scroll = element.scroll.as_deref().cloned().unwrap_or_default();
-        if input.get(SCROLLBAR_THUMB).is_some()
-            || optional_bool(input, VIRTUAL_SCROLLBAR_VISIBLE).unwrap_or(false)
-        {
+        if let Some(physics) = super::flickable::scroll_momentum(input, SCROLL_MOMENTUM)? {
+            scroll = scroll.physics(physics);
+        }
+        if optional_bool(input, VIRTUAL_SCROLLBAR_VISIBLE).unwrap_or(true) {
             let width = float(input, VIRTUAL_SCROLLBAR_WIDTH, "scrollbarWidth", 8.0)?;
             if width <= 0.0 {
                 return Err(SchemaError::Adapter(
@@ -334,13 +344,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 )),
             )
             .width(width)
-            .visibility(
-                if optional_bool(input, VIRTUAL_SCROLLBAR_VISIBLE).unwrap_or(true) {
-                    ScrollbarVisibility::Always
-                } else {
-                    ScrollbarVisibility::Hidden
-                },
-            );
+            .hover_width(width + 4.0)
+            .visibility(ScrollbarVisibility::Always);
             scroll = scroll.scrollbar(scrollbar);
             element = element.scrollbar_gutter(ScrollbarGutter::Stable);
         }

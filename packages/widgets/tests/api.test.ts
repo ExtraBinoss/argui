@@ -17,7 +17,6 @@ test('button variants use official Neutral semantic colors and native state colo
   expect(buttonPaint('ghost', theme).hover).toBe(theme.ghostHover)
   expect(buttonPaint('destructive', theme)).toMatchObject({ background: theme.destructiveSurface, foreground: theme.destructive })
   expect(buttonPaint('link', theme)).toMatchObject({ background: 'transparent', foreground: theme.primary })
-  expect(buttonPaint('default', theme).pressed).toBe(buttonPaint('default', theme).hover)
 })
 
 test('select keyboard navigation wraps and skips disabled options', () => {
@@ -68,5 +67,19 @@ test('widget aliases keep text and surfaces aligned with semantic Neutral roles'
     expect(variant.textMuted).toBe(variant.mutedForeground)
     expect(variant.focusRing).toBe(variant.ring)
     expect(variant.danger).toBe(variant.destructive)
+  }
+})
+
+test('field dimensions are theme layout tokens in both variants', () => {
+  const lengths = [
+    'inputHeight', 'inputGroupHeight', 'inputLineHeight', 'fieldLabelSize',
+    'selectWidth', 'selectCompactHeight', 'selectRowHeight',
+    'selectCompactRowHeight', 'selectMaxPopupHeight',
+  ] as const
+  for (const name of lengths) {
+    expect(widgetThemeDefinition.tokens[name]?.type).toBe('Length')
+    expect(widgetThemeDefinition.tokens[name]?.impact).toBe('Layout')
+    expect((widgetThemeDefinition.variants!.light as WidgetTheme)[name]).toBeGreaterThan(0)
+    expect((widgetThemeDefinition.variants!.dark as WidgetTheme)[name]).toBeGreaterThan(0)
   }
 })

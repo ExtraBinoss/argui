@@ -76,6 +76,33 @@ fn retargeting_preserves_velocity_and_settles_exactly() {
 }
 
 #[test]
+fn subpixel_spring_step_does_not_report_a_value_change() {
+    let mut spring = Spring::new(1.0e9_f32, 1.0e9, 1.0, SpringConfig::default()).unwrap();
+    assert!(!spring.advance(Duration::from_nanos(1)));
+    assert_eq!(spring.value(), 1.0e9);
+    assert!(spring.is_active());
+}
+
+#[test]
+fn springs_snap_exactly_to_the_target_when_inside_rest_thresholds() {
+    let config = SpringConfig::default();
+    let settled = Spring::new(5.0_f32, 5.0005, 0.0, config).unwrap();
+    assert!(!settled.is_active());
+    assert_eq!(settled.value(), 5.0005);
+    assert_eq!(settled.velocity(), 0.0);
+
+    let mut retargeted = Spring::new(5.0_f32, 5.0, 0.0, config).unwrap();
+    retargeted.retarget(5.0005);
+    assert!(!retargeted.is_active());
+    assert_eq!(retargeted.value(), 5.0005);
+
+    let mut stopped = Spring::new(5.0_f32, 5.0005, 1.0, config).unwrap();
+    stopped.set_velocity(0.0);
+    assert!(!stopped.is_active());
+    assert_eq!(stopped.value(), 5.0005);
+}
+
+#[test]
 fn spring_configuration_rejects_non_physical_values() {
     for (config, expected) in [
         (

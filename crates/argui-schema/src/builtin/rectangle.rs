@@ -7,8 +7,8 @@ use argui_ui::{
 
 use super::{
     BACKGROUND, BORDER, CHILDREN, CLIP, CommonProperty, FOCUS_BORDER_COLOR, HOVER_BACKGROUND,
-    PRESSED_BACKGROUND, PRESSED_SCALE, RADII, SHADOW, apply_common, apply_container,
-    common_property, loop_motion, touch_area::TOUCH_AREA_SCOPE, transition,
+    PRESSED_BACKGROUND, PRESSED_SCALE, PRESSED_TRANSLATE_Y, RADII, SHADOW, apply_common,
+    apply_container, common_property, loop_motion, touch_area::TOUCH_AREA_SCOPE, transition,
 };
 use crate::{
     NativeElementInput, NativeSchema, SchemaError, SchemaRegistry, SchemaValue, SlotArity,
@@ -48,9 +48,11 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(loop_motion::properties()[8].clone())
     .property(loop_motion::properties()[9].clone())
     .property(loop_motion::properties()[10].clone())
+    .property(loop_motion::properties()[12].clone())
     .property(common_property(CommonProperty::Opacity))
     .property(transition::properties()[0].clone())
     .property(transition::properties()[1].clone())
+    .property(transition::properties()[2].clone())
     .property(common_property(CommonProperty::BackdropFilter))
     .property(common_property(CommonProperty::DesktopBackdropTint))
     .property(common_property(CommonProperty::DesktopBackdropFallback))
@@ -85,6 +87,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "pressedScale",
         ValueType::Float,
         "Scale around the center while the nearest TouchArea or FocusScope is pressed.",
+    ))
+    .property(crate::PropertySchema::new(
+        PRESSED_TRANSLATE_Y,
+        "pressedTranslateY",
+        ValueType::Float,
+        "Vertical translation in logical pixels while the nearest TouchArea or FocusScope is pressed.",
     ))
     .property(crate::PropertySchema::new(
         BORDER,
@@ -147,6 +155,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             }
             _ => None,
         };
+        let pressed_translate_y = match input.get(PRESSED_TRANSLATE_Y) {
+            Some(SchemaValue::Float(value)) if value.is_finite() => Some(*value),
+            Some(SchemaValue::Float(_)) => {
+                return Err(SchemaError::Adapter(
+                    "Rectangle pressedTranslateY must be finite".into(),
+                ));
+            }
+            _ => None,
+        };
         for (id, state) in [
             (HOVER_BACKGROUND, VisualState::Hovered),
             (PRESSED_BACKGROUND, VisualState::Pressed),
@@ -158,11 +175,13 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 has_style = true;
             }
             if state == VisualState::Pressed
-                && let Some(scale) = pressed_scale
+                && (pressed_scale.is_some() || pressed_translate_y.is_some())
             {
                 patch = patch.set(
                     property::Transform,
-                    Transform2D::IDENTITY.scale(scale, scale),
+                    Transform2D::IDENTITY
+                        .translate(0.0, pressed_translate_y.unwrap_or(0.0))
+                        .scale(pressed_scale.unwrap_or(1.0), pressed_scale.unwrap_or(1.0)),
                 );
                 has_style = true;
             }

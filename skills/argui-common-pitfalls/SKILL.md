@@ -1,6 +1,6 @@
 ---
 name: argui-common-pitfalls
-description: Read before creating an Argui component or using Argui in Rust, Solid, or React. Covers layout, scrolling, theme contrast, icons, identities, and the native contract.
+description: Read before creating an Argui component or using Argui in Rust, Solid, or React. Covers layout, scrolling, animation architecture, expressive motion, gradients, throbbers, theme contrast, identities, and the native contract.
 ---
 
 # Argui v2 common pitfalls
@@ -23,9 +23,10 @@ adapter too.
 - `width` and `height` are preferred sizes. A percentage measures the parent;
   `grow` takes remaining flex space. Use `shrink={0}` for a rigid item and
   `minWidth={0}` when long flex content must shrink. There is no `fill` size.
-- Use `scrollView` with a resolvable viewport bound. Its default is visually
-  neutral: it does not paint a scrollbar merely because content overflows.
-  When authoring a scrollbar, use the native scrollbar contract, including
+- Use `scrollView` with a resolvable viewport bound. A native scrollbar appears
+  when content overflows and grows on hover by default; use
+  `scrollbarVisible={false}` when a viewport needs no visible scrollbar.
+  When customizing it, use the native scrollbar contract, including
   side, width and hover style; keep scroll, dragging and transitions native.
   Check that content actually overflows and the thumb is reachable. Do not
   place a decorative bar over a separate invisible scrollbar.
@@ -113,6 +114,13 @@ adapter too.
   motion with text inside the moving surface and a pause control. Prefer native
   hover, transitions and loops over a JavaScript timer that rebuilds the tree
   every frame. Do not spread anonymous test boxes through widget pages.
+- Before designing motion or diagnosing animation stutter, read
+  [the animation architecture guide](references/animation-architecture.md).
+  For gradients, status indicators, voice surfaces, and throbbers, also read
+  [the expressive motion guide](references/expressive-motion.md).
+  Choose the smallest native invalidation path that can express the effect,
+  design the idle and active states deliberately, and measure the presented
+  result rather than assuming every animation is a compositor update.
 - Size Select's popup from its actual rows and header, up to a viewport cap.
   A short list should show its final option without requiring a tiny extra
   scroll. For `variant="shadcn"`, keep the field's visible value and the

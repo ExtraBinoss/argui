@@ -228,7 +228,11 @@ impl InteractionState {
             );
             update.paint_changed = true;
         }
-        self.hovered.clear();
+        if !self.hovered.is_empty() {
+            update.paint_changed = true;
+            update.full_transition_sync = true;
+            self.hovered.clear();
+        }
         self.pointer_positions.clear();
         self.release_keyboard(&mut update, None);
         for (pointer, target) in self.captured.drain() {

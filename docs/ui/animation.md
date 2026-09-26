@@ -70,10 +70,13 @@ while the remaining container values animate implicitly.
 
 ## Gallery example
 
-The Solid/React TSX gallery's **Animation Lab** demonstrates native loops,
+The Solid/React TSX gallery's **Animation** page demonstrates native loops,
 implicit transitions, composition, spring retargeting and held keyframes. Its
-current source is [`animation-lab.tsx`](../../apps/gallery/src/solid/animation-lab.tsx);
-gallery build and hot-reload instructions are in the
+Solid source is [`animation-page.tsx`](../../apps/gallery/src/solid/animation-page.tsx).
+The **Expressive UI** page adds five examples of retained gradient layers,
+spinners, and status motion; see
+[`expressive-page.tsx`](../../apps/gallery/src/solid/expressive-page.tsx).
+Gallery build and hot-reload instructions are in the
 [gallery README](../../apps/gallery/README.md).
 
 ## Ownership and scheduling

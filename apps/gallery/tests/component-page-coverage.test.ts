@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 
-const expected = ['button', 'button-group', 'input-field', 'popover', 'select', 'virtual-list']
+const expected = ['button', 'button-group', 'checkbox', 'expressive', 'input-field', 'popover',
+  'progress', 'scrollbar', 'select', 'slider', 'switch', 'tabs', 'virtual-list']
 
 test('gallery contains the paired Solid and React widget pages', () => {
   for (const adapter of ['solid', 'react']) {
@@ -17,7 +18,8 @@ test('gallery contains the paired Solid and React widget pages', () => {
 })
 
 test('each framework exports the same widgets and active sources avoid the archive', () => {
-  const widgets = ['button', 'button-group', 'input-field', 'select', 'popover', 'virtual-list']
+  const widgets = ['button', 'button-group', 'checkbox', 'switch', 'input-field', 'select',
+    'tabs', 'slider', 'progress', 'popover', 'virtual-list']
   for (const adapter of ['solid', 'react']) {
     const index = readFileSync(new URL(`../../../packages/widgets/src/${adapter}/index.ts`, import.meta.url), 'utf8')
     const gallery = readFileSync(new URL(`../src/${adapter}/gallery.tsx`, import.meta.url), 'utf8')

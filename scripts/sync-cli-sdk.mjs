@@ -44,3 +44,4 @@ syncDirectory(
 )
 
 if (check && stale) process.exitCode = 1
+else console.log(`[jsx] CLI SDK ${check ? 'snapshot is current' : 'sync complete'}.`)

@@ -25,10 +25,11 @@ export function Popover(props: PopoverProps): JSX.Element {
 
   return <column width={props.width} height={props.height}
     minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
-    grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf} margin={props.margin}>
+    grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf ?? (props.width === undefined ? 'start' : undefined)} margin={props.margin}>
     <Button
       id={id}
       width={props.width}
+      size="sm"
       variant="secondary"
       expanded={expanded()}
       controls={popupId}

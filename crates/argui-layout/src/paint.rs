@@ -1,6 +1,7 @@
 use argui_core::{Affine2D, Color, Rect};
 use argui_paint::{ClipChain, ClipRegion, CompositorId, CompositorLayer, DisplayList, LayerMask};
 use argui_ui::{EffectScope, Element, ElementKind, NodeId, PointerEvents, UiTree};
+use std::collections::HashMap;
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
@@ -76,6 +77,16 @@ pub(crate) fn repaint(
             cache,
             &mut scroll_updates,
         );
+        // Layout walks the authored tree, while portal paint runs after the
+        // main content. Wheel hit testing must follow the painted order.
+        let paint_order = scroll_updates
+            .iter()
+            .enumerate()
+            .map(|(index, update)| (update.node, index))
+            .collect::<HashMap<_, _>>();
+        output
+            .scroll_regions
+            .sort_by_key(|region| paint_order.get(&region.node).copied());
     }
     output.display_list.resolve_compositor_bounds();
     for surface in &mut output.native_surfaces {

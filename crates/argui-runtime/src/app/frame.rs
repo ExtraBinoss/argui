@@ -229,16 +229,12 @@ impl Application {
         let Some((width, height)) = pending.size() else {
             return;
         };
-        let started = self.profile_clock();
-        if let super::RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
-            renderer.resize(width, height);
-        }
+        self.pending_surface_size = Some((width, height));
         let previous_viewport = self.viewport;
         self.update_viewport(width, height);
         if scale_changed || self.viewport != previous_viewport {
             self.pending_ui_frame.request_layout();
         }
-        self.frame_record.surface += started.map_or(Duration::ZERO, |start| start.elapsed());
         self.frame_record.resize_events = pending.events();
     }
 

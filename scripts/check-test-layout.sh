@@ -23,7 +23,8 @@ while IFS= read -r -d '' test_file; do
   source="$crate/src/$relative"
 
   module_source="$crate/src/${relative%.rs}/mod.rs"
-  if [[ ! -f "$source" && ! -f "$module_source" ]]; then
+  parent_source="$crate/src/${relative%/*}.rs"
+  if [[ ! -f "$source" && ! -f "$module_source" && ( "$relative" != */* || ! -f "$parent_source" ) ]]; then
     echo "error: ${test_file#"$repo_root"/} does not mirror ${source#"$repo_root"/}" >&2
     failed=1
   fi

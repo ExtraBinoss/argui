@@ -8,6 +8,7 @@ use argui_core::{Color, Point, Transform2D};
 use std::collections::{HashMap, HashSet};
 
 mod style;
+mod sync;
 use style::collect_specs;
 pub(super) use style::{
     apply_layer, apply_layout, apply_quad, apply_scroll, apply_scrollbar_part, apply_text_color,
@@ -24,6 +25,7 @@ enum TransitionTarget {
 #[derive(Clone, Debug, Default)]
 pub(super) struct TransitionRegistry {
     entries: HashMap<TransitionTarget, NodeTransition>,
+    active_targets: Vec<TransitionTarget>,
 }
 
 #[derive(Clone, Debug)]
@@ -64,6 +66,7 @@ enum AnimatedValue {
 struct TransitionSync<'a> {
     root: &'a Element,
     node_ids: &'a [NodeId],
+    complete: bool,
     states_for: &'a dyn Fn(NodeId) -> VisualStates,
     scrollbar_states_for: &'a dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
     scroll_for: &'a dyn Fn(NodeId) -> Point,
@@ -72,6 +75,12 @@ struct TransitionSync<'a> {
 }
 
 impl TransitionRegistry {
+    /// Removes retained transition state and its pending frame work.
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.active_targets.clear();
+    }
+
     fn sync(&mut self, input: TransitionSync<'_>) -> TreeUpdate {
         let mut specs = Vec::new();
         collect_specs(
@@ -84,8 +93,10 @@ impl TransitionRegistry {
             &mut specs,
         );
         let mut update = TreeUpdate::None;
-        let targets: HashSet<_> = specs.iter().map(|spec| spec.target).collect();
-        self.entries.retain(|target, _| targets.contains(target));
+        if input.complete {
+            let targets: HashSet<_> = specs.iter().map(|spec| spec.target).collect();
+            self.entries.retain(|target, _| targets.contains(target));
+        }
         for mut spec in specs {
             if let Some((element, scroll)) = spec.element {
                 if self.entries.get(&spec.target).is_some_and(|entry| {
@@ -103,28 +114,53 @@ impl TransitionRegistry {
                 continue;
             };
             update = strongest(update, entry.sync(spec, input.reduced_motion));
+            if entry.is_active() && !self.active_targets.contains(&entry.target) {
+                self.active_targets.push(entry.target);
+            }
+        }
+        self.active_targets.retain(|target| {
+            self.entries
+                .get(target)
+                .is_some_and(NodeTransition::is_active)
+        });
+        update
+    }
+
+    /// Samples running transition nodes at `now` and returns their strongest update.
+    pub(super) fn advance(&mut self, now: Time) -> TreeUpdate {
+        let mut update = TreeUpdate::None;
+        let mut index = 0;
+        while index < self.active_targets.len() {
+            let target = self.active_targets[index];
+            let Some(entry) = self.entries.get_mut(&target) else {
+                self.active_targets.swap_remove(index);
+                continue;
+            };
+            update = strongest(update, entry.advance(now));
+            if entry.is_active() {
+                index += 1;
+            } else {
+                self.active_targets.swap_remove(index);
+            }
         }
         update
     }
 
-    pub(super) fn advance(&mut self, now: Time) -> TreeUpdate {
-        self.entries
-            .values_mut()
-            .fold(TreeUpdate::None, |update, entry| {
-                strongest(update, entry.advance(now))
-            })
-    }
-
+    /// Finishes running transitions and returns the strongest final-pixel update.
     pub(super) fn finish(&mut self) -> TreeUpdate {
-        self.entries
-            .values_mut()
-            .fold(TreeUpdate::None, |update, entry| {
-                strongest(update, entry.finish())
-            })
+        let mut update = TreeUpdate::None;
+        for target in &self.active_targets {
+            if let Some(entry) = self.entries.get_mut(target) {
+                update = strongest(update, entry.finish());
+            }
+        }
+        self.active_targets.clear();
+        update
     }
 
+    /// Returns whether at least one transition needs a continuous frame.
     pub(super) fn wants_frame(&self) -> bool {
-        self.entries.values().any(NodeTransition::is_active)
+        !self.active_targets.is_empty()
     }
 
     pub(super) fn set_scroll(&mut self, node: NodeId, offset: Point) {
@@ -142,6 +178,14 @@ impl TransitionRegistry {
         };
         property.target = StateValue::Point(offset);
         property.value.set(StateValue::Point(offset));
+        if self
+            .entries
+            .get(&TransitionTarget::Element(node))
+            .is_some_and(|entry| !entry.is_active())
+        {
+            self.active_targets
+                .retain(|target| *target != TransitionTarget::Element(node));
+        }
     }
 
     fn visit(
@@ -159,7 +203,9 @@ impl TransitionRegistry {
         }
     }
 
-    pub(super) fn layout_indices(&self, ids: &[NodeId]) -> Vec<usize> {
+    /// Returns preorder positions of nodes with layout-affecting transitions.
+    /// `index` resolves stable node IDs without scanning the whole tree per node.
+    pub(super) fn layout_indices(&self, index: &super::index::TreeIndex) -> Vec<usize> {
         self.entries
             .values()
             .filter(|entry| {
@@ -169,9 +215,7 @@ impl TransitionRegistry {
                     .any(|value| value.key.impact() == BindingImpact::Layout)
             })
             .filter_map(|entry| match entry.target {
-                TransitionTarget::Element(node) => {
-                    ids.iter().position(|candidate| *candidate == node)
-                }
+                TransitionTarget::Element(node) => index.position(node),
                 TransitionTarget::ScrollbarTrack(_) | TransitionTarget::ScrollbarThumb(_) => None,
             })
             .collect()
@@ -181,48 +225,6 @@ impl TransitionRegistry {
         self.entries
             .get(&TransitionTarget::Element(node))
             .map_or(0, |entry| entry.revision)
-    }
-}
-
-impl super::UiTree {
-    pub(super) fn sync_transitions(&mut self) -> TreeUpdate {
-        self.sync_transitions_with(self.reduced_motion)
-    }
-
-    pub(super) fn sync_transitions_with(&mut self, reduced_motion: bool) -> TreeUpdate {
-        if !self.index.has_transitions() {
-            self.transitions.entries.clear();
-            return TreeUpdate::None;
-        }
-        let interaction = &self.interaction;
-        let scroll = &self.scroll;
-        let container_sizes = &self.container_sizes;
-        let states_for = |node| interaction.visual_states(node);
-        let scrollbar_states_for = |node, part, enabled| scroll.visual_states(node, part, enabled);
-        let scroll_for = |node| scroll.offset(node);
-        let container_size = |node| {
-            container_sizes
-                .iter()
-                .find(|(id, _)| *id == node)
-                .map(|(_, size)| *size)
-        };
-        self.transitions.sync(TransitionSync {
-            root: &self.root,
-            node_ids: &self.node_ids,
-            states_for: &states_for,
-            scrollbar_states_for: &scrollbar_states_for,
-            scroll_for: &scroll_for,
-            container_size: &container_size,
-            reduced_motion,
-        })
-    }
-
-    /// Returns the visual revision associated with a node.
-    ///
-    /// * `node` — retained node identifier.
-    #[must_use]
-    pub fn visual_revision(&self, node: NodeId) -> u64 {
-        self.transitions.revision(node)
     }
 }
 
@@ -328,6 +330,9 @@ impl NodeTransition {
             .iter()
             .fold(TreeUpdate::None, |update, property| {
                 let was_active = property.value.is_active();
+                if !was_active {
+                    return update;
+                }
                 let changed = property.value.advance(now);
                 let settled = was_active && !property.value.is_active();
                 if changed || settled {

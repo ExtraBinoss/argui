@@ -201,6 +201,67 @@ fn neutral_react_gallery_runs_in_quickjs() {
     );
 }
 
+/// Commits all five new widget pages through the QuickJS and Rust native host boundary.
+#[test]
+#[ignore = "requires bun run build:gallery"]
+fn five_widget_pages_commit_in_both_adapters() {
+    let contract = include_str!("../../../../packages/host/src/contract.generated.json");
+    for (adapter, path, entry) in [
+        ("solid", "../dist/gallery-core.mjs", "mountGallery"),
+        (
+            "react",
+            "../dist/gallery-react-core.mjs",
+            "mountReactGallery",
+        ),
+    ] {
+        let source =
+            std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path))
+                .expect("build the gallery bundle first");
+        let (sender, batches) = mpsc::channel();
+        let gallery = QuickJsGallery::new(&source, contract, entry, move |batch| {
+            sender.send(batch).expect("collector is alive");
+            String::new()
+        })
+        .expect("gallery mount");
+        let initial = drain_batches(&batches, "gallery mount");
+        let mut host = Host::with_builtins().expect("schema");
+        host.commit(
+            &initial
+                .iter()
+                .cloned()
+                .map(WireOperation::into_native)
+                .collect::<Result<Vec<_>, _>>()
+                .expect("native mount values"),
+        )
+        .expect("native mount");
+        for (page, time) in [
+            ("checkbox", 40.0),
+            ("switch", 80.0),
+            ("tabs", 120.0),
+            ("slider", 160.0),
+            ("progress", 200.0),
+        ] {
+            gallery
+                .deliver(&callback_for(&initial, &format!("page-{page}")).to_string())
+                .expect("page callback should run in QuickJS");
+            let operations = collect_after_ticks(&gallery, &batches, time);
+            assert!(
+                !operations.is_empty(),
+                "{adapter} {page} emitted no operations"
+            );
+            host.commit(
+                &operations
+                    .into_iter()
+                    .map(WireOperation::into_native)
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("native page values"),
+            )
+            .unwrap_or_else(|error| panic!("{adapter} {page} native commit: {error}"));
+        }
+        gallery.dispose().expect("gallery should unmount");
+    }
+}
+
 /// Mounts one adapter and exercises real button, theme, and controlled input callbacks.
 fn run_gallery_interactions(adapter: &str, path: &str, entry: &str) {
     let contract = include_str!("../../../../packages/host/src/contract.generated.json");
@@ -215,7 +276,7 @@ fn run_gallery_interactions(adapter: &str, path: &str, entry: &str) {
     .expect("gallery mount");
     let initial = drain_batches(&batches, "gallery mount");
     gallery
-        .deliver(&callback_for(&initial, "button-primary").to_string())
+        .deliver(&callback_for(&initial, "button-default").to_string())
         .expect("button callback should run in QuickJS");
     let clicked = collect_after_ticks(&gallery, &batches, 10.0);
     assert!(
@@ -242,12 +303,24 @@ fn run_gallery_interactions(adapter: &str, path: &str, entry: &str) {
     );
 
     gallery
-        .deliver(&callback_for(&initial, "page-example").to_string())
+        .deliver(&callback_for(&initial, "page-layouting").to_string())
         .expect("layout Example page should open");
     let example = collect_after_ticks(&gallery, &batches, 160.0);
     assert!(contains_value(&example, "layout-fixed-grow-320"));
     assert!(contains_value(&example, "layout-bounded-scroll"));
     assert!(contains_value(&example, "layout-rtl-marker"));
+
+    gallery
+        .deliver(&callback_for(&initial, "page-expressive").to_string())
+        .expect("Expressive UI page should open");
+    let expressive = collect_after_ticks(&gallery, &batches, 180.0);
+    assert!(contains_value(&expressive, "expressive-click-gradient"));
+    assert!(contains_value(&expressive, "expressive-dotted-spinner"));
+    gallery
+        .deliver(&callback_for(&expressive, "expressive-glow-button").to_string())
+        .expect("gradient action should run in QuickJS");
+    let glowing = collect_after_ticks(&gallery, &batches, 190.0);
+    assert!(contains_value(&glowing, "The glow is alive"));
 
     gallery
         .deliver(&callback_for(&initial, "page-input-field").to_string())

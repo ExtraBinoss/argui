@@ -33,6 +33,7 @@ const releaseAssets = {
   "gallery/sun.svg": { kind: "svg", id: 2429037204418036 },
   "gallery/system.svg": { kind: "svg", id: 5782066887110427 },
   "tabler/chevron-down.svg": { kind: "svg", id: 5981616865338806 },
+  "tabler/player-play.svg": { kind: "svg", id: 6833585511893982 },
   "tabler/search.svg": { kind: "svg", id: 2000023927804256 },
   "tabler/star.svg": { kind: "svg", id: 1326099470823436 },
 } as const satisfies Record<string, AssetRef>

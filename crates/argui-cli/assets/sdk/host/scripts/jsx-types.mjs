@@ -1,6 +1,6 @@
 const valueTypes = {
   Bool: 'boolean', Int: 'number', Float: 'number', String: 'string', Name: 'string',
-  Color: 'string', Brush: 'string', Dimension: 'DimensionValue', Constraint: 'ConstraintValue',
+  Color: 'string', Brush: 'BrushValue', Dimension: 'DimensionValue', Constraint: 'ConstraintValue',
   Insets: 'InsetsValue', PositionInsets: 'PositionInsetsValue', Radii: 'RadiiValue', Border: 'BorderValue',
   Shadow: 'ShadowValue', Transform: 'TransformValue', Asset: 'AssetRef',
   GridTracks: 'GridTracksValue',
@@ -31,8 +31,8 @@ export function generateJSX(contract, framework, augmentation = false) {
   if (framework !== 'react' && framework !== 'solid') throw new Error(`Unsupported JSX framework ${framework}`)
   const react = framework === 'react'
   const imports = react
-    ? ["import type { ReactNode, Ref } from 'react'", "import type { NativeHandle, NativeEventPayload, AssetRef, DimensionValue, ConstraintValue, GridTracksValue, ContainerRuleValue, InsetsValue, PositionInsetsValue, RadiiValue, BorderValue, ShadowValue, TransformValue, SemanticRole, SemanticCurrent, SemanticLive, SemanticCheckedState, SemanticOrientation, SemanticPopup, SemanticSort, KeyboardActivation } from '@argui/host'"]
-    : ["import type { NativeHandle, NativeNode, NativeEventPayload, AssetRef, DimensionValue, ConstraintValue, GridTracksValue, ContainerRuleValue, InsetsValue, PositionInsetsValue, RadiiValue, BorderValue, ShadowValue, TransformValue, SemanticRole, SemanticCurrent, SemanticLive, SemanticCheckedState, SemanticOrientation, SemanticPopup, SemanticSort, KeyboardActivation } from '@argui/host'"]
+    ? ["import type { ReactNode, Ref } from 'react'", "import type { NativeHandle, NativeEventPayload, AssetRef, BrushValue, DimensionValue, ConstraintValue, GridTracksValue, ContainerRuleValue, InsetsValue, PositionInsetsValue, RadiiValue, BorderValue, ShadowValue, TransformValue, SemanticRole, SemanticCurrent, SemanticLive, SemanticCheckedState, SemanticOrientation, SemanticPopup, SemanticSort, KeyboardActivation } from '@argui/host'"]
+    : ["import type { NativeHandle, NativeNode, NativeEventPayload, AssetRef, BrushValue, DimensionValue, ConstraintValue, GridTracksValue, ContainerRuleValue, InsetsValue, PositionInsetsValue, RadiiValue, BorderValue, ShadowValue, TransformValue, SemanticRole, SemanticCurrent, SemanticLive, SemanticCheckedState, SemanticOrientation, SemanticPopup, SemanticSort, KeyboardActivation } from '@argui/host'"]
   const lines = [
     `// Generated from argui-schema by packages/${framework}/scripts/generate-jsx.mjs.`,
     ...imports,

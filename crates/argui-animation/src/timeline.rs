@@ -19,6 +19,55 @@ pub enum PlaybackState {
     Canceled,
 }
 
+/// Work required to present the next animation change.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FrameSchedule {
+    /// Playback has no pending presentation work.
+    None,
+    /// The value can change between display refreshes.
+    Continuous,
+    /// A held value can next change at this clock timestamp.
+    At(Time),
+}
+
+enum KeyframeChange {
+    Continuous,
+    At(f32),
+    End,
+}
+
+impl<T> Keyframes<T> {
+    /// Finds the next segment change while traveling through normalized progress.
+    /// `progress` is the current sample and `increasing` is its travel direction.
+    fn next_change(&self, progress: f32, increasing: bool) -> KeyframeChange {
+        let frames = self.as_slice();
+        let upper = frames.partition_point(|frame| frame.offset <= progress);
+        if increasing && upper == frames.len() || !increasing && progress == 0.0 {
+            return KeyframeChange::End;
+        }
+        if !increasing && upper > 0 && frames[upper - 1].offset == progress {
+            return KeyframeChange::At(progress);
+        }
+        let from = &frames[upper.saturating_sub(1)];
+        let to = &frames[upper];
+        let endpoint = if increasing { to.offset } else { from.offset };
+        if from.hold || from.offset == to.offset {
+            return KeyframeChange::At(endpoint);
+        }
+        let Easing::Steps(steps) = &from.easing else {
+            return KeyframeChange::Continuous;
+        };
+        let local = (progress - from.offset) / (to.offset - from.offset);
+        steps
+            .next_internal_jump(local, increasing)
+            .map_or(KeyframeChange::At(endpoint), |jump| {
+                KeyframeChange::At(
+                    (f64::from(from.offset) + jump * f64::from(to.offset - from.offset)) as f32,
+                )
+            })
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 /// Events emitted while sampling a timeline.
 pub struct TimelineEvents {
@@ -105,6 +154,79 @@ impl<T> Timeline<T> {
     #[must_use]
     pub fn needs_frame(&self) -> bool {
         self.state == PlaybackState::Running
+    }
+
+    /// Returns the next presentation requirement at `now`.
+    ///
+    /// Held keyframes and step easing expose a one-shot deadline; smooth
+    /// segments retain display-linked sampling. Playback controls reanchor
+    /// the calculation, so seek, rate changes, reversal, and pause are honored.
+    #[must_use]
+    pub fn frame_schedule(&self, now: Time) -> FrameSchedule {
+        if self.state != PlaybackState::Running {
+            return FrameSchedule::None;
+        }
+        let position = self.position(now);
+        let delay = self.timing.delay.as_secs_f64();
+        let active_end = delay + self.timing.active_seconds();
+        let forward = self.playback_rate > 0.0;
+        let total = self.timing.total_seconds();
+        if position < delay || (position == delay && !forward) {
+            let target = if forward { delay } else { 0.0 };
+            return self.schedule_at(now, position, target, 0.0);
+        }
+        if position > active_end || (position == active_end && forward) {
+            let target = if forward { total } else { active_end };
+            return self.schedule_at(now, position, target, 0.0);
+        }
+
+        let duration = self.timing.duration.as_secs_f64();
+        let active = position - delay;
+        let index = (active / duration).floor() as u64;
+        let iteration_start = index as f64 * duration;
+        let fraction = (active / duration).fract() as f32;
+        let reversed = match self.timing.direction {
+            Direction::Normal => false,
+            Direction::Reverse => true,
+            Direction::Alternate => !index.is_multiple_of(2),
+            Direction::AlternateReverse => index.is_multiple_of(2),
+        };
+        let increasing = forward != reversed;
+        let progress = if reversed { 1.0 - fraction } else { fraction };
+        let boundary = if forward {
+            (iteration_start + duration).min(self.timing.active_seconds())
+        } else {
+            iteration_start
+        };
+        let endpoint = self.keyframes.next_change(progress, increasing);
+        let target = match endpoint {
+            KeyframeChange::Continuous => return FrameSchedule::Continuous,
+            KeyframeChange::At(progress) => {
+                let fraction = if reversed { 1.0 - progress } else { progress };
+                let candidate = iteration_start + f64::from(fraction) * duration;
+                if forward {
+                    candidate.min(boundary)
+                } else {
+                    candidate.max(boundary)
+                }
+            }
+            KeyframeChange::End => boundary,
+        };
+        // The sample path converts progress to f32. A small offset ensures
+        // the scheduled sample lands on the changed side of that conversion.
+        let margin = duration * f64::from(f32::EPSILON) * 2.0;
+        self.schedule_at(now, position, delay + target, margin)
+    }
+
+    /// Converts a playback position boundary into a clock deadline.
+    /// `now` is the last sample, `position` its playback position, `target` the
+    /// next boundary, and `margin` covers progress conversion at that boundary.
+    fn schedule_at(&self, now: Time, position: f64, target: f64, margin: f64) -> FrameSchedule {
+        let distance = (target - position).abs();
+        let seconds = (distance + margin) / self.playback_rate.abs();
+        let nanos = (seconds * 1_000_000_000.0).ceil().max(1.0);
+        let nanos = nanos.min(u64::MAX as f64) as u64;
+        FrameSchedule::At(now + Duration::from_nanos(nanos))
     }
 
     /// Starts playback at `now`, or resumes a paused timeline.

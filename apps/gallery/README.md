@@ -1,36 +1,38 @@
 # Argui TSX gallery
 
-The gallery has six widget pages and separate `Examples / Layouting` and
-`Examples / Animation` pages. Solid is the default; React implements the same
-pages and examples.
+The gallery has widget pages plus `Examples / Layouting`, `Examples / Animation`,
+`Examples / Expressive UI`, and `Examples / Scrollbars`. Expressive UI shows
+five retained gradient and throbber recipes. The Scrolling widget page compares native scrolling
+with a virtualized list. Solid is the default; React implements the same pages
+and examples.
 
 ```sh
-bun run gallery
-bun run gallery:react
-bun run gallery:web
-bun run gallery:web:react
-bun dev
+bun run dev
 bun run dev:react
+bun run dev:web:solid
+bun run dev:web:react
 ```
 
+`bun run dev` starts the native Solid gallery; `bun run dev:react` starts the
+native React gallery. The `dev:web:*` commands start the browser galleries.
 The Web commands regenerate the JSX contract, compile the gallery's WASM host,
 then start Vite. Rust edits rebuild WASM and reload the browser; TSX edits use
-Vite's normal reload. A WASM rebuild resets application state. Use `bun dev`
-for Solid or `bun run dev:react` for React from the repository root.
+Vite's normal reload. A WASM rebuild resets application state.
 An already installed matching `wasm-bindgen` is reused without downloading it.
 Open the local URL printed by Vite; the React page is `/react.html`. Both Web
 pages mount the same TSX scenes and Rust renderer as the native gallery. The
 current browser renderer requires WebGPU and reports a startup error when the
 browser does not provide a WebGPU adapter.
 
-The shared widget package exports `Button`, `ButtonGroup`, `InputField`,
-`Select`, `Popover`, and `VirtualList` from `@argui/widgets/solid` or
-`@argui/widgets/react`.
+The shared widget package exports `Button`, `ButtonGroup`, `Checkbox`,
+`Switch`, `InputField`, `Select`, `Tabs`, `Slider`, `Progress`, `Popover`, and
+`VirtualList` from `@argui/widgets/solid` or `@argui/widgets/react`.
 Public props use the same camelCase names in both frameworks.
 The [ButtonGroup guide](../../docs/ui/button-group.md) shows joined actions,
 search, vertical orientation, and RTL composition.
 The [Popover guide](../../docs/ui/popover.md) defines the controlled state,
 width, focus, and overlay theme contract.
+The [controls guide](../../docs/ui/controls.md) covers the five new controls.
 The [theme guide](../../docs/ui/theme.md) lists the official Neutral tokens,
 System mode, and accepted hex, Oklch, RGB, and RGBA values.
 

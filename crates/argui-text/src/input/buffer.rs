@@ -1,3 +1,8 @@
+mod line_metrics;
+
+pub(super) use line_metrics::LineMetrics;
+use std::ops::Range;
+
 use argui_core::{Size, TextPosition};
 use cosmic_text::{Buffer, Metrics};
 
@@ -7,14 +12,23 @@ use crate::{TextContent, TextStyle, engine};
 pub(super) const VIRTUAL_INPUT_MIN_BYTES: usize = 16 * 1024;
 const INPUT_WINDOW_OVERSCAN: usize = 8;
 
+/// Caret state needed to choose a virtualized input window.
+struct InputCursorWindow {
+    cursor: TextPosition,
+    scroll: TextInputScroll,
+    ascii: bool,
+    columns: usize,
+}
+
 pub(crate) struct InputBuffer {
     pub(super) content: TextContent,
     pub(super) style: TextStyle,
     pub(super) viewport: Size,
-    pub(super) line_offsets: Vec<usize>,
+    pub(super) line_offsets: LineMetrics,
     pub(super) unwrapped_width: f32,
-    max_columns: usize,
-    last_columns: usize,
+    ascii: bool,
+    cursor: usize,
+    cursor_columns: usize,
     pub(super) window: Option<TextInputWindow>,
     pub(super) buffer: Buffer,
 }
@@ -29,7 +43,7 @@ pub(crate) struct InputBuffer {
 ///
 /// Returns `None` when the document is already small enough to shape whole.
 pub(super) fn visible_window(
-    offsets: &[usize],
+    offsets: &LineMetrics,
     text_len: usize,
     line_height: f32,
     viewport_height: f32,
@@ -50,7 +64,7 @@ pub(super) fn visible_window(
         .saturating_add(INPUT_WINDOW_OVERSCAN)
         .min(offsets.len());
     Some(TextInputWindow {
-        byte_range: offsets[first]..offsets.get(end_line).copied().unwrap_or(text_len),
+        byte_range: offsets.get(first).unwrap_or(0)..offsets.get(end_line).unwrap_or(text_len),
         x: 0.0,
         y: first as f32 * line_height,
         height: (end_line - first) as f32 * line_height,
@@ -72,10 +86,11 @@ fn horizontal_window(
     viewport: Size,
     cursor: TextPosition,
     scroll: TextInputScroll,
+    ascii: bool,
+    cursor_columns: usize,
 ) -> TextInputWindow {
     let advance = (style.font_size * 0.62).max(1.0);
     let visible = (viewport.width / advance).ceil().max(1.0) as usize;
-    let ascii = text.is_ascii();
     let first = if ascii {
         match scroll.caret {
             CaretScroll::Reveal => cursor.index.saturating_sub(visible.saturating_mul(2)),
@@ -108,6 +123,8 @@ fn horizontal_window(
     };
     let columns_before = if ascii {
         first
+    } else if scroll.caret == CaretScroll::Reveal {
+        cursor_columns.saturating_sub(column_counts(&text[first..cursor.index]).1)
     } else {
         column_counts(&text[..first]).0
     };
@@ -119,14 +136,13 @@ fn horizontal_window(
     }
 }
 
-/// Estimates the widest unwrapped line from its logical character columns.
+/// Counts the widest unwrapped line without shaping the document.
 ///
 /// * `text` — complete editor text.
-/// * `font_size` — font size used for the approximate column advance.
 ///
-/// Returns an approximate content width in logical pixels.
-pub(super) fn unwrapped_width_estimate(text: &str, font_size: f32) -> f32 {
-    column_counts(text).0 as f32 * font_size * 0.62
+/// Returns approximate logical columns on its widest hard line.
+pub(super) fn unwrapped_columns(text: &str) -> usize {
+    column_counts(text).0
 }
 
 /// Counts the widest logical line and final-line columns for width estimation.
@@ -148,7 +164,71 @@ fn column_counts(text: &str) -> (usize, usize) {
     (maximum.max(current), current)
 }
 
+/// Recognizes an insertion or deletion at the previous caret without scanning
+/// the document as Unicode text. Both sides are compared as byte slices.
+///
+/// * `previous` — cached content and caret before the edit.
+/// * `text` — candidate content after the edit.
+/// * `cursor` — candidate byte caret after the edit.
+///
+/// Returns the replaced old range and inserted slice when the change is local.
+fn direct_cursor_change<'a>(
+    previous: &InputBuffer,
+    text: &'a str,
+    cursor: usize,
+) -> Option<(Range<usize>, &'a str)> {
+    let old = previous.content.as_str();
+    let old_cursor = previous.cursor;
+    if cursor >= old_cursor {
+        let added = cursor - old_cursor;
+        if text.len() == old.len() + added
+            && old[..old_cursor] == text[..old_cursor]
+            && old[old_cursor..] == text[cursor..]
+        {
+            return Some((old_cursor..old_cursor, &text[old_cursor..cursor]));
+        }
+    } else if old.len() >= text.len() {
+        let removed = old.len() - text.len();
+        if old_cursor == cursor + removed
+            && old[..cursor] == text[..cursor]
+            && old[old_cursor..] == text[cursor..]
+        {
+            return Some((cursor..old_cursor, ""));
+        }
+    }
+    None
+}
+
 impl InputBuffer {
+    /// Estimates line count and maximum columns after one edit at the prior caret.
+    ///
+    /// * `content` — newly authored plain text.
+    /// * `style` — layout style that must match the retained buffer.
+    ///
+    /// Returns `None` when a full scan is needed for a complex edit or style change.
+    pub(super) fn estimate_edit(
+        &self,
+        content: &TextContent,
+        style: &TextStyle,
+    ) -> Option<(usize, usize)> {
+        if content.is_rich()
+            || self.content.is_rich()
+            || !crate::cache::same_style_layout(&self.style, style)
+        {
+            return None;
+        }
+        let text = content.as_str();
+        let old = self.content.as_str();
+        let cursor = if text.len() >= old.len() {
+            self.cursor.checked_add(text.len() - old.len())?
+        } else {
+            self.cursor.checked_sub(old.len() - text.len())?
+        };
+        let (range, _) = direct_cursor_change(self, text, cursor)?;
+        let metrics = self.line_offsets.edited(old, text, range);
+        Some((metrics.max_width(), metrics.len()))
+    }
+
     /// Builds a cached editor buffer around the requested viewport.
     ///
     /// * `fonts` — font system used to shape the selected source range.
@@ -170,24 +250,56 @@ impl InputBuffer {
         previous: Option<&Self>,
     ) -> Self {
         let text = content.as_str();
-        let appended = previous.filter(|previous| {
-            previous.viewport == viewport
-                && crate::cache::same_style_layout(&previous.style, style)
-                && text.starts_with(previous.content.as_str())
+        let compatible = previous.filter(|previous| {
+            previous.viewport == viewport && crate::cache::same_style_layout(&previous.style, style)
         });
-        let line_offsets = if let Some(previous) = appended {
-            let mut offsets = previous.line_offsets.clone();
+        let direct = compatible.and_then(|previous| {
+            direct_cursor_change(previous, text, cursor.index).map(|change| (previous, change))
+        });
+        let appended = compatible
+            .filter(|previous| direct.is_none() && text.starts_with(previous.content.as_str()));
+        let ascii = appended.map_or_else(
+            || {
+                direct.as_ref().map_or_else(
+                    || text.is_ascii(),
+                    |(previous, (_, inserted))| previous.ascii && inserted.is_ascii(),
+                )
+            },
+            |previous| previous.ascii && text[previous.content.as_str().len()..].is_ascii(),
+        );
+        let line_offsets = if let Some((previous, (range, _))) = &direct {
+            previous
+                .line_offsets
+                .edited(previous.content.as_str(), text, range.clone())
+        } else if let Some(previous) = appended {
             let base = previous.content.as_str().len();
-            offsets.extend(
-                text[base..]
-                    .char_indices()
-                    .filter_map(|(index, character)| {
-                        (character == '\n').then_some(base + index + 1)
-                    }),
-            );
-            offsets
+            previous
+                .line_offsets
+                .edited(previous.content.as_str(), text, base..base)
         } else {
-            engine::source_line_offsets(text)
+            LineMetrics::new(text)
+        };
+        let cursor_columns = if line_offsets.len() != 1 {
+            0
+        } else if let Some((previous, (range, inserted))) = &direct {
+            if previous.line_offsets.len() == 1 {
+                let removed = &previous.content.as_str()[range.start..range.end];
+                previous.cursor_columns + column_counts(inserted).1 - column_counts(removed).1
+            } else {
+                column_counts(&text[..cursor.index]).1
+            }
+        } else if let Some(previous) = appended {
+            if previous.line_offsets.len() == 1 && cursor.index >= previous.cursor {
+                previous.cursor_columns + column_counts(&text[previous.cursor..cursor.index]).1
+            } else {
+                column_counts(&text[..cursor.index]).1
+            }
+        } else {
+            if cursor.index == text.len() {
+                line_offsets.width(0)
+            } else {
+                column_counts(&text[..cursor.index]).1
+            }
         };
         let cursor_line = line_offsets
             .partition_point(|offset| *offset <= cursor.index)
@@ -207,29 +319,15 @@ impl InputBuffer {
             viewport,
             &line_offsets,
             scroll_y,
-            cursor,
-            scroll,
+            InputCursorWindow {
+                cursor,
+                scroll,
+                ascii,
+                columns: cursor_columns,
+            },
         );
         let buffer = make_input_buffer(fonts, content, style, viewport, window.as_ref());
-        let (max_columns, last_columns) = if let Some(previous) = appended {
-            let suffix = &text[previous.content.as_str().len()..];
-            let (suffix_max, suffix_last) = column_counts(suffix);
-            let first_columns = suffix
-                .split('\n')
-                .next()
-                .map_or(0, |line| column_counts(line).0);
-            let joined_max = previous.last_columns + first_columns;
-            (
-                previous.max_columns.max(joined_max).max(suffix_max),
-                if suffix.contains('\n') {
-                    suffix_last
-                } else {
-                    previous.last_columns + suffix_last
-                },
-            )
-        } else {
-            column_counts(text)
-        };
+        let max_columns = line_offsets.max_width();
         let unwrapped_width = max_columns as f32 * style.font_size * 0.62;
         Self {
             content: content.clone(),
@@ -237,8 +335,9 @@ impl InputBuffer {
             viewport,
             line_offsets,
             unwrapped_width,
-            max_columns,
-            last_columns,
+            ascii,
+            cursor: cursor.index,
+            cursor_columns,
             window,
             buffer,
         }
@@ -257,14 +356,19 @@ impl InputBuffer {
         cursor: TextPosition,
         scroll: TextInputScroll,
     ) {
+        self.update_cursor_columns(cursor.index);
         let next = input_window_for(
             self.content.as_str(),
             &self.style,
             self.viewport,
             &self.line_offsets,
             scroll_y,
-            cursor,
-            scroll,
+            InputCursorWindow {
+                cursor,
+                scroll,
+                ascii: self.ascii,
+                columns: self.cursor_columns,
+            },
         );
         if self.window != next {
             self.buffer = make_input_buffer(
@@ -276,6 +380,24 @@ impl InputBuffer {
             );
             self.window = next;
         }
+    }
+
+    /// Updates the logical column before `cursor` using only the traversed slice.
+    ///
+    /// * `cursor` — byte offset of the next caret position in the unchanged content.
+    fn update_cursor_columns(&mut self, cursor: usize) {
+        if self.line_offsets.len() != 1 || self.cursor == cursor {
+            return;
+        }
+        let text = self.content.as_str();
+        if cursor > self.cursor {
+            self.cursor_columns += column_counts(&text[self.cursor..cursor]).1;
+        } else {
+            self.cursor_columns = self
+                .cursor_columns
+                .saturating_sub(column_counts(&text[cursor..self.cursor]).1);
+        }
+        self.cursor = cursor;
     }
 
     /// Checks whether an editor can reuse this cached layout, ignoring paint changes.
@@ -299,18 +421,16 @@ impl InputBuffer {
 /// * `viewport` — available editor size.
 /// * `offsets` — full-document line starts.
 /// * `scroll_y` — resolved vertical content offset.
-/// * `cursor` — current caret position.
-/// * `scroll` — horizontal offset and caret visibility policy.
+/// * `caret` — current caret, horizontal offset, and source metrics.
 ///
 /// Returns a bounded source window when the large editor can be virtualized.
 fn input_window_for(
     text: &str,
     style: &TextStyle,
     viewport: Size,
-    offsets: &[usize],
+    offsets: &LineMetrics,
     scroll_y: f32,
-    cursor: TextPosition,
-    scroll: TextInputScroll,
+    caret: InputCursorWindow,
 ) -> Option<TextInputWindow> {
     if style.wrap != crate::TextWrap::None || text.len() < VIRTUAL_INPUT_MIN_BYTES {
         return None;
@@ -323,7 +443,17 @@ fn input_window_for(
         scroll_y,
     )
     .or_else(|| {
-        (offsets.len() == 1).then(|| horizontal_window(text, style, viewport, cursor, scroll))
+        (offsets.len() == 1).then(|| {
+            horizontal_window(
+                text,
+                style,
+                viewport,
+                caret.cursor,
+                caret.scroll,
+                caret.ascii,
+                caret.columns,
+            )
+        })
     })
 }
 

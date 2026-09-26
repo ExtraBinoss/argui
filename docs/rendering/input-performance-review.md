@@ -1,0 +1,52 @@
+# InputField performance review
+
+Measured on 2026-09-26 against Argui `583853e5732003000ca2ebfb56bb725fc0511077` and the working tree. Warp references are pinned to [Warp commit `5af88f49f84e70025f9c19e13f6b9ae64b624627`](https://github.com/warpdotdev/warp/commit/5af88f49f84e70025f9c19e13f6b9ae64b624627). These are implementation comparisons, not measurements of Warp on this computer.
+
+## What Warp does
+
+| Source | Relevant mechanism | Argui implementation here |
+| --- | --- | --- |
+| [Warp editor buffer](https://github.com/warpdotdev/warp/blob/5af88f49f84e70025f9c19e13f6b9ae64b624627/crates/editor/src/content/buffer.rs) | `BufferSnapshot` holds a cheap clone of `SumTree`; `BufferEvent::ContentChanged` carries an `EditDelta` rather than requiring a full-content diff. | Argui's native input emits a `TextEdit`. `TextInputState` retains compact pending edits; contiguous insertion runs compare three slices for a partial controlled echo. Sparse checkpoints and borrowed pieces handle mixed edits. The public editor value is still a `String`. |
+| [Warp sum tree](https://github.com/warpdotdev/warp/blob/5af88f49f84e70025f9c19e13f6b9ae64b624627/crates/sum_tree/src/lib.rs) | `SumTree<T>` wraps `Arc<Node<T>>`; nodes cache an `Item::Summary`, and cursors seek by summary. | `LineMetrics` is a persistent block treap over hard lines. Each node caches byte length, line count and maximum width. Copying a path updates the edit line; split/merge handles newline edits without shifting every following offset. |
+| [Warp render model](https://github.com/warpdotdev/warp/blob/5af88f49f84e70025f9c19e13f6b9ae64b624627/crates/editor/src/render/model/mod.rs) | `viewport_items` creates a `ViewportIterator` from scroll position and viewport size; the render model consumes content deltas. | Argui's large non-wrapping input shapes only the visible hard-line window with overscan, or a horizontal window for one long line. Cursor/selection-only updates reuse the shaped buffer. |
+| [Warp text layout](https://github.com/warpdotdev/warp/blob/5af88f49f84e70025f9c19e13f6b9ae64b624627/crates/editor/src/render/layout.rs) | Layout works on a supplied text frame and caps a single frame at 2,097,152 Unicode characters to avoid unbounded glyph/caret vectors. | Argui shapes a bounded viewport slice even when the source has 1 million characters. Its layout estimate reads line aggregates instead of scanning all unshaped text. |
+
+Warp's editor buffer uses a persistent text tree throughout the document. Argui retains a flat `String` because `TextEditorSpec`, public text events, IME handling and JS controlled values currently exchange complete strings. Replacing only the native string while converting it to a full string at each existing boundary would retain the conversion cost. In the measured 1-million-character middle insertion, `String::insert` itself takes 10 µs for ASCII and 21 µs for 1 million Arabic scalars (2 million UTF-8 bytes), while the whole native edit/layout/preparation takes roughly 4–6 ms. The bounded shaping and indexed layout metadata give the material gain on this path without changing observable input semantics.
+
+## Changes in the hot path
+
+- `argui-text`: `LineMetrics` replaces repeated full-document line-start and width scans with persistent prefix sums and maximum-width summaries. Edits within or across hard lines touch only the edited lines and tree paths; `measure_editor_content` reads these summaries for insertion, deletion and newline edits. Long single-line caret reveal uses cached cursor columns. The shaped window stays bounded.
+- `argui-ui`: controlled native input stores compact `TextEdit` acknowledgements instead of hashing the million-character value after every key. Contiguous typed inserts accept a late partial echo by checking the original prefix, inserted prefix and original suffix once. Mixed edits use checkpoints capped at 32 MiB and borrowed text pieces, with an incremental byte checksum to filter same-length candidates. Exact piece comparison verifies any checksum match. Uncontrolled edits survive unrelated parent/theme updates. Grapheme cursor placement uses `GraphemeCursor` so pointer placement does not enumerate every grapheme before the click.
+- Web bridge: Unicode UTF-8 byte offsets map through a sparse UTF-16 checkpoint index. An edit updates later checkpoints and retains a checkpoint at the new caret, including long bursts of one-character inserts. One million Arabic scalars (2 million UTF-8 bytes) require 977 offset checkpoints before editing. Controlled full-value callbacks stay under an 8 MiB cache budget, and extra acknowledgement checkpoints under 32 MiB. The edit journal itself is retained until acknowledgement without a count cap, so a controlled host that never acknowledges edits continues to use memory proportional to its pending event count. The Web bridge also uses piece reconstruction and checksum filtering for late mixed-edit echoes.
+- React and Solid `InputField`: uncontrolled typing leaves the native editor authoritative and does not schedule a framework state update. `onEdit` and its controller are installed only when `onValueChange` is supplied. `onSubmit` reads the native submitted text first.
+
+## Reproduce the measurements
+
+The Rust benchmarks are ignored tests so normal test runs stay fast. For the baseline, the same `crates/argui-layout/tests/input_performance.rs` was copied into a temporary `git archive` of Argui HEAD and run with the same command. Runs below are debug builds on the same Linux host, 100 sequential key events per scenario, reporting median and 95th percentile. A CPU-shared host can vary from run to run.
+
+```sh
+CARGO_TARGET_DIR=target/dev RUSTC_WRAPPER= cargo test -p argui-layout --all-features --test input_performance -- --ignored --nocapture --test-threads=1
+CARGO_TARGET_DIR=target/dev RUSTC_WRAPPER= cargo test -p argui-ui --all-features --test text_input_performance -- --ignored --nocapture --test-threads=1
+ARGUI_ACK_KEYS=10000 CARGO_TARGET_DIR=target/dev RUSTC_WRAPPER= cargo test -p argui-ui --all-features --test text_input_performance million_character_controlled_noncontiguous_partial_echo_cost -- --ignored --nocapture
+bun packages/widgets/bench/input.ts
+```
+
+`input_performance.rs` times a native key event through `UiTree` edit, `LayoutEngine::compute` or text-input update, and `TextEngine::prepare`. It includes CPU layout and preparation, but no browser event dispatch, JS bridge, GPU drawing, display latency or OS scheduling. The Web bridge benchmark separately times `InputEditController.apply` and its callback; it intentionally sends 100 events **without a framework rerender between events** while the authored value is stale. A controlled React or Solid rerender and its native host commit are not included in either timed path. These benchmarks cannot be added into a measured end-to-end browser latency or used as a claim about perceived Web input latency.
+
+| Scenario | HEAD p50 / p95 | Working tree p50 / p95 |
+| --- | ---: | ---: |
+| 1 million ASCII characters, append, native frame | 4.44 / 4.79 ms | 1.25 / 1.92 ms |
+| 1 million Arabic Unicode scalars, middle insert, native frame | 55.75 / 66.06 ms | 4.31 / 5.48 ms |
+| 1 million ASCII characters over 200,000 lines, middle insert, native frame | 37.06 / 38.05 ms | 6.07 / 6.68 ms |
+| 1 million ASCII characters, append, Web bridge | 1.52 / 3.18 ms | 0.005 / 0.062 ms |
+| 1 million Arabic Unicode scalars, middle insert, Web bridge | 6.69 / 26.51 ms | 0.010 / 0.024 ms |
+
+The native multiline Backspace burst is also measured, including deletions of newline characters. With the persistent line index, one run yielded p50 5.40 ms and p95 10.29 ms for 100 edits; other runs on the shared host varied up to roughly 30 ms p95. This is an observed tail, not a claim of guaranteed subframe latency. A standalone 1 million Arabic-scalar navigation benchmark measured left arrow p50 2.0 µs, pointer caret placement p50 1.5 µs and native-model Backspace p50 62 µs. The one-million-byte ASCII line index uses one line; 200,000 hard lines use O(line count) initial metadata but each ordinary edit copies a bounded block and logarithmic tree path.
+
+A separate 2,000-key controlled burst inserted at the middle of a 1-million-character ASCII value, then acknowledged only the first 1,000 keys. Replaying those 1,000 edits into a full string took 10.62 ms in Rust and 2.30 ms in the Web bridge. The contiguous-insert acknowledgement took 1.40 ms through `UiTree::replace` in Rust and 0.23 ms for Web acknowledgement plus the next edit. A later run of 10,000 noncontiguous insertions with an echo after 5,000 keys took 100.65 ms in Rust with a single piece sequence before checkpoints; the checkpointed path took 9.84 ms. The Web bridge's old full-string replay took 548.21 ms; the checkpointed piece path measured 3.52 ms in one run. Ten thousand same-length replacements with a halfway echo took 10.74 ms in Rust and 3.90 ms in the Web bridge. These are individual debug-host runs, not percentile distributions or a browser latency claim. Exact timings vary with CPU contention, and the 32 MiB checkpoint budget means longer or larger pending histories may require a wider replay span.
+
+## Verification and limits
+
+The deterministic `LineMetrics` test compares 800 mixed Unicode, tab, newline, insertion and deletion edits against a fresh full-document index after every edit, including byte starts, widths, maximum width and searches. Controlled partial acknowledgement beyond the former 128-edit cap, Unicode middle insertion, Unicode checkpoint replay, same-length replacement, uncontrolled parent update, Unicode offset boundaries and a 2,048-key same-caret burst have dedicated tests. Targeted `cargo nextest run -p argui-text -p argui-ui -p argui-layout --all-features`, targeted Clippy, WASM host check and TypeScript checks pass.
+
+Large **wrapped** rich-text editors still use full wrapping/shaping, because their line breaks depend on font metrics and viewport width; the measured million-character path is the non-wrapping `InputField`/editor case. The native value and public callbacks still produce complete strings, so memory copying remains proportional to document size even though it is a small fraction of this measured 1-million-character edit. No graphical or browser benchmark was run, so these figures do not certify perceived input latency on the user's GPU/browser.

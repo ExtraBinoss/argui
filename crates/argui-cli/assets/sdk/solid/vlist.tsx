@@ -59,7 +59,8 @@ export function VirtualList(props: VirtualListProps): JSX.Element {
     viewportHeight={axis() === 'vertical' && current().viewportExtent > 0 ? current().viewportExtent : undefined}
     offset={current().offset}
     overscan={props.overscan ?? 3}
-    scrollbarVisible={props.scrollbarVisible ?? !!props.scrollbarColor}
+    scrollMomentum={props.scrollMomentum}
+    scrollbarVisible={props.scrollbarVisible ?? true}
     scrollbarWidth={props.scrollbarWidth}
     scrollbarThumb={props.scrollbarColor}
     shadowColor={shadow()?.color}

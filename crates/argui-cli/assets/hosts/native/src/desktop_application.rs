@@ -193,6 +193,7 @@ pub(crate) fn gallery_config() -> Result<ApplicationConfig, Box<dyn std::error::
         WindowConfig {
             title: "Argui Gallery / QuickJS".into(),
             close_behavior: CloseBehavior::Hide,
+            transparent: cfg!(target_os = "linux"),
             ..WindowConfig::default()
         },
     )

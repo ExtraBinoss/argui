@@ -26,6 +26,17 @@ export function AnimationPage() {
     </column>
 
     <column width="100%" gap={8}>
+      <text color={theme().text} fontSize={16}>Discrete travel · loopSteps</text>
+      <text color={theme().textMuted}>This surface jumps through six positions. The scheduler waits between jumps instead of drawing unchanged frames.</text>
+      <rectangle id="animation-steps-track" width="100%" height={64} padding={8} background={theme().surfaceHover} radii={8}>
+        <rectangle id="animation-steps" width={150} height={48} padding={8} background={theme().primary} radii={6}
+          loopMs={1200} loopTranslateX={120} loopSteps={6} loopPlaying={playing()}>
+          <text color={theme().primaryForeground}>Six steps</text>
+        </rectangle>
+      </rectangle>
+    </column>
+
+    <column width="100%" gap={8}>
       <text color={theme().text} fontSize={16}>Pulse · loopScale</text>
       <text color={theme().textMuted}>The whole rectangle, including its text, grows to 1.18× and returns. Its reserved layout width stays at 180 px.</text>
       <rectangle id="animation-scale-track" width="100%" height={76} padding={12} background={theme().surfaceHover} radii={8}>

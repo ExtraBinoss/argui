@@ -13,12 +13,12 @@ export type InputFieldProps = InputFieldOptions & { leading?: JSX.Element; trail
 /** Renders a controlled or autonomous native text editor with a visible label. */
 export function InputField(props: InputFieldProps): JSX.Element {
   const generatedId = `argui-input-${createUniqueId()}`
-  const id = () => props.id ?? generatedId
+  const id = props.id ?? generatedId
   const theme = useTheme<WidgetTheme>()
-  const [uncontrolled, setUncontrolled] = createSignal(props.defaultValue ?? '')
-  const value = () => props.value ?? uncontrolled()
+  const initialValue = props.defaultValue ?? ''
+  const value = () => props.value ?? initialValue
   const [revealed, setRevealed] = createSignal(false)
-  const edits = new InputEditController(value())
+  let edits: InputEditController | undefined
   const readOnly = () => !!props.readOnly || (props.value !== undefined && !props.onValueChange)
   const inputType = () => props.type ?? 'text'
   const grouped = useButtonGroup() !== null
@@ -26,10 +26,10 @@ export function InputField(props: InputFieldProps): JSX.Element {
   return <column width={props.width ?? (grouped ? undefined : '100%')} height={props.height}
     minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
     grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf} margin={props.margin} gap={theme().spacing}>
-    {props.label ? <text color={theme().textMuted} fontSize={12}>{props.label}</text> : null}
+    {props.label ? <text color={theme().textMuted} fontSize={theme().fieldLabelSize}>{props.label}</text> : null}
     <rectangle
       width="100%"
-      height={grouped ? 38 : 40}
+      height={grouped ? theme().inputGroupHeight : theme().inputHeight}
       padding={theme().spacing}
       background={grouped ? '#00000000' : theme().surface}
       border={{ width: 1, color: props.invalid ? theme().danger : grouped ? '#00000000' : theme().border }}
@@ -41,12 +41,14 @@ export function InputField(props: InputFieldProps): JSX.Element {
         {props.leading}
         <container grow={1} minWidth={0}>
           <textInput
-            id={id()}
+            id={id}
             width="100%"
-            height={20}
+            height={theme().inputLineHeight}
             value={value()}
             placeholder={props.placeholder ?? ''}
             label={props.accessibleName ?? props.label}
+            description={props.description}
+            required={props.required}
             search={inputType() === 'search'}
             privacy={inputType() === 'password' ? revealed() ? 'revealedPassword' : 'password' : 'public'}
             enabled={!props.disabled}
@@ -56,24 +58,24 @@ export function InputField(props: InputFieldProps): JSX.Element {
             textColor={props.disabled ? theme().textMuted : theme().text}
             placeholderColor={theme().textMuted}
             caretColor={theme().primary}
-            onEdit={(payload) => {
-              edits.apply(payload, value(), (next) => {
-                if (props.value === undefined) setUncontrolled(next)
-                props.onValueChange?.(next)
-              })
-            }}
-            onSubmit={(payload) => props.onSubmit?.(submittedText(payload) ?? value())}
+            onEdit={props.onValueChange ? (payload) => {
+              edits ??= new InputEditController(value(), props.value !== undefined)
+              edits.apply(payload, value(), props.onValueChange!, props.value !== undefined)
+            } : undefined}
+            onSubmit={props.onSubmit ? (payload) => props.onSubmit!(submittedText(payload) ?? edits?.currentValue ?? value()) : undefined}
           />
         </container>
         {props.trailing}
         {inputType() === 'password' ? <Button
-          id={`${id()}-visibility`}
+          id={`${id}-visibility`}
           variant="ghost"
+          size="xs"
           disabled={props.disabled}
           accessibleName={revealed() ? 'Hide password' : 'Show password'}
           onClick={() => setRevealed((current) => !current)}
         >{revealed() ? 'Hide' : 'Show'}</Button> : null}
       </row>
     </rectangle>
+    {props.description ? <text color={theme().textMuted} fontSize={theme().fieldLabelSize}>{props.description}</text> : null}
   </column>
 }

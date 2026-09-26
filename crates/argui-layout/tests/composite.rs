@@ -1,11 +1,12 @@
-use argui_animation::{Duration, Motion, Time, Tween};
+use argui_animation::{Duration, Motion, Time, Transition, Tween};
 use argui_core::{Affine2D, Point, Size, Transform2D};
 use argui_layout::LayoutEngine;
-use argui_paint::{CompositorId, DisplayCommand, LayerStyle};
+use argui_paint::{CompositorId, DisplayCommand, Fill, LayerStyle, VectorId};
 use argui_text::TextEngine;
 use argui_ui::{
-    CaretStyle, Color, Element, FocusPolicy, FocusRequest, Interaction, TextEditorSpec,
-    TextInputFilter, TreeUpdate, UiTree, length, property,
+    CaretStyle, Color, Element, FocusPolicy, FocusRequest, Interaction, StylePatch,
+    StyleTransition, TextEditorSpec, TextInputFilter, TreeUpdate, UiTree, VisualState, length,
+    property,
 };
 
 fn scene(transform: Transform2D, opacity: f32) -> Element {
@@ -31,6 +32,7 @@ fn composition_updates_retained_layers_and_descendant_geometry_without_repaint()
         .compute(&mut ui, &mut text, Size::new(240.0, 120.0))
         .unwrap();
     let child = ui.node_id_at(1).expect("child node");
+    let original_hit_regions = output.hit_regions.clone();
     let retained_quad = output
         .display_list
         .commands()
@@ -41,6 +43,13 @@ fn composition_updates_retained_layers_and_descendant_geometry_without_repaint()
         })
         .expect("retained quad");
     let retained_text = output.text.clone();
+
+    assert_eq!(
+        ui.update(scene(Transform2D::IDENTITY, 0.6)),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    assert_eq!(output.hit_regions, original_hit_regions);
 
     assert_eq!(
         ui.update(scene(Transform2D::IDENTITY.translate(36.0, 8.0), 0.4,)),
@@ -79,6 +88,165 @@ fn composition_updates_retained_layers_and_descendant_geometry_without_repaint()
         .expect("child hit region");
     assert_eq!(hit.transform, Affine2D::translation(36.0, 8.0));
     assert!(hit.contains(Point::new(40.0, 12.0)));
+
+    assert_eq!(
+        ui.update(scene(Transform2D::IDENTITY, 0.6)),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    assert_eq!(output.hit_regions, original_hit_regions);
+}
+
+/// Moving a static radial glow updates its layer while retaining the GPU fill.
+#[test]
+fn radial_glow_motion_reuses_the_painted_gradient_quad() {
+    let fill = Fill::radial_gradient(
+        &[Color::srgb(0.3, 0.8, 0.9), Color::srgb(0.3, 0.8, 0.9)],
+        &[0.0, 1.0],
+        Point::new(0.5, 0.9),
+        Point::new(0.5, 0.8),
+        "oklab",
+    )
+    .unwrap();
+    let scene = |transform| {
+        Element::container([])
+            .width(length(120.0))
+            .height(length(64.0))
+            .fill(fill.clone())
+            .transform(transform)
+            .layer(LayerStyle::new(Default::default()).opacity(0.8))
+    };
+    let mut ui = UiTree::new(scene(Transform2D::IDENTITY));
+    let mut engine = LayoutEngine::new();
+    let mut text = TextEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+    let retained = output
+        .display_list
+        .commands()
+        .iter()
+        .find_map(|command| match command {
+            DisplayCommand::Quad(quad) => Some(quad.clone()),
+            _ => None,
+        })
+        .expect("gradient quad");
+    assert!(matches!(
+        retained.background.as_ref(),
+        Some(Fill::Radial(_))
+    ));
+
+    assert_eq!(
+        ui.update(scene(Transform2D::IDENTITY.translate(18.0, 0.0))),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    assert_eq!(
+        output
+            .display_list
+            .commands()
+            .iter()
+            .find_map(|command| match command {
+                DisplayCommand::Quad(quad) => Some(quad),
+                _ => None,
+            }),
+        Some(&retained)
+    );
+}
+
+#[test]
+fn button_surface_icon_and_text_share_one_animated_layer() {
+    let content = || {
+        Element::container([
+            Element::vector(VectorId(1))
+                .width(length(16.0))
+                .height(length(16.0)),
+            Element::text("With icon"),
+        ])
+        .width(length(120.0))
+        .height(length(32.0))
+        .background(Color::WHITE)
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Pressed,
+            StylePatch::new().set(
+                property::Transform,
+                Transform2D::IDENTITY.translate(0.0, 1.0),
+            ),
+        )
+        .transition(StyleTransition::new(Transition::tween(Tween::new(
+            Duration::from_millis(150),
+        ))))
+    };
+    let mut ui = UiTree::new(content());
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(240.0, 120.0))
+        .unwrap();
+    let commands = output.display_list.commands();
+    let begin = commands
+        .iter()
+        .position(|command| matches!(command, DisplayCommand::BeginCompositor(_)))
+        .unwrap();
+    let end = commands
+        .iter()
+        .position(|command| matches!(command, DisplayCommand::EndCompositor))
+        .unwrap();
+    assert!(begin < end);
+    assert!(
+        commands[begin + 1..end]
+            .iter()
+            .any(|command| matches!(command, DisplayCommand::Quad(_)))
+    );
+    assert!(
+        commands[begin + 1..end]
+            .iter()
+            .any(|command| matches!(command, DisplayCommand::Vector(_)))
+    );
+    assert!(
+        commands[begin + 1..end]
+            .iter()
+            .any(|command| matches!(command, DisplayCommand::Text { .. }))
+    );
+    let retained_content = commands[begin + 1..end].to_vec();
+    let retained_text = output.text.clone();
+
+    ui.pointer_moved(Point::new(10.0, 10.0), &output.hit_regions);
+    assert!(ui.primary_pressed(&output.hit_regions).composite_changed);
+    assert_eq!(ui.advance_animations(Time::from_nanos(1)), TreeUpdate::None);
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(50_000_001)),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    let pressed = output
+        .display_list
+        .compositor_layers()
+        .next()
+        .unwrap()
+        .transform;
+    assert_ne!(pressed, Affine2D::IDENTITY);
+    assert_eq!(
+        &output.display_list.commands()[begin + 1..end],
+        retained_content
+    );
+    assert_eq!(output.text, retained_text);
+
+    assert!(ui.primary_released().composite_changed);
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(75_000_001)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(100_000_001)),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    assert_eq!(
+        &output.display_list.commands()[begin + 1..end],
+        retained_content
+    );
+    assert_eq!(output.text, retained_text);
 }
 
 #[test]

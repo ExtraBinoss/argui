@@ -54,6 +54,15 @@ export interface WidgetTheme extends ThemeValues, NeutralColors {
   destructiveHover: string
   radius: number
   spacing: number
+  inputHeight: number
+  inputGroupHeight: number
+  inputLineHeight: number
+  fieldLabelSize: number
+  selectWidth: number
+  selectCompactHeight: number
+  selectRowHeight: number
+  selectCompactRowHeight: number
+  selectMaxPopupHeight: number
   overlaySurface: string
   overlayBlur: number
   overlayRadius: number
@@ -119,6 +128,9 @@ const light: WidgetTheme = {
   destructiveSurface: 'oklch(0.577 0.245 27.325 / 10%)',
   destructiveHover: 'oklch(0.577 0.245 27.325 / 20%)',
   radius: 10, spacing: 8,
+  inputHeight: 40, inputGroupHeight: 38, inputLineHeight: 20, fieldLabelSize: 12,
+  selectWidth: 240, selectCompactHeight: 32, selectRowHeight: 36,
+  selectCompactRowHeight: 28, selectMaxPopupHeight: 256,
   overlaySurface: 'oklch(1 0 0 / 92%)', overlayBlur: 10,
   overlayRadius: 10, overlayPadding: 16, overlayWidth: 280,
   overlayBorderWidth: 1, overlayShadowColor: 'oklch(0 0 0 / 12%)',
@@ -134,18 +146,25 @@ const dark: WidgetTheme = {
   primaryHover: 'oklch(0.922 0 0 / 80%)',
   secondaryHover: 'oklch(0.3048 0 0)',
   ghostHover: 'oklch(0.269 0 0 / 50%)',
-  outlineSurface: 'oklch(1 0 0 / 30%)', outlineBorder: neutralDark.input,
-  outlineHover: 'oklch(1 0 0 / 50%)',
+  outlineSurface: 'oklch(1 0 0 / 4.5%)', outlineBorder: neutralDark.input,
+  outlineHover: 'oklch(1 0 0 / 7.5%)',
   destructiveSurface: 'oklch(0.704 0.191 22.216 / 20%)',
   destructiveHover: 'oklch(0.704 0.191 22.216 / 30%)',
   radius: 10, spacing: 8,
+  inputHeight: 40, inputGroupHeight: 38, inputLineHeight: 20, fieldLabelSize: 12,
+  selectWidth: 240, selectCompactHeight: 32, selectRowHeight: 36,
+  selectCompactRowHeight: 28, selectMaxPopupHeight: 256,
   overlaySurface: 'oklch(0.205 0 0 / 92%)', overlayBlur: 10,
   overlayRadius: 10, overlayPadding: 16, overlayWidth: 280,
   overlayBorderWidth: 1, overlayShadowColor: 'oklch(0 0 0 / 50%)',
   overlayShadowBlur: 14, overlayShadowOffsetY: 4,
 }
 
-const layoutTokens = new Set(['spacing', 'overlayPadding', 'overlayWidth'])
+const layoutTokens = new Set([
+  'spacing', 'inputHeight', 'inputGroupHeight', 'inputLineHeight', 'fieldLabelSize',
+  'selectWidth', 'selectCompactHeight', 'selectRowHeight', 'selectCompactRowHeight',
+  'selectMaxPopupHeight', 'overlayPadding', 'overlayWidth',
+])
 
 /** Default system-aware Neutral theme, with reusable Argui overlay tokens. */
 export const widgetThemeDefinition: ThemeDefinition<WidgetTheme> = {

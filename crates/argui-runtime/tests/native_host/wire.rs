@@ -53,6 +53,55 @@ fn transparent_literal_decodes_for_color_and_brush() {
 }
 
 #[test]
+fn gradient_brushes_decode_into_native_gpu_fills() {
+    let linear = serde_json::from_value(serde_json::json!({
+        "type": "Brush", "value": {
+            "kind": "linear", "angle": 90, "space": "oklab",
+            "stops": [
+                {"offset": 0, "color": "#53d5ff"},
+                {"offset": 0.5, "color": "#e885d9"},
+                {"offset": 1, "color": "transparent"}
+            ]
+        }
+    }))
+    .unwrap();
+    assert!(matches!(
+        argui_runtime::WireValue::into_native(linear).unwrap(),
+        SchemaValue::Brush(Fill::Linear(gradient)) if gradient.stops.len() == 3
+    ));
+
+    let radial = serde_json::from_value(serde_json::json!({
+        "type": "Brush", "value": {
+            "kind": "radial", "center": {"x": 0.5, "y": 1.0},
+            "radius": {"x": 0.5, "y": 1.0},
+            "stops": [
+                {"offset": 0, "color": "#fa9691"},
+                {"offset": 1, "color": "transparent"}
+            ]
+        }
+    }))
+    .unwrap();
+    assert!(matches!(
+        argui_runtime::WireValue::into_native(radial).unwrap(),
+        SchemaValue::Brush(Fill::Radial(_))
+    ));
+}
+
+#[test]
+fn malformed_gradient_brushes_are_rejected() {
+    for value in [
+        serde_json::json!({"kind":"linear","angle":90,"stops":[{"offset":0,"color":"#fff"}]}),
+        serde_json::json!({"kind":"linear","angle":90,"stops":[{"offset":0.8,"color":"#fff"},{"offset":0.2,"color":"#000"}]}),
+        serde_json::json!({"kind":"radial","center":{"x":0.5,"y":0.5},"radius":{"x":0,"y":1},"stops":[{"offset":0,"color":"#fff"},{"offset":1,"color":"#000"}]}),
+        serde_json::json!({"kind":"linear","angle":90,"space":"hsl","stops":[{"offset":0,"color":"#fff"},{"offset":1,"color":"#000"}]}),
+    ] {
+        let wire =
+            serde_json::from_value(serde_json::json!({"type":"Brush","value":value})).unwrap();
+        assert!(argui_runtime::WireValue::into_native(wire).is_err());
+    }
+}
+
+#[test]
 fn css_color_literals_decode_through_native_wire() {
     for literal in [
         "#ff008080",

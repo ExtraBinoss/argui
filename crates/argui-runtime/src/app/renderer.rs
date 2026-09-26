@@ -336,6 +336,7 @@ impl Application {
         let Some(window) = self.window.clone() else {
             return;
         };
+        let resize_started = self.profile_clock();
         let mut state = self.renderer.borrow_mut();
 
         #[cfg(target_arch = "wasm32")]
@@ -347,6 +348,12 @@ impl Application {
         let RendererState::Ready(renderer) = &mut *state else {
             return;
         };
+        if let Some((width, height)) = self.pending_surface_size.take() {
+            // Keep the prior swapchain image visible while layout is prepared.
+            renderer.resize(width, height);
+            self.frame_record.surface +=
+                resize_started.map_or(std::time::Duration::ZERO, |start| start.elapsed());
+        }
         if !self.renderer_announced {
             (self.on_event)(RuntimeEvent::RendererReady);
             self.renderer_announced = true;
@@ -482,8 +489,12 @@ impl Application {
             }
             Ok(RenderStatus::Reconfigure) => {
                 let size = crate::host::WindowHost::drawable_size(&window);
-                renderer.resize(size.width, size.height);
-                window.request_redraw();
+                if size.width > 0 && size.height > 0 {
+                    if !renderer.resize(size.width, size.height) {
+                        renderer.reconfigure_surface();
+                    }
+                    window.request_redraw();
+                }
                 Ok(())
             }
             Ok(RenderStatus::RecreateSurface) => window

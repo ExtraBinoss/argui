@@ -74,7 +74,13 @@ impl UiTree {
     pub fn resolved_transform(&self, node: NodeId, element: &Element) -> argui_core::Transform2D {
         let mut transform = element.transform;
         super::transition::apply_transform(&self.transitions, node, &mut transform);
-        crate::binding::resolved_transform(&element.bindings, transform)
+        let mut transform = crate::binding::resolved_transform(&element.bindings, transform);
+        if let Some(bounce) = self.press_bounces.get(&node) {
+            let scale = bounce.scale();
+            transform.scale.x *= scale;
+            transform.scale.y *= scale;
+        }
+        transform
     }
 
     /// Resolves an element layout style using transitions, bindings, direction, and borders.
@@ -135,6 +141,9 @@ impl UiTree {
     pub fn resolved_scroll_config(&self, node: NodeId, config: &ScrollConfig) -> ScrollConfig {
         let mut resolved = config.clone();
         if let Some(scrollbar) = &mut resolved.scrollbar {
+            if let Some(hovered) = scrollbar.hover_width {
+                scrollbar.width = self.scroll.hover_width(node, scrollbar.width, hovered);
+            }
             super::transition::apply_scrollbar_part(
                 &self.transitions,
                 node,

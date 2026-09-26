@@ -20,7 +20,7 @@ mod responsive;
 mod scroll;
 mod text_input;
 mod transition;
-use animation::AnimationRegistry;
+use animation::{AnimationRegistry, PressBounce};
 use event::EventRegistry;
 use focus::FocusRegistry;
 use transition::TransitionRegistry;
@@ -64,6 +64,7 @@ pub struct UiTree {
     layout_dirty: bool,
     update_stats: TreeUpdateStats,
     animations: AnimationRegistry,
+    press_bounces: std::collections::HashMap<NodeId, PressBounce>,
     transitions: TransitionRegistry,
     container_sizes: Vec<(NodeId, argui_core::Size)>,
     container_indices: Vec<(NodeId, usize)>,
@@ -108,6 +109,7 @@ impl UiTree {
             layout_dirty: true,
             update_stats: TreeUpdateStats::default(),
             animations,
+            press_bounces: Default::default(),
             transitions: TransitionRegistry::default(),
             container_sizes: Vec::new(),
             container_indices: Vec::new(),
@@ -251,6 +253,14 @@ impl UiTree {
                 );
             }
         }
+        self.press_bounces.retain(|node, _| {
+            self.index
+                .element(*node)
+                .and_then(|element| element.interaction.as_ref())
+                .is_some_and(|interaction| {
+                    interaction.enabled && interaction.press_bounce_scale.is_some()
+                })
+        });
         self.events.sync(&self.index);
         if update == TreeUpdate::Layout {
             self.sync_responsive_registry();
@@ -344,23 +354,39 @@ impl UiTree {
     }
 
     fn decorate(&mut self, raw: RawUpdate) -> InteractionUpdate {
+        // Press and release paths can query focus and pointer position without
+        // changing either state. Avoid resolving the whole style tree again.
+        if raw.events.is_empty() && !raw.paint_changed {
+            return InteractionUpdate::default();
+        }
         let text_input_changed = raw.events.iter().any(|(target, kind)| {
             matches!(kind, UiEventKind::Focused | UiEventKind::Blurred)
                 && self.text_inputs.get(*target).is_some()
         });
+        let transition_update = if raw.full_transition_sync {
+            self.sync_transitions()
+        } else {
+            self.sync_transitions_for_events(&raw.events)
+        };
+        let transition_update =
+            strongest_update(transition_update, self.start_press_bounces(&raw.events));
         let events = raw
             .events
             .into_iter()
             .flat_map(|(target, kind)| self.event_deliveries(target, kind))
             .collect();
-        let transition_update = self.sync_transitions();
         if text_input_changed {
             self.caret.reset();
         }
         InteractionUpdate {
             events,
             composite_changed: transition_update == TreeUpdate::Composite,
-            paint_changed: raw.paint_changed || transition_update == TreeUpdate::Paint,
+            // Pointer and keyboard visual-state changes start as a conservative
+            // paint signal. Once transition resolution proves that their only
+            // visible change is composited, keep the first frame on that path.
+            // Text-input focus has its own invalidation below.
+            paint_changed: (raw.paint_changed && transition_update != TreeUpdate::Composite)
+                || transition_update == TreeUpdate::Paint,
             scroll_changed: transition_update == TreeUpdate::Scroll,
             layout_changed: transition_update == TreeUpdate::Layout,
             text_input_changed,
@@ -386,7 +412,7 @@ impl UiTree {
                 || self.has_event_listener(node, crate::EventType::TextEdit))
                 && let Some(state) = self.text_inputs.get_mut(node)
             {
-                state.note_current_value();
+                state.note_current_value(&edit);
             }
             events.extend(self.event_deliveries(node, UiEventKind::TextEdited(edit.edit)));
             if self.has_event_listener(node, crate::EventType::Input) {

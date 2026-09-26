@@ -35,7 +35,10 @@ impl Default for TextEngine {
         #[cfg(target_arch = "wasm32")]
         {
             Self::from_embedded_fonts(
-                [include_bytes!("../assets/fonts/NotoSans-Regular.ttf").as_slice()],
+                [
+                    include_bytes!("../assets/fonts/NotoSans-Regular.ttf").as_slice(),
+                    include_bytes!("../../../assets/fonts/NotoSansArabic.ttf").as_slice(),
+                ],
                 "Noto Sans",
                 "Noto Sans",
                 "Noto Sans",
@@ -56,8 +59,8 @@ impl Default for TextEngine {
 }
 
 impl TextEngine {
-    /// Creates a text engine using system fonts on native targets and a bundled
-    /// fallback font on WebAssembly, where system fonts are unavailable.
+    /// Creates a text engine using system fonts on native targets and bundled
+    /// Noto Sans and Noto Sans Arabic on WebAssembly, where system fonts are unavailable.
     #[must_use]
     pub fn new() -> Self {
         Self::default()

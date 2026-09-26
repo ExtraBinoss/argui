@@ -1,4 +1,10 @@
 use argui_core::{Point, Size, TextPosition};
+
+#[path = "input/buffer/line_metrics.rs"]
+mod input;
+
+#[path = "input/performance.rs"]
+mod performance;
 use argui_text::{
     CaretScroll, TextContent, TextEngine, TextInputScroll, TextSpan, TextSpanStyle, TextStyle,
     TextWrap,

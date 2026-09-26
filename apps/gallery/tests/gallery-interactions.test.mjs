@@ -131,11 +131,11 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
     const dispose = mount(view.bridge, contract.abiHash)
     try {
       let selected = view.find('FocusScope', (node) => node.properties.id === 'page-button')
-      let surface = selected?.children[0]
+      let surface = descendant(selected, 'Rectangle')
       assert.equal(surface?.properties.background, 'oklch(0.97 0 0)', 'light selected navigation uses sidebar accent')
       assert.equal(descendant(selected, 'Text')?.properties.textColor, 'oklch(0.205 0 0)', 'selected navigation label uses sidebar primary')
       assert.equal(surface?.properties.hoverBackground, 'oklch(0.97 0 0)', 'ghost hover follows the official muted role')
-      assert.equal(surface?.properties.pressedScale, 0.98, 'native press gently scales the control')
+      assert.equal(selected?.properties.pressBounceScale, 0.97, 'native press bounces the entire control')
 
       view.dispatch(findButton(view, 'Layouting'), 'click')
       await turn()
@@ -168,9 +168,9 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       const themeBatches = view.commits.slice(themeStart).flat()
       assert(themeBatches.length > 0, 'theme update emits native properties')
       assert(themeBatches.every((operation) => operation.kind === 'setProperty'),
-        'theme update changes existing native properties without rebuilding nodes')
+        `theme update changes existing native properties without rebuilding nodes: ${JSON.stringify(themeBatches.filter((operation) => operation.kind !== 'setProperty'))}`)
       selected = view.find('FocusScope', (node) => node.properties.id === 'page-layouting')
-      surface = selected?.children[0]
+      surface = descendant(selected, 'Rectangle')
       assert.equal(surface?.properties.background, 'oklch(0.269 0 0)', 'dark selected navigation uses sidebar accent')
       assert.equal(surface?.properties.hoverBackground, 'oklch(0.269 0 0)', 'sidebar hover uses its own accent role')
       assert.equal(descendant(selected, 'Text')?.properties.textColor, 'oklch(0.488 0.243 264.376)', 'dark selected label uses sidebar primary')
@@ -196,6 +196,78 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       view.dispatch(findButton(view, 'Default'), 'click')
       await turn()
       assert(view.all('Text').some((node) => node.properties.text === 'Clicked 1 times'))
+      assert.equal(findButton(view, 'Default')?.properties.accessibleName, 'Default')
+      const disabled = findButton(view, 'Disabled')
+      assert.equal(disabled?.properties.mouseCursor, 'notAllowed')
+      assert.equal(disabled?.properties.enabled, false)
+      assert.equal(disabled?.children[0]?.type.name, 'Rectangle', 'button press uses its focus scope without an extra hit region')
+      const opened = []
+      const previousWindow = globalThis.window
+      globalThis.window = { location: { assign: (...args) => opened.push(args) } }
+      try {
+        view.dispatch(findButton(view, 'Link'), 'click')
+        await turn()
+      } finally {
+        if (previousWindow === undefined) delete globalThis.window
+        else globalThis.window = previousWindow
+      }
+      assert.deepEqual(opened, [['https://extrabinoss.github.io/argui/']])
+    } finally { dispose() }
+  })
+
+  test(`${adapter} color family and appearance update shared button paint`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      view.dispatch(findButton(view, 'Settings'), 'click')
+      await turn()
+      const colors = view.find('ScrollView', (node) => node.properties.id === 'gallery-color-list')
+      assert.equal(colors?.properties.scrollY, true)
+      assert.equal(colors?.properties.height, 228)
+      assert.equal(colors?.children[0]?.type.name, 'Column', 'color choices form a vertical overflow list')
+      assert(view.all('FocusScope').filter((node) => node.properties.id?.startsWith('color-')).length > 15,
+        'the bounded viewport contains more choices than one screen can show')
+      view.dispatch(findButton(view, 'Blue'), 'click')
+      await turn()
+      assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
+        'oklch(0.488 0.243 264.376)')
+      assert.equal(findButton(view, 'Blue')?.properties.pressedState, true)
+      view.dispatch(findButton(view, 'Dark'), 'click')
+      await turn()
+      assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
+        'oklch(0.707 0.165 254.624)')
+      view.dispatch(findButton(view, 'System'), 'click')
+      await turn()
+      assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
+        'oklch(0.488 0.243 264.376)', 'system mode follows the light fixture scheme')
+      view.bridge.theme.update(1, { systemScheme: 'dark' })
+      await turn()
+      assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
+        'oklch(0.707 0.165 254.624)', 'system changes refresh the chosen family')
+      view.dispatch(findButton(view, 'Neutral'), 'click')
+      await turn()
+      assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
+        'oklch(0.922 0 0)', 'Neutral restores the official dark primary')
+    } finally { dispose() }
+  })
+
+  test(`${adapter} motion toggle changes the native press animation`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      const demo = () => findButton(view, 'Click repeatedly')
+      assert.equal(descendant(findButton(view, 'Rounded'), 'Rectangle')?.properties.radii, 16)
+      assert.equal(descendant(findButton(view, 'Small'), 'Rectangle')?.properties.radii, 8)
+      assert.equal(demo()?.properties.pressBounceScale, 0.97)
+      assert.equal(descendant(demo(), 'Rectangle')?.properties.transitionMs, 150)
+      assert.equal(descendant(demo(), 'Rectangle')?.properties.transitionTimingFunction, 'cubic-bezier(0.4, 0, 0.2, 1)')
+      view.dispatch(findButton(view, 'Motion: On'), 'click')
+      await turn()
+      assert(findButton(view, 'Motion: Off'))
+      assert.equal(demo()?.properties.pressBounceScale, undefined)
+      view.dispatch(findButton(view, 'Motion: Off'), 'click')
+      await turn()
+      assert.equal(demo()?.properties.pressBounceScale, 0.97)
     } finally { dispose() }
   })
 
@@ -228,7 +300,7 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       const schedule = findButton(view, 'Schedule')
       assert(schedule, 'split button popover can mount its own controls')
-      assert.equal(schedule.children[0]?.properties.radii, 10,
+      assert.equal(descendant(schedule, 'Rectangle')?.properties.radii, 10,
         'floating controls regain their own corners outside the trigger group')
     } finally { dispose() }
   })
@@ -241,6 +313,15 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       assert(view.all('Text').some((node) => node.properties.text === 'Examples'))
       const navigation = view.find('ScrollView', (node) => node.properties.id === 'gallery-navigation')
       assert(navigation)
+      const navigationFrame = view.find('Rectangle', (node) => node.properties.id === 'gallery-navigation-frame')
+      assert.equal(navigationFrame?.properties.grow, 1, 'navigation fills the remaining sidebar height')
+      assert.equal(navigationFrame?.properties.minHeight, 0)
+      for (const side of ['top', 'bottom']) {
+        const shade = view.find('Rectangle', (node) => node.properties.id === `gallery-nav-shade-${side}`)
+        assert.equal(shade?.properties.height, 28)
+        assert.match(shade?.properties.background.stops[0].color, /^oklch\([\d.]+ [\d.]+ [\d.]+ \/ \d+%\)$/,
+          `${side} shadow keeps the sidebar hue and darkens it`)
+      }
       assert.equal(descendant(navigation, 'Svg'), undefined, 'sidebar navigation does not mount icons')
       const inputNavigationId = view.find('FocusScope', (node) => node.properties.id === 'page-input-field')?.id
       view.dispatch(findButton(view, 'Layouting'), 'click')
@@ -254,15 +335,59 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       view.dispatch(findButton(view, 'Animation'), 'click')
       await turn()
       assert.equal(view.find('Row', (node) => node.properties.id === 'layout-live-row'), undefined)
-      for (const id of ['animation-travel', 'animation-scale', 'animation-color', 'animation-width']) {
+      for (const id of ['animation-travel', 'animation-steps', 'animation-scale', 'animation-color', 'animation-width']) {
         const scene = view.find('Rectangle', (node) => node.properties.id === id)
         assert(scene, `${id} is mounted`)
         assert(descendant(scene, 'Text'), `${id} includes explanatory text`)
         assert(scene.properties.loopMs > 0, `${id} uses native loop timing`)
       }
+      assert.equal(view.find('Rectangle', (node) => node.properties.id === 'animation-steps')?.properties.loopSteps, 6)
       view.dispatch(findButton(view, 'Pause animations'), 'click')
       await turn()
       assert.equal(view.find('Rectangle', (node) => node.properties.id === 'animation-travel')?.properties.loopPlaying, false)
+    } finally { dispose() }
+  })
+
+  test(`${adapter} expressive examples keep gradients and loops in native nodes`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      view.dispatch(findButton(view, 'Expressive UI'), 'click')
+      await turn()
+      const gradient = view.find('Rectangle', (node) => node.properties.id === 'expressive-click-gradient')
+      assert.equal(gradient?.properties.background.kind, 'linear')
+      assert.equal(gradient?.properties.opacity, 0)
+      for (const id of ['expressive-voice-cyan', 'expressive-dotted-spinner',
+        'expressive-breathing-halo', 'expressive-sweep']) {
+        assert(view.find('Rectangle', (node) => node.properties.id === id), `${id} is mounted`)
+      }
+      assert.equal(view.find('Rectangle', (node) => node.properties.id === 'expressive-voice-cyan')?.properties.background.kind, 'radial')
+      assert.equal(view.find('Rectangle', (node) => node.properties.id === 'expressive-dotted-spinner')?.properties.rotationLoopMs, 1200)
+
+      view.dispatch(view.find('FocusScope', (node) => node.properties.id === 'expressive-glow-button'), 'click')
+      await turn()
+      assert.equal(view.find('Rectangle', (node) => node.properties.id === 'expressive-click-gradient')?.properties.opacity, 0.95)
+      view.dispatch(view.find('FocusScope', (node) => node.properties.id === 'expressive-record-button'), 'click')
+      await turn()
+      assert.equal(view.find('Rectangle', (node) => node.properties.id === 'expressive-voice-cyan')?.properties.opacity, 0.76)
+      view.dispatch(view.find('FocusScope', (node) => node.properties.id === 'expressive-record-button'), 'click')
+      await turn()
+      assert(view.all('Text').some((node) => node.properties.text === 'Processing…'))
+      view.dispatch(findButton(view, 'Pause motion'), 'click')
+      await turn()
+      assert.equal(view.find('Rectangle', (node) => node.properties.id === 'expressive-dotted-spinner')?.properties.loopPlaying, false)
+    } finally { dispose() }
+  })
+
+  test(`${adapter} exposes five additional widget pages from the sidebar`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      for (const label of ['Checkbox', 'Switch', 'Tabs', 'Slider', 'Progress']) {
+        view.dispatch(findButton(view, label), 'click')
+        await turn()
+        assert(view.all('Text').some((node) => node.properties.text === label), `${label} page opens`)
+      }
     } finally { dispose() }
   })
 
@@ -292,10 +417,14 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       const languagePopup = view.find('PopupWindow', (node) => node.properties.id === 'language-select-popup')
       assert(languagePopup, 'standard select popup is mounted')
+      assert.equal(descendant(languagePopup, 'Rectangle')?.properties.clip, true,
+        'popup contents stay inside the rounded border')
       assert.equal(languagePopup.properties.placementOffset, undefined,
         'standard select keeps the native anchored offset')
       assert.equal(descendant(languagePopup, 'ScrollView')?.properties.height, 158,
         'viewport includes option rows, gaps, and vertical padding')
+      assert.equal(descendant(languagePopup, 'ScrollView')?.properties.scrollY, true,
+        'long option lists can scroll within the border')
       const option = view.find('FocusScope', (node) => node.properties.role === 'option'
         && node.properties.accessibleName === 'TypeScript')
       assert(option, 'TypeScript option is mounted')
@@ -353,6 +482,9 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       const trigger = view.find('FocusScope', (node) => node.properties.controls === 'gallery-popover-popup')
       assert(trigger, 'anchored trigger is mounted')
+      assert.equal(trigger.properties.hasPopup, undefined, 'generic popovers do not claim dialog semantics')
+      assert.equal(descendant(trigger, 'Rectangle')?.properties.pressedTranslateY, undefined,
+        'popup triggers do not use the active press translation')
       view.dispatch(trigger, 'click')
       await turn()
       let popup = view.find('PopupWindow', (node) => node.properties.id === 'gallery-popover-popup')
@@ -362,24 +494,24 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       assert.equal(popup.properties.initialFocus, '')
       assert.equal(popup.properties.restoreFocus, true)
       assert.equal(popup.properties.dismissPolicy, 'outsidePointerOrEscape')
-      assert.equal(popup.properties.width, 280)
-      assert.equal(trigger.properties.accessibleName, 'Show details')
+      assert.equal(popup.properties.width, 240)
+      assert.equal(trigger.properties.accessibleName, 'Opaque')
       assert.equal(trigger.properties.width, undefined)
-      assert(view.all('Text').some((node) => node.properties.text === 'Popover content'))
+      assert(view.all('Text').some((node) => node.properties.text === 'The background is fully opaque.'))
       view.dispatch(popup, 'dismiss')
       await turn()
       popup = view.find('PopupWindow', (node) => node.properties.id === 'gallery-popover-popup')
       assert.equal(popup, undefined)
-      const searchTrigger = view.find('FocusScope', (node) => node.properties.accessibleName === 'Search filters')
-      assert(searchTrigger, 'accessibleLabel names the filter trigger')
+      const searchTrigger = view.find('FocusScope', (node) => node.properties.controls === 'gallery-blurred-popover-popup')
+      assert(searchTrigger, 'blurred filter trigger is mounted')
       view.dispatch(searchTrigger, 'click')
       await turn()
       const searchPopup = view.find('PopupWindow', (node) => node.properties.id === searchTrigger.properties.controls)
       assert(searchPopup, 'filter popup keeps its stable trigger relation')
-      assert.equal(searchPopup.properties.width, 320)
+      assert.equal(searchPopup.properties.width, 280)
       assert.equal(searchPopup.properties.initialFocus, 'first')
       assert.equal(searchPopup.properties.containment, 'none')
-      assert.equal(searchPopup.properties.accessibleName, 'Search filters')
+      assert.equal(searchPopup.properties.accessibleName, 'Blurred')
       assert.equal(searchTrigger.properties.width, undefined)
     } finally { dispose() }
   })
@@ -393,6 +525,9 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       const list = view.find('VirtualWindow')
       assert(list, 'native VirtualWindow is mounted')
       assert.equal(list.properties.itemCount, 5000)
+      assert.equal(list.properties.variableHeight, false, 'fixed rows avoid measurement jitter')
+      assert.equal(list.properties.overscan, 8, 'fast scroll keeps a larger bounded window')
+      assert.equal(list.properties.scrollMomentum, 0.35)
       assert(list.children.length <= 12, `initial range is bounded (${list.children.length} rows)`)
       const createdBefore = view.all('Text').length
       view.dispatch(list, 'window', { kind: 'window', start: 100, end: 104, offset: 3600, viewportExtent: 430 })
@@ -400,6 +535,33 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       assert.equal(list.children.length, 4)
       assert(view.all('Text').some((node) => node.properties.text === 'Record 101'))
       assert(view.all('Text').length <= createdBefore + 4)
+    } finally { dispose() }
+  })
+
+  test(`${adapter} scrollbar example exposes native hover geometry and momentum controls`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      view.dispatch(findButton(view, 'Scrollbars'), 'click')
+      await turn()
+      const scrollbar = () => view.find('ScrollView', (node) => node.properties.id === 'gallery-custom-scrollbar')
+      assert.equal(scrollbar()?.properties.scrollbarWidth, 6)
+      assert.equal(scrollbar()?.properties.scrollbarHoverWidth, 10)
+      assert.equal(scrollbar()?.properties.scrollbarSide, 'right')
+      assert.equal(scrollbar()?.properties.scrollMomentum, 0.35)
+      assert(scrollbar()?.properties.scrollbarTrackColor)
+      assert(scrollbar()?.properties.scrollbarPressedColor)
+      view.dispatch(findButton(view, 'Left'), 'click')
+      await turn()
+      assert.equal(scrollbar()?.properties.scrollbarSide, 'left')
+      view.dispatch(findButton(view, '8 px'), 'click')
+      view.dispatch(findButton(view, '+4 px on hover'), 'click')
+      view.dispatch(findButton(view, 'Direct'), 'click')
+      await turn()
+      assert.equal(scrollbar()?.properties.scrollbarWidth, 8)
+      assert.equal(scrollbar()?.properties.scrollbarHoverWidth, 8)
+      assert.equal(scrollbar()?.properties.scrollbarSide, 'left')
+      assert.equal(scrollbar()?.properties.scrollMomentum, 0)
     } finally { dispose() }
   })
 }

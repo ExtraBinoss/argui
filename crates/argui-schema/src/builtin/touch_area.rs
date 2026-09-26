@@ -254,7 +254,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
 /// # Errors
 ///
 /// Returns an adapter error when the name is not a supported cursor.
-fn parse_cursor(name: &str) -> Result<CursorIcon, SchemaError> {
+pub(super) fn parse_cursor(name: &str) -> Result<CursorIcon, SchemaError> {
     let cursor = match name {
         "auto" => CursorIcon::Auto,
         "default" => CursorIcon::Default,

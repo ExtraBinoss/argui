@@ -1,9 +1,11 @@
 use argui_core::{Affine2D, Color, Point, PointerButton, PointerEvent, PointerPhase, Rect, Size};
+use argui_layout::LayoutEngine;
 use argui_paint::{ClipChain, Fill};
 use argui_schema::{
     NativeElementInput, NativeEventValue, NativeSlotValue, ObservationKind, SchemaError,
     SchemaValue, builtin,
 };
+use argui_text::TextEngine;
 use argui_ui::{
     Current, CursorIcon, Element, EventHandler, EventHandlerId, EventOwnerId, FocusContainment,
     FocusPolicy, HitRegion, HitShape, InitialFocus, KeyboardActivation, Role, SemanticValue, Sides,
@@ -46,6 +48,67 @@ fn focus_scope_exposes_widget_root_layout_without_a_wrapper() {
     assert_eq!(scope.style.flex_shrink, 0.0);
     assert_eq!(scope.style.align_self, Some(argui_ui::AlignSelf::CENTER));
     assert_eq!(scope.style.margin.left, argui_ui::length(6.0));
+}
+
+#[test]
+fn disabled_focus_scope_keeps_an_explicit_pointer_cursor() {
+    let scope = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(builtin::ENABLED, SchemaValue::Bool(false))
+                .property(
+                    builtin::MOUSE_CURSOR,
+                    SchemaValue::String("notAllowed".into()),
+                )
+                .slot(NativeSlotValue::new(
+                    builtin::CHILDREN,
+                    [Element::container([])
+                        .width(argui_ui::length(80.0))
+                        .height(argui_ui::length(32.0))],
+                )),
+        )
+        .unwrap();
+    let interaction = scope.interaction.as_ref().unwrap();
+    assert!(!interaction.enabled);
+    assert_eq!(interaction.cursor, CursorIcon::NotAllowed);
+    let mut tree = UiTree::new(scope);
+    let output = LayoutEngine::new()
+        .compute(&mut tree, &mut TextEngine::new(), Size::new(120.0, 80.0))
+        .unwrap();
+    let region = output
+        .hit_regions
+        .iter()
+        .find(|region| region.node == tree.node_ids()[0])
+        .unwrap();
+    assert!(!region.enabled);
+    assert_eq!(region.cursor, CursorIcon::NotAllowed);
+}
+
+#[test]
+fn focus_scope_validates_native_press_bounce_scale() {
+    let registry = builtin::registry().unwrap();
+    let scope = registry
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(builtin::PRESS_BOUNCE_SCALE, SchemaValue::Float(0.97)),
+        )
+        .unwrap();
+    assert_eq!(
+        scope.interaction.as_ref().unwrap().press_bounce_scale,
+        Some(0.97)
+    );
+    assert!(scope.needs_compositor_layer());
+    for scale in [0.0, -0.1, 1.1, f32::NAN] {
+        let error = registry.construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(builtin::PRESS_BOUNCE_SCALE, SchemaValue::Float(scale)),
+        );
+        assert!(error.is_err(), "invalid scale {scale}");
+    }
 }
 
 #[test]

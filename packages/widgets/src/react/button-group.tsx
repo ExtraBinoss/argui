@@ -28,7 +28,7 @@ export function ButtonGroup(props: ButtonGroupProps): ReactElement {
     role: 'group' as const,
     accessibleName: props.accessibleName,
     width: props.width,
-    height: props.height ?? (orientation === 'horizontal' ? 40 : undefined),
+    height: props.height,
     minWidth: props.minWidth,
     maxWidth: props.maxWidth,
     minHeight: props.minHeight,
@@ -46,7 +46,7 @@ export function ButtonGroup(props: ButtonGroupProps): ReactElement {
   const fill = props.width !== undefined || props.alignSelf === 'stretch'
   const group = <rectangle {...common}>
     {orientation === 'horizontal'
-      ? <row width={fill ? '100%' : undefined} height="100%" directionScope={props.directionScope}
+      ? <row width={fill ? '100%' : undefined} height={props.height !== undefined ? '100%' : undefined} directionScope={props.directionScope}
           gap={0} alignItems="center">{props.children}</row>
       : <column width={fill ? '100%' : undefined} directionScope={props.directionScope}
           gap={0}>{props.children}</column>}
@@ -63,8 +63,8 @@ export function ButtonGroupSeparator(props: ButtonGroupSeparatorProps): ReactEle
   const group = useButtonGroup()
   const orientation = props.orientation ?? (group === 'vertical' ? 'horizontal' : 'vertical')
   return orientation === 'vertical'
-    ? <rectangle width={1} height={24} shrink={0} background={theme.border} />
-    : <rectangle width="100%" height={1} shrink={0} background={theme.border} />
+    ? <rectangle width={1} height={24} shrink={0} background={theme.input} />
+    : <rectangle width="100%" height={1} shrink={0} background={theme.input} />
 }
 
 /** Props for static text within a button group. */
@@ -74,8 +74,8 @@ export type ButtonGroupTextProps = { children?: ReactNode; render?: ReactNode }
 export function ButtonGroupText(props: ButtonGroupTextProps): ReactElement {
   const theme = useTheme<WidgetTheme>()
   const content = props.render ?? (typeof props.children === 'string'
-    ? <text color={theme.textMuted}>{props.children}</text> : props.children)
-  return <container height={38} padding={{ start: 12, end: 12 }}>
+    ? <text color={theme.foreground} fontSize={14} weight={500}>{props.children}</text> : props.children)
+  return <container height={32} padding={{ start: 10, end: 10 }} background={theme.muted}>
     <row height="100%" alignItems="center">{content}</row>
   </container>
 }

@@ -15,6 +15,10 @@ impl Element {
     pub fn needs_compositor_layer(&self) -> bool {
         self.transform != Transform2D::IDENTITY
             || self
+                .interaction
+                .as_ref()
+                .is_some_and(|interaction| interaction.press_bounce_scale.is_some())
+            || self
                 .layer
                 .as_ref()
                 .is_some_and(|layer| layer.opacity != 1.0)

@@ -12,15 +12,16 @@ use super::focus_scope_parse::{
 use super::{
     BLUR, BUSY, CAPTURE_KEY_INPUT, CHECKED, CHILDREN, CLICK, CommonProperty, ENABLED, EXPANDED,
     FOCUS, FOCUS_CONTAINMENT, FOCUS_ON_CLICK, FOCUS_ON_TAB, FOCUS_VISIBLE, HAS_FOCUS,
-    INITIAL_FOCUS, KEY_INPUT, KEYBOARD_ACTIVATION, RESTORE_FOCUS, SEMANTIC_ACTION,
-    SEMANTIC_ACTIVE_DESCENDANT, SEMANTIC_CAN_COLLAPSE, SEMANTIC_CAN_DECREMENT, SEMANTIC_CAN_EXPAND,
-    SEMANTIC_CAN_INCREMENT, SEMANTIC_CAN_SCROLL_INTO_VIEW, SEMANTIC_CAN_SET_VALUE,
-    SEMANTIC_CONTROLS, SEMANTIC_CURRENT, SEMANTIC_DESCRIBED_BY, SEMANTIC_DESCRIPTION,
-    SEMANTIC_EXPANDABLE, SEMANTIC_FOCUSABLE, SEMANTIC_INVALID, SEMANTIC_LABEL,
-    SEMANTIC_LABELLED_BY, SEMANTIC_LIVE, SEMANTIC_MAXIMUM_VALUE, SEMANTIC_MINIMUM_VALUE,
-    SEMANTIC_MULTISELECTABLE, SEMANTIC_NUMERIC_VALUE, SEMANTIC_PRESSED, SEMANTIC_READ_ONLY,
-    SEMANTIC_REQUIRED, SEMANTIC_ROLE, SEMANTIC_SELECTED, SEMANTIC_VALUE, SEMANTIC_VALUE_STEP,
-    apply_common, common_event, common_property, optional_bool,
+    INITIAL_FOCUS, KEY_INPUT, KEYBOARD_ACTIVATION, MOUSE_CURSOR, PRESS_BOUNCE_SCALE, RESTORE_FOCUS,
+    SEMANTIC_ACTION, SEMANTIC_ACTIVE_DESCENDANT, SEMANTIC_CAN_COLLAPSE, SEMANTIC_CAN_DECREMENT,
+    SEMANTIC_CAN_EXPAND, SEMANTIC_CAN_INCREMENT, SEMANTIC_CAN_SCROLL_INTO_VIEW,
+    SEMANTIC_CAN_SET_VALUE, SEMANTIC_CONTROLS, SEMANTIC_CURRENT, SEMANTIC_DESCRIBED_BY,
+    SEMANTIC_DESCRIPTION, SEMANTIC_EXPANDABLE, SEMANTIC_FOCUSABLE, SEMANTIC_INVALID,
+    SEMANTIC_LABEL, SEMANTIC_LABELLED_BY, SEMANTIC_LIVE, SEMANTIC_MAXIMUM_VALUE,
+    SEMANTIC_MINIMUM_VALUE, SEMANTIC_MULTISELECTABLE, SEMANTIC_NUMERIC_VALUE, SEMANTIC_PRESSED,
+    SEMANTIC_READ_ONLY, SEMANTIC_REQUIRED, SEMANTIC_ROLE, SEMANTIC_SELECTED, SEMANTIC_VALUE,
+    SEMANTIC_VALUE_STEP, apply_common, common_event, common_property, optional_bool,
+    touch_area::parse_cursor,
 };
 use crate::{
     NativeElementInput, NativeSchema, ObservationKind, PropertySchema, SchemaError, SchemaRegistry,
@@ -63,6 +64,18 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Shrink))
     .property(common_property(CommonProperty::AlignSelf))
     .property(common_property(CommonProperty::Margin))
+    .property(PropertySchema::new(
+        MOUSE_CURSOR,
+        "mouseCursor",
+        ValueType::String,
+        "Cursor shown over this focus scope, including when disabled.",
+    ))
+    .property(PropertySchema::new(
+        PRESS_BOUNCE_SCALE,
+        "pressBounceScale",
+        ValueType::Float,
+        "Minimum scale of a native bounce replayed on every press.",
+    ))
     .property(
         PropertySchema::new(
             ENABLED,
@@ -370,11 +383,32 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             initial,
             restore: optional_bool(input, RESTORE_FOCUS).unwrap_or(true),
         };
-        let interaction = Interaction::default()
+        let cursor = match input.get(MOUSE_CURSOR) {
+            Some(SchemaValue::String(name)) => parse_cursor(name)?,
+            _ => argui_ui::CursorIcon::Auto,
+        };
+        let press_bounce_scale = match input.get(PRESS_BOUNCE_SCALE) {
+            Some(SchemaValue::Float(scale))
+                if scale.is_finite() && *scale > 0.0 && *scale <= 1.0 =>
+            {
+                Some(*scale)
+            }
+            Some(SchemaValue::Float(_)) => {
+                return Err(SchemaError::Adapter(
+                    "FocusScope pressBounceScale must be finite and in (0, 1]".into(),
+                ));
+            }
+            _ => None,
+        };
+        let mut interaction = Interaction::default()
             .enabled(enabled)
+            .cursor(cursor)
             .focus_policy(focus_policy)
             .focus_on_descendant_press(optional_bool(input, FOCUS_ON_CLICK).unwrap_or(true))
             .keyboard_activation(activation);
+        if let Some(scale) = press_bounce_scale {
+            interaction = interaction.press_bounce_scale(scale);
+        }
         let mut element =
             apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?
                 .focus_scope(focus_scope)

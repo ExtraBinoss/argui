@@ -218,6 +218,21 @@ impl Steps {
         Ok(Self { count, position })
     }
 
+    /// Returns the next internal jump in the selected progress direction.
+    ///
+    /// `progress` is the current local progress and `increasing` selects the
+    /// direction of travel. Segment endpoints are handled by the keyframe
+    /// scheduler, so this returns only jumps strictly inside the segment.
+    pub(crate) fn next_internal_jump(self, progress: f32, increasing: bool) -> Option<f64> {
+        let position = f64::from(progress.clamp(0.0, 1.0)) * f64::from(self.count);
+        let index = if increasing {
+            (position.floor() as u32).saturating_add(1)
+        } else {
+            position.floor() as u32
+        };
+        (index > 0 && index < self.count).then(|| f64::from(index) / f64::from(self.count))
+    }
+
     /// Evaluates the step curve at normalized `progress`, clamped to zero through one.
     #[must_use]
     pub fn sample(self, progress: f32) -> f32 {

@@ -1,8 +1,4 @@
-use std::{
-    borrow::Cow,
-    collections::VecDeque,
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::{borrow::Cow, collections::VecDeque};
 
 use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition};
 use unicode_segmentation::UnicodeSegmentation;
@@ -21,15 +17,21 @@ pub use filter::TextInputFilter;
 pub use history::HistoryConfig;
 pub use privacy::TextPrivacy;
 mod navigation;
+mod pending;
 mod selection;
 mod states;
+use pending::{PendingCheckpoints, PendingEdit, PendingInsert};
 pub(crate) use states::{RetainedInput, TextInputStates};
 
 #[derive(Clone, Default, PartialEq)]
 pub(crate) struct TextInputState {
     value: String,
     authored_value: String,
-    pending_values: VecDeque<(usize, u64)>,
+    pending_values: VecDeque<PendingEdit>,
+    pending_insert: Option<PendingInsert>,
+    pending_checkpoints: PendingCheckpoints,
+    content_checksum: u64,
+    authored_checksum: u64,
     cursor: usize,
     affinity: CaretAffinity,
     anchor: Option<TextPosition>,
@@ -168,56 +170,6 @@ impl TextInputState {
             crate::SelectionCommand::Undo | crate::SelectionCommand::Redo => unreachable!(),
         };
         self.record_edit(history::EditKind::Atomic, |state| state.shortcut(key))
-    }
-
-    pub fn sync(&mut self, value: &str, multiline: bool, read_only: bool, filter: TextInputFilter) {
-        if self.multiline != multiline || self.filter != filter {
-            self.history.clear();
-            self.preedit = None;
-        }
-        self.multiline = multiline;
-        self.read_only = read_only;
-        self.filter = filter;
-        if self.authored_value == value {
-            return;
-        }
-        self.authored_value = value.to_owned();
-        if let Some(index) = self
-            .pending_values
-            .iter()
-            .position(|pending| *pending == value_stamp(value))
-        {
-            self.pending_values.drain(..=index);
-            return;
-        }
-        self.pending_values.clear();
-        if self.value == value {
-            return;
-        }
-        self.history.clear();
-        self.value.clear();
-        self.goal_x = None;
-        self.value.push_str(value);
-        self.cursor = grapheme_boundary(&self.value, self.cursor.min(self.value.len()));
-        self.anchor = self.anchor.and_then(|anchor| {
-            (anchor.index <= self.value.len()).then(|| {
-                TextPosition::new(
-                    grapheme_boundary(&self.value, anchor.index),
-                    anchor.affinity,
-                )
-            })
-        });
-        self.preedit = None;
-        self.reveal_cursor = true;
-    }
-
-    /// Records the current native value awaiting acknowledgement from controlled properties.
-    pub(crate) fn note_current_value(&mut self) {
-        const MAX_PENDING_VALUES: usize = 128;
-        self.pending_values.push_back(value_stamp(&self.value));
-        if self.pending_values.len() > MAX_PENDING_VALUES {
-            self.pending_values.pop_front();
-        }
     }
 
     pub fn display_cursor(&self) -> usize {
@@ -566,15 +518,4 @@ impl TextInputState {
             self.anchor = None;
         }
     }
-}
-
-/// Returns a compact fingerprint for an emitted controlled value.
-///
-/// * `value` — text that may be acknowledged by a later UI transaction.
-///
-/// Returns its byte length and hash without retaining copies of input contents.
-fn value_stamp(value: &str) -> (usize, u64) {
-    let mut hasher = DefaultHasher::new();
-    value.hash(&mut hasher);
-    (value.len(), hasher.finish())
 }

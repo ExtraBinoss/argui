@@ -1,6 +1,6 @@
 // Generated from argui-schema by packages/react/scripts/generate-jsx.mjs.
 import type { ReactNode, Ref } from 'react'
-import type { NativeHandle, NativeEventPayload, AssetRef, DimensionValue, ConstraintValue, GridTracksValue, ContainerRuleValue, InsetsValue, PositionInsetsValue, RadiiValue, BorderValue, ShadowValue, TransformValue, SemanticRole, SemanticCurrent, SemanticLive, SemanticCheckedState, SemanticOrientation, SemanticPopup, SemanticSort, KeyboardActivation } from '@argui/host'
+import type { NativeHandle, NativeEventPayload, AssetRef, BrushValue, DimensionValue, ConstraintValue, GridTracksValue, ContainerRuleValue, InsetsValue, PositionInsetsValue, RadiiValue, BorderValue, ShadowValue, TransformValue, SemanticRole, SemanticCurrent, SemanticLive, SemanticCheckedState, SemanticOrientation, SemanticPopup, SemanticSort, KeyboardActivation } from '@argui/host'
 export namespace JSX {
   export type Element = import('react').ReactElement
   export interface IntrinsicAttributes { key?: import('react').Key }
@@ -22,13 +22,14 @@ export namespace JSX {
       minWidth?: ConstraintValue
       minHeight?: ConstraintValue
       background?: string
-      selectionFill?: string
+      selectionFill?: BrushValue
       selectionColor?: string
       selectionRadius?: number
       gap?: number
       loopMs?: number
       loopPlaying?: boolean
       loopGap?: number
+      loopSteps?: number
       padding?: InsetsValue
       directionScope?: "ltr" | "rtl"
       wrap?: boolean
@@ -64,6 +65,7 @@ export namespace JSX {
       shadow?: ShadowValue
       transitionMs?: number
       transitionSpring?: boolean
+      transitionTimingFunction?: string
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
       accessibleDescription?: string
@@ -130,13 +132,14 @@ export namespace JSX {
       minWidth?: ConstraintValue
       minHeight?: ConstraintValue
       background?: string
-      selectionFill?: string
+      selectionFill?: BrushValue
       selectionColor?: string
       selectionRadius?: number
       gap?: number
       loopMs?: number
       loopPlaying?: boolean
       loopGap?: number
+      loopSteps?: number
       padding?: InsetsValue
       directionScope?: "ltr" | "rtl"
       wrap?: boolean
@@ -172,6 +175,7 @@ export namespace JSX {
       shadow?: ShadowValue
       transitionMs?: number
       transitionSpring?: boolean
+      transitionTimingFunction?: string
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
       accessibleDescription?: string
@@ -238,13 +242,14 @@ export namespace JSX {
       minWidth?: ConstraintValue
       minHeight?: ConstraintValue
       background?: string
-      selectionFill?: string
+      selectionFill?: BrushValue
       selectionColor?: string
       selectionRadius?: number
       gap?: number
       loopMs?: number
       loopPlaying?: boolean
       loopGap?: number
+      loopSteps?: number
       padding?: InsetsValue
       directionScope?: "ltr" | "rtl"
       wrap?: boolean
@@ -280,6 +285,7 @@ export namespace JSX {
       shadow?: ShadowValue
       transitionMs?: number
       transitionSpring?: boolean
+      transitionTimingFunction?: string
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
       accessibleDescription?: string
@@ -351,7 +357,7 @@ export namespace JSX {
       loopOpacity?: number
       transitionMs?: number
       transitionSpring?: boolean
-      selectionFill?: string
+      selectionFill?: BrushValue
       selectionColor?: string
       selectionRadius?: number
       color?: string
@@ -564,9 +570,11 @@ export namespace JSX {
       loopHold?: boolean
       loopWidth?: number
       loopRadius?: number
+      loopSteps?: number
       opacity?: number
       transitionMs?: number
       transitionSpring?: boolean
+      transitionTimingFunction?: string
       backdropFilter?: string
       desktopBackdropTint?: string
       desktopBackdropFallback?: string
@@ -578,10 +586,11 @@ export namespace JSX {
       alignSelf?: "start" | "center" | "end" | "stretch"
       margin?: InsetsValue
       padding?: InsetsValue
-      background?: string
-      hoverBackground?: string
-      pressedBackground?: string
+      background?: BrushValue
+      hoverBackground?: BrushValue
+      pressedBackground?: BrushValue
       pressedScale?: number
+      pressedTranslateY?: number
       border?: BorderValue
       radii?: RadiiValue
       shadow?: ShadowValue
@@ -730,6 +739,8 @@ export namespace JSX {
       shrink?: number
       alignSelf?: "start" | "center" | "end" | "stretch"
       margin?: InsetsValue
+      mouseCursor?: "auto" | "default" | "contextMenu" | "help" | "pointer" | "progress" | "wait" | "cell" | "crosshair" | "text" | "verticalText" | "alias" | "copy" | "move" | "noDrop" | "notAllowed" | "grab" | "grabbing" | "eResize" | "nResize" | "neResize" | "nwResize" | "sResize" | "seResize" | "swResize" | "wResize" | "ewResize" | "nsResize" | "neswResize" | "nwseResize" | "colResize" | "rowResize" | "allScroll" | "zoomIn" | "zoomOut" | "dndAsk" | "allResize"
+      pressBounceScale?: number
       enabled?: boolean
       focusOnClick?: boolean
       focusOnTabNavigation?: boolean
@@ -877,13 +888,13 @@ export namespace JSX {
       visible?: boolean
       background?: string
       clip?: boolean
-      selectionFill?: string
+      selectionFill?: BrushValue
       selectionRadius?: number
       textColor?: string
       placeholderColor?: string
       selectionColor?: string
       caretColor?: string
-      caretFill?: string
+      caretFill?: BrushValue
       caretWidth?: number
       caretHeight?: number
       caretRadius?: number
@@ -1088,8 +1099,13 @@ export namespace JSX {
       scrollY?: boolean
       scrollbarSide?: "left" | "right"
       scrollbarWidth?: number
+      scrollbarVisible?: boolean
       scrollbarThumbColor?: string
+      scrollbarTrackColor?: string
       scrollbarHoverColor?: string
+      scrollbarHoverWidth?: number
+      scrollbarPressedColor?: string
+      scrollMomentum?: number
       grow?: number
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
@@ -1176,6 +1192,7 @@ export namespace JSX {
       shadowStart?: boolean
       shadowEnd?: boolean
       overscan?: number
+      scrollMomentum?: number
       itemCount?: number
       windowStart?: number
       dataVersion?: number
@@ -1246,13 +1263,14 @@ export namespace JSX {
       minWidth?: ConstraintValue
       minHeight?: ConstraintValue
       background?: string
-      selectionFill?: string
+      selectionFill?: BrushValue
       selectionColor?: string
       selectionRadius?: number
       gap?: number
       loopMs?: number
       loopPlaying?: boolean
       loopGap?: number
+      loopSteps?: number
       padding?: InsetsValue
       directionScope?: "ltr" | "rtl"
       wrap?: boolean
@@ -1288,6 +1306,7 @@ export namespace JSX {
       shadow?: ShadowValue
       transitionMs?: number
       transitionSpring?: boolean
+      transitionTimingFunction?: string
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
       accessibleDescription?: string

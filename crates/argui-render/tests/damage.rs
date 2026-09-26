@@ -420,6 +420,17 @@ fn snapshots_cover_every_command_and_prepared_text_changes() {
         [256, 128],
         1.0,
     );
+    let same_text = DamageSnapshot::capture(
+        &text_list,
+        &prepared(&mut engine, "Alpha"),
+        &text_bounds,
+        [256, 128],
+        1.0,
+    );
+    assert_eq!(
+        first.compare(&same_text, DamageTracking::enabled()),
+        DamagePlan::Unchanged
+    );
     let second = DamageSnapshot::capture(
         &text_list,
         &prepared(&mut engine, "Beta"),

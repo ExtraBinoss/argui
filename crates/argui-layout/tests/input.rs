@@ -15,6 +15,9 @@ use argui_ui::{
 
 const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
+#[path = "input/performance.rs"]
+mod performance;
+
 fn text_editor(
     key: &str,
     value: impl AsRef<str>,

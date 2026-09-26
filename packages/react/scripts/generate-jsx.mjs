@@ -9,3 +9,4 @@ const content = generateJSX(contract, 'react')
 if (process.argv.includes('--check')) {
   if (readFileSync(destination, 'utf8') !== content) throw new Error('Stale generated React JSX declarations')
 } else writeFileSync(destination, content)
+console.log(`[jsx] ${process.argv.includes('--check') ? 'Verified' : 'Generated'} React JSX declarations.`)

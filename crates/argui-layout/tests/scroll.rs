@@ -5,10 +5,12 @@ use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, QuadStyle};
 use argui_text::TextEngine;
 use argui_ui::{
     Axes, Color, Element, EventHandlerId, EventListener, EventOwnerId, EventType, FlexWrap,
-    Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig, ScrollbarPartStyle,
-    ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition,
-    Transition, UiEventKind, UiTree, VisualState, length, percent, property,
+    Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig, ScrollGesture,
+    ScrollbarPartStyle, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch,
+    StyleTransition, Transition, UiEventKind, UiTree, ViewportPlacement, VisualState, WindowLayer,
+    length, percent, property,
 };
+use std::time::Duration as StdDuration;
 
 const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
@@ -95,262 +97,66 @@ fn wrapped_children_extend_scroll_content_and_wheel_chains_from_sidebar() {
 }
 
 #[test]
-fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
-    let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(
-            QuadStyle::solid(Color::srgb(0.0, 0.0, 0.0)).radius(CornerRadii::all(4.0)),
-        ),
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE).radius(CornerRadii::all(4.0))),
-    )
-    .width(8.0)
-    .insets(Sides::length(4.0))
-    .min_thumb(20.0);
-    let mut ui = UiTree::new(content(style));
+/// The topmost portal viewport receives wheel input before the page behind it.
+fn popover_scroll_receives_wheel_before_overlapped_page_scroll() {
+    let scroller = |key: &'static str, width: f32, height: f32, content_height: f32| {
+        Element::column([Element::container([])
+            .height(length(content_height))
+            .shrink(0.0)])
+        .keyed(key)
+        .width(length(width))
+        .height(length(height))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default())
+    };
+    let popup = scroller("settings", 200.0, 120.0, 480.0)
+        .viewport_portal(WindowLayer::Popover, ViewportPlacement::centered());
+    let page = scroller("page", 400.0, 300.0, 900.0);
+    let mut ui = UiTree::new(Element::column([popup, page]));
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
-    let mut output = layout
-        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
         .unwrap();
-    let initial = output.scroll_regions[0]
-        .scrollbar
-        .as_ref()
-        .unwrap()
-        .vertical
-        .as_ref()
+    let popup_node = ui
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| ui.key(*node) == Some("settings"))
         .unwrap();
+    let page_node = ui
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| ui.key(*node) == Some("page"))
+        .unwrap();
+    let point = Point::new(200.0, 150.0);
+    assert!(output.scroll_regions.iter().any(|region| {
+        region.node == popup_node && region.contains(point) && region.max_offset.y > 0.0
+    }));
+    assert!(output.scroll_regions.iter().any(|region| {
+        region.node == page_node && region.contains(point) && region.max_offset.y > 0.0
+    }));
 
-    assert_eq!(initial.track.size, Size::new(8.0, 92.0));
-    assert_eq!(initial.track.origin, Point::new(188.0, 4.0));
-    assert!(initial.thumb.size.height > 20.0);
-    let initial_thumb_y = initial.thumb.origin.y;
-    assert_eq!(output.display_list.quad_count(), 2);
-    assert!(matches!(
-        output.display_list.commands(),
-        [
-            DisplayCommand::BeginCompositor(_),
-            DisplayCommand::BeginLayer(_),
-            DisplayCommand::Quad(_),
-            DisplayCommand::Quad(_),
-            DisplayCommand::EndLayer,
-            DisplayCommand::EndCompositor
-        ]
-    ));
-
-    ui.scroll(
-        Point::new(10.0, 10.0),
-        ScrollDelta::Pixels(Point::new(0.0, -100.0)),
+    let target =
+        ScrollGesture::default().target(point, StdDuration::ZERO, true, &output.scroll_regions);
+    assert_eq!(target, Some(popup_node));
+    let update = ui.scroll_from(
+        target.unwrap(),
+        point,
+        ScrollDelta::Pixels(Point::new(0.0, -80.0)),
         &output.scroll_regions,
     );
-    layout.apply_scroll(&ui, &mut output).unwrap();
-    let moved = output.scroll_regions[0]
-        .scrollbar
-        .as_ref()
-        .unwrap()
-        .vertical
-        .as_ref()
-        .unwrap();
-    assert!(moved.thumb.origin.y > initial_thumb_y);
+    assert!(update.scroll_changed);
+    assert!(ui.scroll_offset(popup_node).y > 0.0);
+    assert_eq!(ui.scroll_offset(page_node).y, 0.0);
 }
 
-#[test]
-fn scrollbar_state_transition_repaints_the_resolved_thumb() {
-    let hovered = Color::srgb(0.8, 0.3, 0.2);
-    let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::default()),
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))
-            .when(
-                VisualState::Hovered,
-                StylePatch::new().set(property::BackgroundColor, hovered),
-            )
-            .transition(StyleTransition::new(Transition::tween(Tween::new(
-                Duration::from_millis(100),
-            )))),
-    )
-    .width(12.0);
-    let mut ui = UiTree::new(content(style));
-    let mut layout = LayoutEngine::new();
-    let mut text = text_engine();
-    let mut output = layout
-        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
-        .unwrap();
-    let thumb = output.scroll_regions[0]
-        .scrollbar
-        .as_ref()
-        .unwrap()
-        .vertical
-        .as_ref()
-        .unwrap()
-        .thumb;
-    let point = Point::new(thumb.origin.x + 2.0, thumb.origin.y + 2.0);
-    ui.scrollbar_pointer_moved(Some(point), &output.scroll_regions);
-    ui.set_reduced_motion(true);
-    layout.repaint(&ui, &mut output);
-
-    assert!(
-        output
-            .display_list
-            .commands()
-            .iter()
-            .any(|command| matches!(
-                command,
-                DisplayCommand::Quad(quad)
-                    if quad.background == Some(argui_paint::Fill::Solid(hovered))
-            )),
-        "{:?}",
-        output.display_list.commands()
-    );
-}
-
-#[test]
-fn horizontal_scrollbars_use_the_same_retained_geometry() {
-    let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::default()),
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
-    );
-    let content = Element::row([Element::container([])
-        .width(length(500.0))
-        .height(length(40.0))
-        .shrink(0.0)])
-    .width(length(200.0))
-    .height(length(80.0))
-    .overflow(Axes {
-        x: Overflow::Auto,
-        y: Overflow::Hidden,
-    })
-    .scroll_config(
-        ScrollConfig::default()
-            .axes(ScrollAxes::Horizontal)
-            .scrollbar(style),
-    );
-    let mut ui = UiTree::new(content);
-    let mut layout = LayoutEngine::new();
-    let mut text = text_engine();
-    let output = layout
-        .compute(&mut ui, &mut text, Size::new(200.0, 80.0))
-        .unwrap();
-    let scrollbar = output.scroll_regions[0].scrollbar.as_ref().unwrap();
-    assert!(scrollbar.horizontal.is_some());
-    assert!(scrollbar.vertical.is_none());
-}
-
-#[test]
-fn hidden_and_geometry_free_scrollbars_do_not_paint() {
-    let parts = || {
-        ScrollbarStyle::new(
-            ScrollbarPartStyle::new(QuadStyle::default()),
-            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
-        )
-    };
-    let mut layout = LayoutEngine::new();
-    let mut text = text_engine();
-    let mut hidden = UiTree::new(content(parts().visibility(ScrollbarVisibility::Hidden)));
-    let hidden_output = layout
-        .compute(&mut hidden, &mut text, Size::new(200.0, 100.0))
-        .unwrap();
-    assert!(hidden_output.scroll_regions[0].scrollbar.is_none());
-    assert_eq!(hidden_output.display_list.quad_count(), 0);
-
-    let both = Element::container([Element::container([])
-        .width(length(500.0))
-        .height(length(500.0))
-        .shrink(0.0)])
-    .width(length(200.0))
-    .height(length(100.0))
-    .overflow(Axes {
-        x: Overflow::Auto,
-        y: Overflow::Auto,
-    })
-    .scroll_config(
-        ScrollConfig::default()
-            .axes(ScrollAxes::Both)
-            .scrollbar(parts().width(0.0)),
-    );
-    let mut both = UiTree::new(both);
-    let mut layout = LayoutEngine::new();
-    let output = layout
-        .compute(&mut both, &mut text, Size::new(200.0, 100.0))
-        .unwrap();
-    let scrollbar = output.scroll_regions[0].scrollbar.as_ref().unwrap();
-    assert!(scrollbar.vertical.is_none());
-    assert!(scrollbar.horizontal.is_none());
-
-    let mut no_vertical_track = UiTree::new(content(parts().insets(Sides::length(60.0))));
-    let mut layout = LayoutEngine::new();
-    let output = layout
-        .compute(&mut no_vertical_track, &mut text, Size::new(200.0, 100.0))
-        .unwrap();
-    assert!(
-        output.scroll_regions[0]
-            .scrollbar
-            .as_ref()
-            .unwrap()
-            .vertical
-            .is_none()
-    );
-
-    let horizontal = Element::row([Element::container([])
-        .width(length(500.0))
-        .height(length(40.0))
-        .shrink(0.0)])
-    .width(length(200.0))
-    .height(length(80.0))
-    .overflow(Axes {
-        x: Overflow::Auto,
-        y: Overflow::Hidden,
-    })
-    .scroll_config(ScrollConfig::default().scrollbar(parts().insets(Sides {
-        left: 120.0,
-        right: 120.0,
-        top: 4.0,
-        bottom: 4.0,
-    })));
-    let mut horizontal = UiTree::new(horizontal);
-    let mut layout = LayoutEngine::new();
-    let output = layout
-        .compute(&mut horizontal, &mut text, Size::new(200.0, 80.0))
-        .unwrap();
-    assert!(
-        output.scroll_regions[0]
-            .scrollbar
-            .as_ref()
-            .unwrap()
-            .horizontal
-            .is_none()
-    );
-
-    let only_vertical_overflow = Element::column([Element::container([])
-        .width(length(200.0))
-        .height(length(300.0))
-        .shrink(0.0)])
-    .width(length(200.0))
-    .height(length(100.0))
-    .overflow(Axes {
-        x: Overflow::Auto,
-        y: Overflow::Auto,
-    })
-    .scroll_config(ScrollConfig::default().scrollbar(parts()));
-    let mut only_vertical_overflow = UiTree::new(only_vertical_overflow);
-    let mut layout = LayoutEngine::new();
-    let output = layout
-        .compute(
-            &mut only_vertical_overflow,
-            &mut text,
-            Size::new(200.0, 100.0),
-        )
-        .unwrap();
-    let scrollbar = output.scroll_regions[0].scrollbar.as_ref().unwrap();
-    assert!(scrollbar.vertical.is_some());
-    assert!(scrollbar.horizontal.is_none());
-
-    let mut y_clip = UiTree::new(Element::container([]).overflow(Axes {
-        x: Overflow::Visible,
-        y: Overflow::Hidden,
-    }));
-    let mut layout = LayoutEngine::new();
-    layout
-        .compute(&mut y_clip, &mut text, Size::new(200.0, 100.0))
-        .unwrap();
-}
+#[path = "scroll/scrollbar.rs"]
+mod scrollbar;
 
 #[test]
 fn sticky_children_follow_scroll_without_recomputing_taffy() {
@@ -562,31 +368,4 @@ fn horizontal_virtual_lists_measure_widths_and_request_a_bounded_window() {
         event.kind,
         UiEventKind::VirtualWindowChanged { start: 0, end, .. } if end < 24
     )));
-}
-
-#[test]
-fn vertical_scrollbar_can_attach_to_the_left_edge() {
-    let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::default()),
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
-    )
-    .side(ScrollbarSide::Left)
-    .width(4.0)
-    .insets(Sides {
-        left: 0.0,
-        right: 0.0,
-        top: 0.0,
-        bottom: 0.0,
-    });
-    let mut ui = UiTree::new(content(style));
-    let output = LayoutEngine::new()
-        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 100.0))
-        .unwrap();
-    let thumb = output.scroll_regions[0]
-        .scrollbar
-        .as_ref()
-        .and_then(|bar| bar.vertical)
-        .expect("overflowing content has a vertical scrollbar");
-    assert_eq!(thumb.track.origin.x, 0.0);
-    assert_eq!(thumb.track.size.width, 4.0);
 }

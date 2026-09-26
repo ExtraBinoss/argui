@@ -1,5 +1,5 @@
 {
-  "abiHash": "1735044035009116845",
+  "abiHash": "8113770748628963310",
   "natives": [
     {
       "id": 1,
@@ -220,6 +220,15 @@
           "id": 195,
           "name": "loopGap",
           "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 255,
+          "name": "loopSteps",
+          "valueType": "Int",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -578,6 +587,15 @@
           "id": 183,
           "name": "transitionSpring",
           "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 254,
+          "name": "transitionTimingFunction",
+          "valueType": "String",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -1290,6 +1308,15 @@
           "allowedValues": []
         },
         {
+          "id": 255,
+          "name": "loopSteps",
+          "valueType": "Int",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
           "id": 7,
           "name": "padding",
           "valueType": "Insets",
@@ -1642,6 +1669,15 @@
           "id": 183,
           "name": "transitionSpring",
           "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 254,
+          "name": "transitionTimingFunction",
+          "valueType": "String",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -2354,6 +2390,15 @@
           "allowedValues": []
         },
         {
+          "id": 255,
+          "name": "loopSteps",
+          "valueType": "Int",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
           "id": 7,
           "name": "padding",
           "valueType": "Insets",
@@ -2706,6 +2751,15 @@
           "id": 183,
           "name": "transitionSpring",
           "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 254,
+          "name": "transitionTimingFunction",
+          "valueType": "String",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -5460,6 +5514,15 @@
           "allowedValues": []
         },
         {
+          "id": 255,
+          "name": "loopSteps",
+          "valueType": "Int",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
           "id": 44,
           "name": "opacity",
           "valueType": "Float",
@@ -5481,6 +5544,15 @@
           "id": 183,
           "name": "transitionSpring",
           "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 254,
+          "name": "transitionTimingFunction",
+          "valueType": "String",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -5620,6 +5692,15 @@
         {
           "id": 252,
           "name": "pressedScale",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 253,
+          "name": "pressedTranslateY",
           "valueType": "Float",
           "readOnly": false,
           "required": false,
@@ -7106,6 +7187,62 @@
           "id": 240,
           "name": "margin",
           "valueType": "Insets",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 73,
+          "name": "mouseCursor",
+          "valueType": "String",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": [
+            "auto",
+            "default",
+            "contextMenu",
+            "help",
+            "pointer",
+            "progress",
+            "wait",
+            "cell",
+            "crosshair",
+            "text",
+            "verticalText",
+            "alias",
+            "copy",
+            "move",
+            "noDrop",
+            "notAllowed",
+            "grab",
+            "grabbing",
+            "eResize",
+            "nResize",
+            "neResize",
+            "nwResize",
+            "sResize",
+            "seResize",
+            "swResize",
+            "wResize",
+            "ewResize",
+            "nsResize",
+            "neswResize",
+            "nwseResize",
+            "colResize",
+            "rowResize",
+            "allScroll",
+            "zoomIn",
+            "zoomOut",
+            "dndAsk",
+            "allResize"
+          ]
+        },
+        {
+          "id": 256,
+          "name": "pressBounceScale",
+          "valueType": "Float",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -10548,8 +10685,26 @@
           "allowedValues": []
         },
         {
+          "id": 261,
+          "name": "scrollbarVisible",
+          "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": "Bool(true)",
+          "allowedValues": []
+        },
+        {
           "id": 249,
           "name": "scrollbarThumbColor",
+          "valueType": "Color",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 259,
+          "name": "scrollbarTrackColor",
           "valueType": "Color",
           "readOnly": false,
           "required": false,
@@ -10560,6 +10715,33 @@
           "id": 250,
           "name": "scrollbarHoverColor",
           "valueType": "Color",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 257,
+          "name": "scrollbarHoverWidth",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 260,
+          "name": "scrollbarPressedColor",
+          "valueType": "Color",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 258,
+          "name": "scrollMomentum",
+          "valueType": "Float",
           "readOnly": false,
           "required": false,
           "default": null,
@@ -11366,7 +11548,7 @@
           "valueType": "Bool",
           "readOnly": false,
           "required": false,
-          "default": null,
+          "default": "Bool(true)",
           "allowedValues": []
         },
         {
@@ -11484,6 +11666,15 @@
           "readOnly": false,
           "required": false,
           "default": "Int(3)",
+          "allowedValues": []
+        },
+        {
+          "id": 258,
+          "name": "scrollMomentum",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
           "allowedValues": []
         },
         {
@@ -12226,6 +12417,15 @@
           "allowedValues": []
         },
         {
+          "id": 255,
+          "name": "loopSteps",
+          "valueType": "Int",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
           "id": 7,
           "name": "padding",
           "valueType": "Insets",
@@ -12578,6 +12778,15 @@
           "id": 183,
           "name": "transitionSpring",
           "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 254,
+          "name": "transitionTimingFunction",
+          "valueType": "String",
           "readOnly": false,
           "required": false,
           "default": null,

@@ -112,6 +112,7 @@ pub struct Interaction {
     pub capture_on_press: bool,
     pub focus_on_descendant_press: bool,
     pub keyboard_activation: KeyboardActivation,
+    pub press_bounce_scale: Option<f32>,
     pub window_drag: Option<WindowDragBehavior>,
 }
 
@@ -125,6 +126,7 @@ impl Default for Interaction {
             capture_on_press: false,
             focus_on_descendant_press: false,
             keyboard_activation: KeyboardActivation::None,
+            press_bounce_scale: None,
             window_drag: None,
         }
     }
@@ -152,6 +154,7 @@ impl Interaction {
             capture_on_press: false,
             focus_on_descendant_press: false,
             keyboard_activation: KeyboardActivation::None,
+            press_bounce_scale: None,
             window_drag: None,
         }
     }
@@ -207,6 +210,15 @@ impl Interaction {
     #[must_use]
     pub const fn keyboard_activation(mut self, activation: KeyboardActivation) -> Self {
         self.keyboard_activation = activation;
+        self
+    }
+
+    /// Replays a native scale bounce from `scale` back to full size on each press.
+    ///
+    /// * `scale` — minimum scale, greater than zero and at most one.
+    #[must_use]
+    pub const fn press_bounce_scale(mut self, scale: f32) -> Self {
+        self.press_bounce_scale = Some(scale);
         self
     }
 
@@ -354,6 +366,7 @@ impl InteractionUpdate {
 pub(crate) struct RawUpdate {
     pub events: Vec<(NodeId, crate::UiEventKind)>,
     pub paint_changed: bool,
+    pub full_transition_sync: bool,
 }
 
 impl RawUpdate {

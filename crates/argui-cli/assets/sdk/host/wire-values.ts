@@ -15,10 +15,12 @@ export function encodeValue(property: NativeProperty, value: unknown): WireValue
     case 'String':
     case 'Name':
     case 'Color':
-    case 'Brush':
       if (typeof value !== 'string') break
       if (property.allowedValues?.length && !property.allowedValues.includes(value)) break
       return { type: property.valueType, value }
+    case 'Brush':
+      if (typeof value === 'string' || validBrush(value)) return { type: 'Brush', value }
+      break
     case 'Dimension':
       if (validDimension(value)) return { type: 'Dimension', value }
       break
@@ -71,6 +73,35 @@ export function encodeValue(property: NativeProperty, value: unknown): WireValue
       }
   }
   throw new TypeError(`Invalid ${property.valueType} value for ${property.name}`)
+}
+
+function validBrush(value: unknown): boolean {
+  if (!plainObject(value) || !Array.isArray(value.stops)
+    || value.stops.length < 2 || value.stops.length > 64) return false
+  if (value.space !== undefined && !['oklab', 'linear-srgb', 'srgb'].includes(value.space as string)) return false
+  let previous = 0
+  for (const stop of value.stops) {
+    if (!plainObject(stop) || Object.keys(stop).length !== 2
+      || !validNumber(stop.offset) || stop.offset < previous || stop.offset > 1
+      || typeof stop.color !== 'string') return false
+    previous = stop.offset
+  }
+  if (value.kind === 'linear') {
+    return Object.keys(value).every((key) => ['kind', 'angle', 'space', 'stops'].includes(key))
+      && validNumber(value.angle)
+  }
+  if (value.kind === 'radial') {
+    return Object.keys(value).every((key) => ['kind', 'center', 'radius', 'space', 'stops'].includes(key))
+      && point(value.center) && point(value.radius)
+      && (value.radius as { x: number; y: number }).x > 0
+      && (value.radius as { x: number; y: number }).y > 0
+  }
+  return false
+}
+
+function point(value: unknown): boolean {
+  return plainObject(value) && Object.keys(value).length === 2
+    && validNumber(value.x) && validNumber(value.y)
 }
 
 function validNumber(value: unknown): value is number {

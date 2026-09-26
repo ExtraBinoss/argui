@@ -90,6 +90,20 @@ export interface ShadowValue {
   inset?: boolean
 }
 
+/** One ordered color stop in a native GPU gradient. */
+export interface GradientStopValue {
+  offset: number
+  color: string
+}
+
+/** A solid color or a GPU-shaded gradient in normalized rectangle coordinates. */
+export type BrushValue = string | (
+  { stops: readonly GradientStopValue[]; space?: 'oklab' | 'linear-srgb' | 'srgb' } & (
+    | { kind: 'linear'; angle: number }
+    | { kind: 'radial'; center: { x: number; y: number }; radius: { x: number; y: number } }
+  )
+)
+
 /** Paint-only transform; it does not reserve layout space. */
 export interface TransformValue {
   translateX?: number

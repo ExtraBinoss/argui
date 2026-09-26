@@ -31,7 +31,7 @@ pub use schedule::{Cue, CueId, Schedule, ScheduleBuilder};
 pub use scheduler::{AnimationId, Frame, Scheduler};
 pub use spring::{Spring, SpringConfig};
 pub use time::{Duration, Time};
-pub use timeline::{PlaybackState, Timeline, TimelineEvents, TimelineSample};
+pub use timeline::{FrameSchedule, PlaybackState, Timeline, TimelineEvents, TimelineSample};
 pub use timing::{Direction, FillMode, Iterations, Timing, TimingError};
 pub use transition::Transition;
 

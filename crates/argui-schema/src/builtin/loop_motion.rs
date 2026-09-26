@@ -2,7 +2,7 @@
 
 use argui_animation::{
     CubicBezier, Direction, Duration, Easing, Interpolate, Iterations, Keyframe, Keyframes, Motion,
-    Timeline, Timing,
+    StepPosition, Steps, Timeline, Timing,
 };
 use argui_core::Transform2D;
 use argui_paint::Fill;
@@ -10,14 +10,14 @@ use argui_ui::{Element, ExpandedDimension, property};
 
 use super::{
     BACKGROUND, GAP, LOOP_BACKGROUND, LOOP_GAP, LOOP_HOLD, LOOP_MS, LOOP_OPACITY, LOOP_PLAYING,
-    LOOP_RADIUS, LOOP_SCALE, LOOP_TRANSLATE_X, LOOP_TRANSLATE_Y, LOOP_WIDTH, RADII, ROTATION,
-    ROTATION_LOOP_MS, WIDTH,
+    LOOP_RADIUS, LOOP_SCALE, LOOP_STEPS, LOOP_TRANSLATE_X, LOOP_TRANSLATE_Y, LOOP_WIDTH, RADII,
+    ROTATION, ROTATION_LOOP_MS, WIDTH,
 };
 use crate::{NativeElementInput, PropertyId, PropertySchema, SchemaError, SchemaValue, ValueType};
 
 /// Declares one rotation driver and coordinated alternating native property loops.
 #[must_use]
-pub(super) fn properties() -> [PropertySchema; 12] {
+pub(super) fn properties() -> [PropertySchema; 13] {
     [
         control(
             ROTATION_LOOP_MS,
@@ -91,6 +91,12 @@ pub(super) fn properties() -> [PropertySchema; 12] {
             ValueType::Float,
             "Child spacing at the far end of a native layout loop in logical pixels.",
         ),
+        control(
+            LOOP_STEPS,
+            "loopSteps",
+            ValueType::Int,
+            "Number of discrete jump-end steps in each native loop leg.",
+        ),
     ]
 }
 
@@ -119,6 +125,22 @@ pub(super) fn apply(
     let loop_ms = duration(input, LOOP_MS, "loopMs")?;
     let playing = !matches!(input.get(LOOP_PLAYING), Some(SchemaValue::Bool(false)));
     let hold = matches!(input.get(LOOP_HOLD), Some(SchemaValue::Bool(true)));
+    let steps = match input.get(LOOP_STEPS) {
+        Some(SchemaValue::Int(value)) => {
+            let count = u32::try_from(*value)
+                .map_err(|_| SchemaError::Adapter("loopSteps must be a positive integer".into()))?;
+            Some(
+                Steps::new(count, StepPosition::JumpEnd)
+                    .map_err(|error| SchemaError::Adapter(error.to_string()))?,
+            )
+        }
+        _ => None,
+    };
+    if steps.is_some() && loop_ms.is_none() && rotation_ms.is_none() {
+        return Err(SchemaError::Adapter(
+            "loopSteps requires loopMs or rotationLoopMs".into(),
+        ));
+    }
     let x = scalar(input, LOOP_TRANSLATE_X, "loopTranslateX")?;
     let y = scalar(input, LOOP_TRANSLATE_Y, "loopTranslateY")?;
     let scale = scalar(input, LOOP_SCALE, "loopScale")?;
@@ -182,6 +204,7 @@ pub(super) fn apply(
             Direction::Normal,
             playing,
             false,
+            steps,
         )?;
         element = element.bind(property::Transform, motion);
     } else if let Some(milliseconds) = loop_ms
@@ -197,6 +220,7 @@ pub(super) fn apply(
             Direction::Alternate,
             playing,
             hold,
+            steps,
         )?;
         element = element.bind(property::Transform, motion);
     }
@@ -210,6 +234,7 @@ pub(super) fn apply(
                 Direction::Alternate,
                 playing,
                 false,
+                steps,
             )?,
         );
     }
@@ -231,6 +256,7 @@ pub(super) fn apply(
                 Direction::Alternate,
                 playing,
                 false,
+                steps,
             )?,
         );
     }
@@ -259,6 +285,7 @@ pub(super) fn apply(
                 Direction::Alternate,
                 playing,
                 false,
+                steps,
             )?,
         );
     }
@@ -276,6 +303,7 @@ pub(super) fn apply(
                 Direction::Alternate,
                 playing,
                 false,
+                steps,
             )?,
         );
     }
@@ -293,6 +321,7 @@ pub(super) fn apply(
                 Direction::Alternate,
                 playing,
                 false,
+                steps,
             )?,
         );
     }
@@ -343,7 +372,8 @@ fn scalar(
 /// `direction` chooses continuous rotation or alternate motion; alternate and
 /// held motion ease to rest at each turnaround, while rotation stays linear.
 /// `playing` controls the initial pause state. `hold` adds a plateau and a
-/// return keyframe to the transform sequence. Returns a shared native motion
+/// return keyframe to the transform sequence. `steps` uses discrete jump-end
+/// easing instead of continuous easing. Returns a shared native motion
 /// or a timing error.
 ///
 /// # Errors
@@ -356,8 +386,11 @@ fn motion<T: Clone + Interpolate>(
     direction: Direction,
     playing: bool,
     hold: bool,
+    steps: Option<Steps>,
 ) -> Result<Motion<T>, SchemaError> {
-    let easing = if hold || direction == Direction::Alternate {
+    let easing = if let Some(steps) = steps {
+        Easing::Steps(steps)
+    } else if hold || direction == Direction::Alternate {
         Easing::CubicBezier(
             CubicBezier::new(0.42, 0.0, 0.58, 1.0).expect("constant CSS Bézier is valid"),
         )

@@ -10,12 +10,14 @@ mode=$1
 framework=$2
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
+echo "[gallery:$mode:$framework] Generating gallery assets…"
 bun run generate:assets
 if [[ "$framework" == react ]]; then
   bundle="$repo_root/apps/gallery/dist/gallery-react-core.mjs"
 else
   bundle="$repo_root/apps/gallery/dist/gallery-core.mjs"
 fi
+echo "[gallery:$mode:$framework] Starting Vite bundle watch; TSX edits will rebuild automatically…"
 ARGUI_GALLERY_DEV=1 ARGUI_GALLERY_ENTRY="$framework" bunx vite build --config apps/gallery/vite.config.ts --watch &
 builder_pid=$!
 sync_pid=
@@ -28,10 +30,12 @@ trap cleanup EXIT
 if [[ "$mode" == desktop ]]; then
   cargo_options=()
   if [[ "${ARGUI_GALLERY_ALL_TABLER:-0}" == 1 ]]; then cargo_options+=(--features dev-tabler-icons); fi
+  echo "[gallery:desktop:$framework] Building and launching the native host with Cargo; the first compile can take a while…"
   CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$repo_root/target/dev}" ARGUI_GALLERY_BUNDLE="$bundle" \
     cargo run --manifest-path apps/gallery/quickjs-host/Cargo.toml --locked "${cargo_options[@]}"
 else
   package=dev.argui.solidgallery.debug
+  echo "[gallery:android:$framework] Preparing Android app and watching for bundles…"
   adb shell run-as "$package" mkdir -p files
   (
     previous=

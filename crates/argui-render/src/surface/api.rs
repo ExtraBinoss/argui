@@ -265,6 +265,17 @@ impl SurfaceRenderer {
         true
     }
 
+    /// Reconfigures a native surface after WGPU reports an outdated or suboptimal frame.
+    ///
+    /// This also handles a swapchain change that leaves the drawable width and
+    /// height unchanged. An offscreen renderer has no native surface to configure.
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub fn reconfigure_surface(&mut self) {
+        if let Some(surface) = &self.surface {
+            surface.configure(&self.device, &self.surface_config);
+        }
+    }
+
     /// Replaces the native surface target while retaining the existing GPU device.
     ///
     /// # Errors

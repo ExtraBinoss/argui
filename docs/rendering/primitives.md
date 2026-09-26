@@ -33,6 +33,28 @@ Gradient stops use shared immutable CPU storage and one frame storage buffer.
 `RendererConfig::gradient_stop_capacity` bounds the total; its default is
 65,536. Geometry and stops can bind to typed motions.
 
+TSX `background` accepts a solid color string or a linear/radial brush. Stops
+are ordered offsets from 0 to 1; radial centers and radii are relative to the
+painted rectangle. A static gradient can move or fade through its compositor
+layer without recalculating stops in JavaScript:
+
+```tsx
+import type { BrushValue } from '@argui/host'
+
+const glow: BrushValue = {
+  kind: 'radial',
+  center: { x: 0.5, y: 0.8 },
+  radius: { x: 0.5, y: 0.75 },
+  space: 'oklab',
+  stops: [
+    { offset: 0, color: '#60dedbba' },
+    { offset: 1, color: '#60dedb00' },
+  ],
+}
+
+<rectangle background={glow} loopMs={1800} loopScale={1.12} />
+```
+
 `BilinearGradient` interpolates four premultiplied corners. The ColorPicker's
 HSV pad uses one bilinear quad: white/hue at the top and black at the bottom.
 

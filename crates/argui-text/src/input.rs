@@ -8,7 +8,7 @@ use crate::{TextContent, TextEngine, TextStyle, engine};
 
 mod buffer;
 pub(crate) use buffer::InputBuffer;
-use buffer::{VIRTUAL_INPUT_MIN_BYTES, unwrapped_width_estimate, visible_window};
+use buffer::{VIRTUAL_INPUT_MIN_BYTES, unwrapped_columns, visible_window};
 
 const INPUT_BUFFER_CACHE_CAPACITY: usize = 8;
 
@@ -98,15 +98,24 @@ impl TextEngine {
             .measure_layout("M", style, None)
             .first_baseline
             .unwrap_or(style.line_height * 0.8);
-        let lines = content
-            .as_str()
-            .bytes()
-            .filter(|byte| *byte == b'\n')
-            .count()
-            + 1;
+        let (columns, lines) = self
+            .input_buffers
+            .last()
+            .and_then(|previous| previous.estimate_edit(content, style))
+            .unwrap_or_else(|| {
+                (
+                    unwrapped_columns(content.as_str()),
+                    content
+                        .as_str()
+                        .bytes()
+                        .filter(|byte| *byte == b'\n')
+                        .count()
+                        + 1,
+                )
+            });
         crate::TextMeasurement {
             size: Size::new(
-                unwrapped_width_estimate(content.as_str(), style.font_size),
+                columns as f32 * style.font_size * 0.62,
                 lines as f32 * style.line_height,
             ),
             first_baseline: Some(baseline),

@@ -11,10 +11,11 @@ Install Rust and Bun, then run:
 
 ```sh
 bun install
-bun run gallery
+bun run dev
 ```
 
-Use `bun run gallery:react` for the React gallery. Reusable TSX controls live
+Use `bun run dev:react` for the native React gallery, or `bun run dev:web:solid`
+and `bun run dev:web:react` for the browser galleries. Reusable TSX controls live
 in `@argui/widgets/react` and `@argui/widgets/solid`. The current gallery
 demonstrates Button, ButtonGroup, InputField, Select, Popover, VirtualList, and the layout
 primitives. Previous components are archived in `OLD_API/`.

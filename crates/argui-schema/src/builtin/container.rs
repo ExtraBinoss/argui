@@ -55,6 +55,7 @@ pub(super) fn register(
         .property(loop_motion::properties()[1].clone())
         .property(loop_motion::properties()[2].clone())
         .property(loop_motion::properties()[11].clone())
+        .property(loop_motion::properties()[12].clone())
         .property(common_property(CommonProperty::Padding))
         .property(PropertySchema::new(
             DIRECTION_SCOPE,

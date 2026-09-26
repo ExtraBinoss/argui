@@ -254,13 +254,19 @@ impl UiTree {
         if self.scroll.advance_scrollbars(elapsed, regions) {
             update.paint_changed = true;
         }
+        if self.scroll.advance_hover_widths(elapsed) {
+            update.scroll_changed = true;
+            update.paint_changed = true;
+        }
         update
     }
 
     /// Returns whether scrolling physics or scrollbar activity needs another frame.
     #[must_use]
     pub fn wants_scroll_frame(&self) -> bool {
-        self.scroll.overscroll_active() || self.scroll.scrollbar_activity_active()
+        self.scroll.overscroll_active()
+            || self.scroll.scrollbar_activity_active()
+            || self.scroll.hover_width_active()
     }
 
     /// Routes a scroll delta from the pointer through eligible scroll ancestors.
@@ -390,11 +396,15 @@ impl UiTree {
         point: Option<Point>,
         regions: &[ScrollRegion],
     ) -> InteractionUpdate {
-        if !self.scroll.update_hover(point, regions) {
+        let (changed, geometry_changed) =
+            self.scroll
+                .update_hover(point, regions, self.reduced_motion);
+        if !changed {
             return InteractionUpdate::default();
         }
         let mut update = transition_update(self.sync_transitions());
         update.paint_changed = true;
+        update.scroll_changed |= geometry_changed;
         update
     }
 

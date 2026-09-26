@@ -3,6 +3,9 @@ use argui_animation::{
     Timeline, Timing, Tween,
 };
 
+#[path = "controller/frame_schedule.rs"]
+mod frame_schedule;
+
 #[test]
 fn tween_retargets_from_the_presented_value() {
     let motion = Motion::new(0.0_f32);
@@ -52,6 +55,22 @@ fn spring_retarget_preserves_velocity() {
     motion.spring_to(-4.0, SpringConfig::default()).unwrap();
     assert_eq!(motion.value(), presented);
     assert_eq!(motion.velocity(), velocity);
+}
+
+#[test]
+fn timeline_completion_without_a_value_change_does_not_invalidate() {
+    let timeline = Timeline::new(
+        Keyframes::new([Keyframe::new(0.0, 10.0_f32), Keyframe::new(1.0, 10.0)]).unwrap(),
+        Timing::new(Duration::from_millis(100)),
+    )
+    .unwrap();
+    let motion = Motion::new(10.0_f32);
+    motion.play(timeline);
+
+    assert!(!motion.advance(Time::ZERO).unwrap());
+    assert!(!motion.advance(Time::from_nanos(100_000_000)).unwrap());
+    assert_eq!(motion.state(), MotionState::Finished);
+    assert_eq!(motion.value(), 10.0);
 }
 
 #[test]
@@ -172,4 +191,13 @@ fn settled_and_restarted_springs_have_explicit_states() {
     assert_eq!(motion.value(), 0.0);
     assert_eq!(motion.target(), 5.0);
     assert_eq!(motion.state(), MotionState::Running);
+}
+
+#[test]
+fn immediately_settled_motion_presents_its_exact_target() {
+    let motion = Motion::new(5.0_f32);
+    motion.spring_to(5.0005, SpringConfig::default()).unwrap();
+    assert_eq!(motion.state(), MotionState::Finished);
+    assert_eq!(motion.value(), motion.target());
+    assert!(!motion.is_active());
 }

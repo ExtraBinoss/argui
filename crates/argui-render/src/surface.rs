@@ -489,11 +489,11 @@ impl SurfaceRenderer {
             }
             canvas_commands.push(encoder.finish());
             self.queue.submit(canvas_commands);
-            self.poll_submitted_gpu_work();
-            self.finish_profile(profiler, viewport, graph_stats, damage_profile, false);
             if let Some(frame) = frame {
                 self.queue.present(frame);
             }
+            self.poll_submitted_gpu_work();
+            self.finish_profile(profiler, viewport, graph_stats, damage_profile, false);
             return Ok(status);
         }
         self.effect_root = None;
@@ -549,6 +549,9 @@ impl SurfaceRenderer {
         }
         canvas_commands.push(encoder.finish());
         self.queue.submit(canvas_commands);
+        if let Some(frame) = frame {
+            self.queue.present(frame);
+        }
         self.poll_submitted_gpu_work();
         self.finish_profile(
             profiler,
@@ -557,9 +560,6 @@ impl SurfaceRenderer {
             damage_profile,
             direct_surface,
         );
-        if let Some(frame) = frame {
-            self.queue.present(frame);
-        }
         Ok(status)
     }
 

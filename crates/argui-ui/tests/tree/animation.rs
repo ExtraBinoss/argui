@@ -1,4 +1,4 @@
-use argui_animation::{Duration, Motion, Time, Tween};
+use argui_animation::{Duration, Easing, Motion, StepPosition, Steps, Time, Tween};
 use argui_core::Transform2D;
 use argui_ui::{Display, Element, TreeUpdate, UiTree, property};
 
@@ -106,4 +106,81 @@ fn hidden_binding_suspends_frames_until_page_is_visible() {
         tree.advance_animations(Time::from_nanos(100_000_002)),
         TreeUpdate::None
     );
+}
+
+/// Step easing exposes one-shot deadlines and leaves the tree idle on plateaus.
+#[test]
+fn step_binding_wakes_only_at_visual_changes() {
+    let opacity = Motion::new(0.0_f32);
+    let mut tree =
+        UiTree::new(Element::container([]).bind(property::LayerOpacity, opacity.clone()));
+    opacity.animate_to(
+        1.0,
+        Tween::new(Duration::from_millis(100))
+            .easing(Easing::Steps(Steps::new(4, StepPosition::JumpEnd).unwrap())),
+    );
+    assert!(tree.wants_animation_frame());
+    assert_eq!(tree.advance_animations(Time::ZERO), TreeUpdate::None);
+    assert!(!tree.wants_animation_frame());
+    let first = tree.next_animation_frame_at().unwrap();
+    assert!(first >= Time::from_nanos(25_000_000));
+    assert!(first < Time::from_nanos(26_000_000));
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(10_000_000)),
+        TreeUpdate::None
+    );
+    assert_eq!(tree.advance_animations(first), TreeUpdate::Composite);
+    assert_eq!(opacity.value(), 0.25);
+    assert!(!tree.wants_animation_frame());
+    assert!(tree.next_animation_frame_at().unwrap() >= Time::from_nanos(50_000_000));
+    assert_eq!(tree.set_reduced_motion(true), TreeUpdate::Composite);
+    assert_eq!(tree.next_animation_frame_at(), None);
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(opacity.value(), 1.0);
+}
+
+/// External motion changes remain visible to tree scheduling without a rebuild.
+#[test]
+fn shared_motion_start_pause_resume_and_retarget_update_frame_demand() {
+    let opacity = Motion::new(1.0_f32);
+    let mut tree =
+        UiTree::new(Element::container([]).bind(property::LayerOpacity, opacity.clone()));
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(tree.next_animation_frame_at(), None);
+
+    opacity.animate_to(0.0, Tween::new(Duration::from_millis(100)));
+    assert!(tree.wants_animation_frame());
+    assert_eq!(tree.advance_animations(Time::ZERO), TreeUpdate::None);
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(25_000_000)),
+        TreeUpdate::Composite
+    );
+
+    opacity.pause();
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(tree.next_animation_frame_at(), None);
+    opacity.resume();
+    assert!(tree.wants_animation_frame());
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(50_000_000)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(75_000_000)),
+        TreeUpdate::Composite
+    );
+
+    opacity.animate_to(0.8, Tween::new(Duration::from_millis(100)));
+    assert!(tree.wants_animation_frame());
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(80_000_000)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(130_000_000)),
+        TreeUpdate::Composite
+    );
+    opacity.finish();
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(tree.next_animation_frame_at(), None);
 }

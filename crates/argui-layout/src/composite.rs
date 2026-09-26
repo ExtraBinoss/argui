@@ -8,6 +8,8 @@ use crate::{DesktopBackdropRegion, LayoutOutput, TextRegion, engine::LayoutEngin
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CompositeGeometry {
+    /// Whether the previous presentation patched any geometry away from the paint baseline.
+    transformed: bool,
     owners: HashMap<NodeId, CompositorId>,
     nodes: HashMap<CompositorId, usize>,
     carets: HashMap<CompositorId, usize>,
@@ -22,6 +24,7 @@ impl CompositeGeometry {
     /// Captures the painted presentation baseline and compositor ownership map.
     pub(crate) fn capture(output: &LayoutOutput) -> Self {
         Self {
+            transformed: false,
             owners: output.compositor_owners.clone(),
             nodes: output
                 .nodes
@@ -258,7 +261,12 @@ fn contains_rect(outer: argui_core::Rect, inner: argui_core::Rect) -> bool {
 
 /// Restores baseline interaction geometry and applies the latest layer deltas.
 fn apply_geometry(output: &mut LayoutOutput, deltas: &HashMap<CompositorId, Affine2D>) {
-    let base = &output.composite_geometry;
+    let base = &mut output.composite_geometry;
+    if deltas.is_empty() && !base.transformed {
+        // Opacity-only frames cannot change hit testing, text selection, or semantics.
+        return;
+    }
+    base.transformed = !deltas.is_empty();
     let owners = &base.owners;
     let mut clip_cache = HashMap::new();
     output.hit_regions.clone_from(&base.hit_regions);

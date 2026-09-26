@@ -48,4 +48,5 @@ if [[ "$command_name" == install ]]; then
 fi
 
 cd "$android_project"
+echo "[gallery:android] Running Gradle $gradle_task…"
 "$gradle_wrapper" "$gradle_task" "$@"

@@ -172,7 +172,9 @@ fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
         || old.z_index != new.z_index;
     let transform_changed =
         old.transform != new.transform || old.transform_origin != new.transform_origin;
-    if paint || (transform_changed && contains_text(new) && !has_active_transform(new)) {
+    if scrollbar_geometry_changed(old, new) {
+        Some(TreeUpdate::Scroll)
+    } else if paint || (transform_changed && contains_text(new) && !has_active_transform(new)) {
         Some(TreeUpdate::Paint)
     } else if old.declared_scroll_offset != new.declared_scroll_offset {
         Some(TreeUpdate::Scroll)
@@ -189,6 +191,32 @@ fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
         Some(TreeUpdate::Paint)
     } else {
         None
+    }
+}
+
+/// Returns whether authored scrollbar changes require refreshed scroll geometry.
+///
+/// `old` is the mounted element and `new` is its replacement description.
+fn scrollbar_geometry_changed(old: &Element, new: &Element) -> bool {
+    let old = old
+        .scroll
+        .as_deref()
+        .and_then(|scroll| scroll.scrollbar.as_ref());
+    let new = new
+        .scroll
+        .as_deref()
+        .and_then(|scroll| scroll.scrollbar.as_ref());
+    match (old, new) {
+        (Some(before), Some(after)) => {
+            before.width != after.width
+                || before.hover_width != after.hover_width
+                || before.side != after.side
+                || before.insets != after.insets
+                || before.min_thumb != after.min_thumb
+                || before.visibility != after.visibility
+        }
+        (None, None) => false,
+        _ => true,
     }
 }
 

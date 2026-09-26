@@ -11,6 +11,9 @@ use std::{
 };
 
 mod timeline_retention;
+mod track;
+
+pub use track::MotionTrack;
 
 #[derive(Clone, Debug, PartialEq)]
 /// Parameters for a finite, eased transition between two values.
@@ -340,7 +343,7 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
         self.animate_to(target, tween);
     }
 
-    /// Samples the motion at `now`, returning whether its value changed.
+    /// Samples a tween or timeline at `now`, returning whether its value changed.
     ///
     /// # Errors
     /// Returns a timing error if the tween cannot be represented as a valid timeline.
@@ -366,7 +369,8 @@ impl<T: MotionValue> Motion<T> {
         }
     }
 
-    /// Springs the current value toward `target` using `config`.
+    /// Springs the current value toward `target` using `config`, snapping to it
+    /// immediately when both rest thresholds are already satisfied.
     ///
     /// # Errors
     /// Returns a physics error if the spring configuration is invalid.
@@ -378,6 +382,7 @@ impl<T: MotionValue> Motion<T> {
             _ => T::zero(),
         };
         let spring = Spring::new(inner.value, target, velocity, config)?;
+        inner.value = spring.value();
         inner.target = target;
         inner.state = if spring.is_active() {
             MotionState::Running
@@ -472,16 +477,17 @@ fn advance_timeline<T: Clone + Interpolate + PartialEq>(
         inner.completed_iterations = inner
             .completed_iterations
             .saturating_add(sample.events.iterations);
-        if let Some(value) = sample.value {
-            changed = value != inner.value;
-            inner.value = value;
-        }
         if sample.state == PlaybackState::Finished {
+            changed = inner.value != inner.target;
             inner.value = inner.target.clone();
             inner.driver = Driver::None;
             inner.state = MotionState::Finished;
             inner.last_frame = None;
-            return Ok(true);
+            return Ok(changed);
+        }
+        if let Some(value) = sample.value {
+            changed = value != inner.value;
+            inner.value = value;
         }
     }
     inner.last_frame = Some(now);
@@ -516,71 +522,4 @@ fn advance_spring<T: MotionValue>(inner: &mut MotionInner<T>, now: Time) -> bool
         inner.last_frame = None;
     }
     changed
-}
-
-/// Type-erased operations used by animation scheduling.
-pub trait MotionTrack {
-    /// Returns the stable identity of this track.
-    fn identity(&self) -> usize;
-    /// Returns whether this track is active.
-    fn is_active(&self) -> bool;
-    /// Advances the track at `now`, returning whether its value changed.
-    fn advance(&self, now: Time) -> bool;
-    /// Moves the track to its target and marks it finished.
-    fn finish(&self);
-    /// Cancels the track without moving it to its target.
-    fn cancel(&self);
-    /// Freezes the track at its last sampled presentation value.
-    fn pause(&self);
-    /// Resumes a paused track without counting time spent paused.
-    fn resume(&self);
-}
-
-impl<T> MotionTrack for Motion<T>
-where
-    T: MotionValue + Clone + Interpolate + 'static,
-{
-    fn identity(&self) -> usize {
-        self.identity()
-    }
-
-    fn is_active(&self) -> bool {
-        self.is_active()
-    }
-
-    fn advance(&self, now: Time) -> bool {
-        if !self.is_active() {
-            return false;
-        }
-        let mut inner = self.lock();
-        let changed = if matches!(&inner.driver, Driver::Spring(_)) {
-            advance_spring(&mut inner, now)
-        } else {
-            advance_timeline(&mut inner, now).unwrap_or_else(|_| {
-                inner.driver = Driver::None;
-                inner.state = MotionState::Canceled;
-                inner.last_frame = None;
-                false
-            })
-        };
-        let active = inner.state == MotionState::Running;
-        self.set_active(active);
-        changed
-    }
-
-    fn finish(&self) {
-        self.finish();
-    }
-
-    fn cancel(&self) {
-        self.cancel();
-    }
-
-    fn pause(&self) {
-        self.pause();
-    }
-
-    fn resume(&self) {
-        self.resume();
-    }
 }

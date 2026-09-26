@@ -1,5 +1,8 @@
 #[path = "text_input/filter.rs"]
 mod filter;
+
+#[path = "text_input/performance.rs"]
+mod performance;
 use argui_core::{
     Affine2D, CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, PointerButton,
     PointerEvent, PointerId, PointerKind, PointerPhase, Rect, Size, TextPosition,

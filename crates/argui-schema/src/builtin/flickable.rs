@@ -1,25 +1,26 @@
-//! Visually neutral scroll viewport for declarative scroll compositions.
+//! Native scroll viewport with an overflow-aware scrollbar.
 
 use argui_animation::{Duration, Tween};
 use argui_paint::{CornerRadii, QuadStyle};
 use argui_ui::{
-    Axes, Color, Element, EventType, Overflow, ScrollAxes, ScrollConfig, ScrollbarPartStyle,
-    ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition,
-    Transition, VisualState, property,
+    Axes, Color, Element, EventType, InertialScroll, Overflow, ScrollAxes, ScrollConfig,
+    ScrollPhysics, ScrollbarPartStyle, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, Sides,
+    StylePatch, StyleTransition, Transition, VisualState, property,
 };
 
 use super::{
     CHILDREN, CONTENT_HEIGHT, CONTENT_WIDTH, CommonProperty, ENABLED, FLICK_VIEWPORT_HEIGHT,
-    FLICK_VIEWPORT_WIDTH, GROW, OFFSET_X, OFFSET_Y, SCROLL, SCROLL_X, SCROLL_Y,
-    SCROLLBAR_HOVER_COLOR, SCROLLBAR_SIDE, SCROLLBAR_THUMB_COLOR, SCROLLBAR_WIDTH, apply_common,
+    FLICK_VIEWPORT_WIDTH, GROW, OFFSET_X, OFFSET_Y, SCROLL, SCROLL_MOMENTUM, SCROLL_X, SCROLL_Y,
+    SCROLLBAR_HOVER_COLOR, SCROLLBAR_HOVER_WIDTH, SCROLLBAR_PRESSED_COLOR, SCROLLBAR_SIDE,
+    SCROLLBAR_THUMB_COLOR, SCROLLBAR_TRACK_COLOR, SCROLLBAR_VISIBLE, SCROLLBAR_WIDTH, apply_common,
     common_property, optional_bool,
 };
 use crate::{
-    EventSchema, NativeElementInput, NativeSchema, ObservationKind, PropertySchema, SchemaError,
-    SchemaRegistry, SchemaValue, SlotArity, SlotSchema, ValueType,
+    EventSchema, NativeElementInput, NativeSchema, ObservationKind, PropertyId, PropertySchema,
+    SchemaError, SchemaRegistry, SchemaValue, SlotArity, SlotSchema, ValueType,
 };
 
-/// Registers a scroll viewport without a prescribed scrollbar or visual effect.
+/// Registers a scroll viewport with a default overflow-aware scrollbar.
 ///
 /// * `registry` — native schema registry receiving the viewport adapter.
 ///
@@ -77,14 +78,23 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         SCROLLBAR_SIDE,
         "scrollbarSide",
         ValueType::String,
-        "Physical edge of the optional vertical scrollbar: left or right.",
+        "Physical edge of the vertical scrollbar: left or right.",
     ))
     .property(PropertySchema::new(
         SCROLLBAR_WIDTH,
         "scrollbarWidth",
         ValueType::Float,
-        "Width of the optional native scrollbar in logical pixels.",
+        "Resting width of the native scrollbar in logical pixels.",
     ))
+    .property(
+        PropertySchema::new(
+            SCROLLBAR_VISIBLE,
+            "scrollbarVisible",
+            ValueType::Bool,
+            "Show the native scrollbar when content overflows; set false to hide it.",
+        )
+        .default_value(SchemaValue::Bool(true)),
+    )
     .property(PropertySchema::new(
         SCROLLBAR_THUMB_COLOR,
         "scrollbarThumbColor",
@@ -92,10 +102,34 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "Native thumb color before hover.",
     ))
     .property(PropertySchema::new(
+        SCROLLBAR_TRACK_COLOR,
+        "scrollbarTrackColor",
+        ValueType::Color,
+        "Native scrollbar track color.",
+    ))
+    .property(PropertySchema::new(
         SCROLLBAR_HOVER_COLOR,
         "scrollbarHoverColor",
         ValueType::Color,
         "Native thumb color while hovered.",
+    ))
+    .property(PropertySchema::new(
+        SCROLLBAR_HOVER_WIDTH,
+        "scrollbarHoverWidth",
+        ValueType::Float,
+        "Thumb and hit-target width on hover, eased by the native renderer.",
+    ))
+    .property(PropertySchema::new(
+        SCROLLBAR_PRESSED_COLOR,
+        "scrollbarPressedColor",
+        ValueType::Color,
+        "Native thumb color while dragging.",
+    ))
+    .property(PropertySchema::new(
+        SCROLL_MOMENTUM,
+        "scrollMomentum",
+        ValueType::Float,
+        "Scroll glide strength from zero (direct) to one (longest glide).",
     ))
     .property(PropertySchema::new(
         GROW,
@@ -183,15 +217,10 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         let mut config = ScrollConfig::default()
             .enabled(optional_bool(input, ENABLED).unwrap_or(true) && (x || y))
             .axes(axes);
-        if [
-            SCROLLBAR_SIDE,
-            SCROLLBAR_WIDTH,
-            SCROLLBAR_THUMB_COLOR,
-            SCROLLBAR_HOVER_COLOR,
-        ]
-        .iter()
-        .any(|id| input.get(*id).is_some())
-        {
+        if let Some(physics) = scroll_momentum(input, SCROLL_MOMENTUM)? {
+            config = config.physics(physics);
+        }
+        if optional_bool(input, SCROLLBAR_VISIBLE).unwrap_or(true) {
             let side = match input.get(SCROLLBAR_SIDE) {
                 Some(SchemaValue::String(value)) if value == "left" => ScrollbarSide::Left,
                 _ => ScrollbarSide::Right,
@@ -213,14 +242,35 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 Some(SchemaValue::Color(color)) => *color,
                 _ => Color::srgba(0.5, 0.5, 0.5, 0.9),
             };
+            let track = match input.get(SCROLLBAR_TRACK_COLOR) {
+                Some(SchemaValue::Color(color)) => QuadStyle::solid(*color),
+                _ => QuadStyle::default(),
+            };
+            let pressed = match input.get(SCROLLBAR_PRESSED_COLOR) {
+                Some(SchemaValue::Color(color)) => *color,
+                _ => hover,
+            };
+            let hover_width = match input.get(SCROLLBAR_HOVER_WIDTH) {
+                Some(SchemaValue::Float(value)) if value.is_finite() && *value >= width => *value,
+                Some(_) => {
+                    return Err(SchemaError::Adapter(
+                        "scrollbarHoverWidth must be finite and at least scrollbarWidth".into(),
+                    ));
+                }
+                None => width + 4.0,
+            };
             let scrollbar = ScrollbarStyle::new(
-                ScrollbarPartStyle::new(QuadStyle::default()),
+                ScrollbarPartStyle::new(track.radius(CornerRadii::all(hover_width / 2.0))),
                 ScrollbarPartStyle::new(
-                    QuadStyle::solid(thumb).radius(CornerRadii::all(width / 2.0)),
+                    QuadStyle::solid(thumb).radius(CornerRadii::all(hover_width / 2.0)),
                 )
                 .when(
                     VisualState::Hovered,
                     StylePatch::new().set(property::BackgroundColor, hover),
+                )
+                .when(
+                    VisualState::Pressed,
+                    StylePatch::new().set(property::BackgroundColor, pressed),
                 )
                 .transition(StyleTransition::new(Transition::tween(Tween::new(
                     Duration::from_millis(120),
@@ -235,7 +285,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 bottom: 4.0,
             })
             .visibility(ScrollbarVisibility::Always);
-            config = config.scrollbar(scrollbar);
+            config = config.scrollbar(scrollbar.hover_width(hover_width));
         }
         let overflow = Axes {
             x: if x { Overflow::Auto } else { Overflow::Hidden },
@@ -251,4 +301,40 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         }
         Ok(element)
     })
+}
+
+/// Parses a public glide strength into native scroll physics.
+///
+/// * `input` — authored primitive properties.
+/// * `property` — scroll-momentum property identifier.
+///
+/// Returns `None` when the caller should keep its default physics.
+///
+/// # Errors
+///
+/// Returns an adapter error for a nonfinite or out-of-range strength.
+pub(super) fn scroll_momentum(
+    input: &NativeElementInput,
+    property: PropertyId,
+) -> Result<Option<ScrollPhysics>, SchemaError> {
+    let Some(value) = input.get(property) else {
+        return Ok(None);
+    };
+    let SchemaValue::Float(strength) = value else {
+        return Err(SchemaError::Adapter(
+            "scrollMomentum must be a number in [0, 1]".into(),
+        ));
+    };
+    if !strength.is_finite() || !(0.0..=1.0).contains(strength) {
+        return Err(SchemaError::Adapter(
+            "scrollMomentum must be a number in [0, 1]".into(),
+        ));
+    }
+    if *strength == 0.0 {
+        return Ok(Some(ScrollPhysics::Direct));
+    }
+    Ok(Some(ScrollPhysics::Inertial(InertialScroll {
+        decay: 16.0 - 11.0 * strength,
+        ..InertialScroll::default()
+    })))
 }

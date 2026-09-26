@@ -25,14 +25,14 @@ export function ButtonGroup(props: ButtonGroupProps): JSX.Element {
   const orientation = () => props.orientation ?? 'horizontal'
   return <GroupContext.Provider value={orientation()}>
     <rectangle id={props.id} role="group" accessibleName={props.accessibleName}
-      width={props.width} height={props.height ?? (orientation() === 'horizontal' ? 40 : undefined)}
+      width={props.width} height={props.height}
       minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
       grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf ?? 'start'} margin={props.margin}
       background={theme().surface} border={{ width: 1, color: theme().border }}
       focusBorderColor={theme().focusRing} radii={theme().radius} clip={true}>
       {orientation() === 'horizontal'
         ? <row width={props.width !== undefined || props.alignSelf === 'stretch' ? '100%' : undefined}
-            height="100%" directionScope={props.directionScope} gap={0} alignItems="center">{props.children}</row>
+            height={props.height !== undefined ? '100%' : undefined} directionScope={props.directionScope} gap={0} alignItems="center">{props.children}</row>
         : <column width={props.width !== undefined || props.alignSelf === 'stretch' ? '100%' : undefined}
             directionScope={props.directionScope} gap={0}>{props.children}</column>}
     </rectangle>
@@ -48,8 +48,8 @@ export function ButtonGroupSeparator(props: ButtonGroupSeparatorProps): JSX.Elem
   const group = useButtonGroup()
   const orientation = () => props.orientation ?? (group === 'vertical' ? 'horizontal' : 'vertical')
   return orientation() === 'vertical'
-    ? <rectangle width={1} height={24} shrink={0} background={theme().border} />
-    : <rectangle width="100%" height={1} shrink={0} background={theme().border} />
+    ? <rectangle width={1} height={24} shrink={0} background={theme().input} />
+    : <rectangle width="100%" height={1} shrink={0} background={theme().input} />
 }
 
 /** Props for static text within a button group. */
@@ -59,8 +59,8 @@ export type ButtonGroupTextProps = { children?: JSX.Element; render?: JSX.Elemen
 export function ButtonGroupText(props: ButtonGroupTextProps): JSX.Element {
   const theme = useTheme<WidgetTheme>()
   const content = () => props.render ?? (typeof props.children === 'string'
-    ? <text color={theme().textMuted}>{props.children}</text> : props.children)
-  return <container height={38} padding={{ start: 12, end: 12 }}>
+    ? <text color={theme().foreground} fontSize={14} weight={500}>{props.children}</text> : props.children)
+  return <container height={32} padding={{ start: 10, end: 10 }} background={theme().muted}>
     <row height="100%" alignItems="center">{content()}</row>
   </container>
 }

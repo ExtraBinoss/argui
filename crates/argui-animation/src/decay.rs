@@ -89,6 +89,7 @@ impl<T: MotionValue> Decay<T> {
         if !self.active || elapsed == Duration::ZERO {
             return false;
         }
+        let previous = self.value;
         let decay = (-self.config.rate * elapsed.as_secs_f64()).exp();
         let distance = self.velocity.scale((1.0 - decay) / self.config.rate);
         self.value = self.value.add(distance);
@@ -97,6 +98,6 @@ impl<T: MotionValue> Decay<T> {
             self.velocity = T::zero();
             self.active = false;
         }
-        true
+        self.value != previous
     }
 }

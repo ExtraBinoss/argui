@@ -2,7 +2,7 @@
 
 use argui_core::{Color, Name, Transform2D};
 use argui_host::{CallbackId, HostId, Operation};
-use argui_paint::{Border, BorderWidths, CornerRadii, Fill, ImageId, Shadow, VectorId};
+use argui_paint::{Border, BorderWidths, CornerRadii, ImageId, Shadow, VectorId};
 use argui_schema::{
     AssetHandle, ContainerRule, ContainerRuleStyle, EventId, NativeTypeId, PropertyId, SchemaValue,
 };
@@ -14,7 +14,9 @@ use argui_ui::{
 use serde::Deserialize;
 use serde_json::Value;
 
+mod brush;
 mod grid;
+use brush::brush;
 use grid::{container_rules, grid_tracks};
 
 /// An ID transported between the JavaScript actor and native host.
@@ -57,10 +59,7 @@ impl WireValue {
                 .as_str()
                 .and_then(|s| Color::from_literal(s).ok())
                 .map(SchemaValue::Color),
-            "Brush" => value
-                .as_str()
-                .and_then(|s| Color::from_literal(s).ok())
-                .map(|c| SchemaValue::Brush(Fill::Solid(c))),
+            "Brush" => brush(value).map(SchemaValue::Brush),
             "Dimension" => dimension(value).map(SchemaValue::Dimension),
             "Constraint" => constraint(value).map(SchemaValue::Constraint),
             "Insets" => insets(value).map(SchemaValue::Insets),

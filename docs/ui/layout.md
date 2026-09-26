@@ -81,8 +81,10 @@ result.
 `scrollView` is the public viewport primitive. Set a resolvable `height` or
 `maxHeight` for vertical scrolling, or place it in a bounded flex parent with
 `grow={1}`. `scrollX` and `scrollY` select axes. Scrolling, sticky movement,
-scrollbar interaction, and virtual list windowing stay in the native engine;
-there is no JS callback for each movement frame.
+scrollbar interaction, and virtual list windowing stay in the native engine.
+The scrollbar appears automatically when content overflows and grows on hover;
+`scrollbarVisible={false}` hides it without disabling scroll input. There is no
+JS callback for each movement frame.
 
 In development, the inspector reports preferred and bounded sizes, flex
 growth and shrink, computed geometry, and notes for likely mistakes such as a

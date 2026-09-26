@@ -135,7 +135,10 @@ impl Default for ScrollConfig {
             propagation: ScrollPropagation::Chain,
             line_size: 40.0,
             multiplier: 1.0,
-            physics: ScrollPhysics::Hybrid,
+            physics: ScrollPhysics::Inertial(InertialScroll {
+                decay: 12.15,
+                ..InertialScroll::default()
+            }),
             overscroll: OverscrollBehavior::Clamp,
             anchoring: ScrollAnchoring::Auto,
             scrollbar: None,
@@ -276,6 +279,8 @@ fn finite(value: f32) -> f32 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarStyle {
     pub width: f32,
+    pub hover_width: Option<f32>,
+    pub hover_duration: Duration,
     pub side: ScrollbarSide,
     pub insets: Sides<f32>,
     pub min_thumb: f32,
@@ -295,6 +300,8 @@ impl ScrollbarStyle {
     pub const fn new(track: ScrollbarPartStyle, thumb: ScrollbarPartStyle) -> Self {
         Self {
             width: 10.0,
+            hover_width: None,
+            hover_duration: Duration::from_millis(140),
             side: ScrollbarSide::Right,
             insets: Sides {
                 left: 4.0,
@@ -315,6 +322,24 @@ impl ScrollbarStyle {
     #[must_use]
     pub const fn width(mut self, width: f32) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Sets the thumb and hit-target width while the scrollbar is hovered.
+    ///
+    /// * `width` — hovered width in logical pixels; keep it at least the base width.
+    #[must_use]
+    pub const fn hover_width(mut self, width: f32) -> Self {
+        self.hover_width = Some(width);
+        self
+    }
+
+    /// Sets the duration of the native hover-width animation.
+    ///
+    /// * `duration` — time to grow or shrink the scrollbar.
+    #[must_use]
+    pub const fn hover_duration(mut self, duration: Duration) -> Self {
+        self.hover_duration = duration;
         self
     }
 

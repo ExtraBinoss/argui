@@ -1,4 +1,4 @@
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 
 /// Returns two byte offsets in ascending order.
 pub(super) const fn ordered(left: usize, right: usize) -> (usize, usize) {
@@ -38,11 +38,19 @@ pub(super) fn grapheme_boundary(value: &str, index: usize) -> usize {
     if index >= value.len() {
         return value.len();
     }
-    value
-        .grapheme_indices(true)
-        .take_while(|(boundary, _)| *boundary <= index)
-        .last()
-        .map_or(0, |(boundary, _)| boundary)
+    let index = char_boundary(value, index);
+    let mut cursor = GraphemeCursor::new(index, value.len(), true);
+    if cursor
+        .is_boundary(value, 0)
+        .expect("a complete string contains all grapheme context")
+    {
+        index
+    } else {
+        cursor
+            .prev_boundary(value, 0)
+            .expect("a complete string contains all grapheme context")
+            .unwrap_or(0)
+    }
 }
 
 /// Returns the byte offset at the beginning of the cursor's logical line.

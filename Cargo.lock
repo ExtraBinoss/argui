@@ -471,6 +471,7 @@ dependencies = [
  "cosmic-text",
  "swash",
  "unicode-segmentation",
+ "web-time",
 ]
 
 [[package]]

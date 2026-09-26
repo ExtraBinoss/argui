@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { NativeHost, type NativeBridge, type NativeContract, type Operation } from '../src'
+import { encodeValue } from '../src/wire-values'
 
 const contract: NativeContract = {
   abiHash: 'v2-fixture',
@@ -85,6 +86,18 @@ test('layout and paint values reject ambiguous or unsupported wire shapes', () =
   expect(() => host.setProperty(root, 'containerRules', [{ scope: 'cards', when: {}, style: { gap: 12 } }])).toThrow('Invalid ContainerRules')
   expect(() => host.setProperty(root, 'inset', { end: 2, right: 3 })).toThrow('Invalid PositionInsets')
   expect(() => host.setProperty(root, 'minWidth', 'fit')).toThrow('Invalid Constraint')
+})
+
+test('GPU gradient brushes retain typed stops and reject invalid geometry', () => {
+  const property = { id: 13, name: 'background', valueType: 'Brush', readOnly: false }
+  const gradient = { kind: 'linear', angle: 90, space: 'oklab', stops: [
+    { offset: 0, color: '#58d9ff' }, { offset: 0.55, color: '#e291dc' },
+    { offset: 1, color: 'transparent' },
+  ] }
+  expect(encodeValue(property, gradient)).toEqual({ type: 'Brush', value: gradient })
+  expect(() => encodeValue(property, { ...gradient, stops: gradient.stops.slice(0, 1) })).toThrow('Invalid Brush')
+  expect(() => encodeValue(property, { ...gradient, stops: [...gradient.stops].reverse() })).toThrow('Invalid Brush')
+  expect(() => encodeValue(property, { kind: 'radial', center: { x: 0.5, y: 1 }, radius: { x: 0, y: 1 }, stops: gradient.stops })).toThrow('Invalid Brush')
 })
 
 test('Solid inline text children update one Text property without native child nodes', () => {

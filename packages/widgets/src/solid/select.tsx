@@ -10,8 +10,8 @@ export type SelectProps = SelectOptions & { leading?: JSX.Element; trailing?: JS
 /** Renders a keyboard-accessible native option list with controlled or local value. */
 export function Select(props: SelectProps): JSX.Element {
   const generatedId = `argui-select-${createUniqueId()}`
-  const id = () => props.id ?? generatedId
-  const popupId = () => `${id()}-popup`
+  const id = props.id ?? generatedId
+  const popupId = `${id}-popup`
   const theme = useTheme<WidgetTheme>()
   const [localValue, setLocalValue] = createSignal(props.defaultValue ?? '')
   const [localOpen, setLocalOpen] = createSignal(props.defaultOpen ?? false)
@@ -19,18 +19,17 @@ export function Select(props: SelectProps): JSX.Element {
   const value = () => props.value ?? localValue()
   const expanded = () => props.open ?? localOpen()
   const controlledReadOnly = () => props.value !== undefined && !props.onValueChange
-  const fixedOpen = () => props.open !== undefined && !props.onOpenChange
   const disabled = () => !!props.disabled || controlledReadOnly()
   const selectedIndex = () => props.options.findIndex((option) => option.value === value())
   const currentIndex = () => activeIndex() >= 0 && activeIndex() < props.options.length
     ? activeIndex() : selectedIndex()
 
   const setOpen = (next: boolean) => {
-    if (props.open === undefined && !fixedOpen()) setLocalOpen(next)
+    if (props.open === undefined) setLocalOpen(next)
     props.onOpenChange?.(next)
   }
   const showOptions = () => {
-    if (disabled() || fixedOpen()) return
+    if (disabled()) return
     const selected = selectedIndex()
     setActiveIndex(selected >= 0 && !props.options[selected]?.disabled
       ? selected : nextEnabledOption(props.options, -1, 1))
@@ -65,44 +64,47 @@ export function Select(props: SelectProps): JSX.Element {
   }
 
   const selected = () => props.options.find((option) => option.value === value())
-  const width = () => props.width ?? 240
+  const width = () => props.width ?? theme().selectWidth
   const shadcn = () => props.variant === 'shadcn'
-  const rowHeight = () => shadcn() ? 28 : 36
+  const rowHeight = () => shadcn() ? theme().selectCompactRowHeight : theme().selectRowHeight
   const rowCount = () => Math.max(1, props.options.length + Number(shadcn()))
   const contentHeight = () => 8 + rowCount() * rowHeight() + (rowCount() - 1) * 2
     + (shadcn() ? 26 : 0)
-  const optionHeight = () => Math.min(256, contentHeight())
-  // The popup's selected row overlays the center of the 32 px trigger when every row fits.
-  const placementOffset = () => shadcn() && contentHeight() <= 256
-    ? -(16 + 1 + 4 + 24 + 2 + Math.max(0, selectedIndex() + 1) * 30 + 14)
+  const optionHeight = () => Math.min(theme().selectMaxPopupHeight, contentHeight())
+  // Align the selected compact row with the trigger when the whole menu fits.
+  const placementOffset = () => shadcn() && contentHeight() <= theme().selectMaxPopupHeight
+    ? -(theme().selectCompactHeight / 2 + 1 + 4 + 24 + 2
+      + Math.max(0, selectedIndex() + 1) * (theme().selectCompactRowHeight + 2)
+      + theme().selectCompactRowHeight / 2)
     : undefined
 
-  return <column width={props.width ?? '100%'} height={props.height}
+  return <column width={width()} height={props.height}
     minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
     grow={props.grow} shrink={props.shrink} alignSelf={props.alignSelf} margin={props.margin} gap={theme().spacing}>
-    {!shadcn() ? <text color={theme().textMuted} fontSize={12}>{props.label}</text> : null}
+    {!shadcn() ? <text color={theme().textMuted} fontSize={theme().fieldLabelSize}>{props.label}</text> : null}
     <focusScope
-      id={id()}
+      id={id}
       role="comboBox"
       accessibleName={props.label}
       accessibleValue={selected()?.label ?? ''}
-      enabled={!disabled() && !fixedOpen()}
+      enabled={!disabled()}
+      mouseCursor={disabled() ? 'notAllowed' : 'pointer'}
       expandable={true}
       expanded={expanded()}
-      controls={popupId()}
+      controls={popupId}
       hasPopup="listBox"
       activeDescendant={expanded() && currentIndex() >= 0
-        ? `${id()}-option-${encodeURIComponent(props.options[currentIndex()]!.value)}` : undefined}
+        ? `${id}-option-${encodeURIComponent(props.options[currentIndex()]!.value)}` : undefined}
       keyboardActivation="none"
       onClick={() => expanded() ? setOpen(false) : showOptions()}
       onKey={onKey}
     >
       <rectangle
-        width={width()}
-        height={shadcn() ? 32 : 40}
+        width="100%"
+        height={shadcn() ? theme().selectCompactHeight : theme().inputHeight}
         padding={theme().spacing}
         background={theme().surface}
-        border={{ width: 1, color: disabled() ? theme().border : theme().border }}
+        border={{ width: 1, color: theme().border }}
         radii={theme().radius}
         focusBorderColor={theme().focusRing}
         opacity={props.disabled ? 0.55 : 1}
@@ -119,10 +121,10 @@ export function Select(props: SelectProps): JSX.Element {
       </rectangle>
     </focusScope>
     {expanded() ? <popupWindow
-      id={popupId()}
+      id={popupId}
       role="listBox"
       accessibleName={props.label}
-      anchor={id()}
+      anchor={id}
       placement="bottomStart"
       placementOffset={placementOffset()}
       width={width()}
@@ -136,17 +138,18 @@ export function Select(props: SelectProps): JSX.Element {
       <rectangle
         width="100%"
         background={theme().surface}
+        clip={true}
         border={{ width: theme().overlayBorderWidth, color: theme().border }}
         radii={theme().overlayRadius}
         shadow={{ offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
       >
-        <scrollView width="100%" height={optionHeight()}>
+        <scrollView width="100%" height={optionHeight()} scrollY={true}>
           <column width="100%" gap={2} padding={4}>
             {shadcn() ? <container height={24} padding={{ start: 6, top: 3 }}>
-              <text color={theme().textMuted} fontSize={12}>{props.label}</text>
+              <text color={theme().textMuted} fontSize={theme().fieldLabelSize}>{props.label}</text>
             </container> : null}
             {shadcn() ? <focusScope
-              id={`${id()}-placeholder`}
+              id={`${id}-placeholder`}
               role="option"
               accessibleName={props.placeholder ?? 'Choose an option'}
               selected={!selected()}
@@ -171,7 +174,7 @@ export function Select(props: SelectProps): JSX.Element {
               </touchArea>
             </focusScope> : null}
             {props.options.length ? props.options.map((option, index) => {
-              const optionId = `${id()}-option-${encodeURIComponent(option.value)}`
+              const optionId = `${id}-option-${encodeURIComponent(option.value)}`
               const active = () => index === currentIndex()
               return <focusScope
                 id={optionId}

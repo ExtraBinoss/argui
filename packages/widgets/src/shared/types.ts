@@ -39,19 +39,23 @@ export type ButtonSize = 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | '
 export type ButtonIconSize = Extract<ButtonSize, `icon${string}`>
 
 /** Props shared by Solid and React buttons, excluding framework-specific children. */
-export type ButtonOptions = WidgetLayoutProps & {
+export type ButtonOptions = Omit<WidgetLayoutProps, 'height' | 'minHeight' | 'maxHeight'> & {
   variant?: ButtonVariant
-  /** Whether a pointer press gently scales the button; enabled by default. */
+  /** Whether a pointer press moves the button down one pixel; enabled by default. */
   pressAnimation?: boolean
   /** Horizontal alignment of the button content. */
   contentAlign?: 'start' | 'center' | 'end'
-  /** Pressed state exposed to assistive technology for a toggle-style button. */
+  /** Use pill corners on an ungrouped button. */
+  rounded?: boolean
+  /** Controlled selected state of a toggle button, exposed as pressed to assistive technology. */
   pressed?: boolean
   disabled?: boolean
   onClick: () => void
   iconOnly?: boolean
   expanded?: boolean
   controls?: string
+  /** Popup role advertised by this button; set by the component that owns the popup. */
+  hasPopup?: 'menu' | 'listBox' | 'dialog' | 'grid' | 'tree'
 } & (
   | { iconOnly: true; size?: ButtonSize; accessibleName: string }
   | { iconOnly?: false; size: ButtonIconSize; accessibleName: string }
@@ -65,17 +69,23 @@ export type ButtonGroupOptions = WidgetLayoutProps & {
   directionScope?: 'ltr' | 'rtl'
 }
 
+/** Controlled, read-only, or autonomous value ownership for a text field. */
+type InputValueOptions =
+  | { value: string; onValueChange: (value: string) => void; defaultValue?: never; readOnly?: boolean }
+  | { value: string; onValueChange?: never; defaultValue?: never; readOnly: true }
+  | { value?: never; defaultValue?: string; onValueChange?: (value: string) => void; readOnly?: boolean }
+
 /** Props shared by both native text input implementations. */
-export type InputFieldOptions = WidgetLayoutProps & {
-  value?: string
-  defaultValue?: string
-  onValueChange?: (value: string) => void
+export type InputFieldOptions = WidgetLayoutProps & InputValueOptions & {
   onSubmit?: (value: string) => void
   placeholder?: string
   type?: 'text' | 'search' | 'password'
   disabled?: boolean
-  readOnly?: boolean
   invalid?: boolean
+  /** Accessible help text announced with the native editor. */
+  description?: string
+  /** Exposes a required value to assistive technology. */
+  required?: boolean
 } & (
   | { label: string; accessibleName?: string }
   | { label?: undefined; accessibleName: string }
@@ -111,20 +121,20 @@ export interface SelectOption {
 export type SelectVariant = 'default' | 'shadcn'
 
 /** Shared options for the Solid and React Select implementations. */
-export interface SelectOptions extends WidgetLayoutProps {
+export type SelectOptions = WidgetLayoutProps & {
   /** Standard field or compact trigger with its group title inside the open menu. */
   variant?: SelectVariant
   options: readonly SelectOption[]
-  value?: string
-  defaultValue?: string
-  onValueChange?: (value: string) => void
-  open?: boolean
-  defaultOpen?: boolean
-  onOpenChange?: (open: boolean) => void
   label: string
   placeholder?: string
   disabled?: boolean
-}
+} & (
+  | { value: string; onValueChange?: (value: string) => void; defaultValue?: never }
+  | { value?: never; defaultValue?: string; onValueChange?: (value: string) => void }
+) & (
+  | { open: boolean; onOpenChange: (open: boolean) => void; defaultOpen?: never }
+  | { open?: never; defaultOpen?: boolean; onOpenChange?: (open: boolean) => void }
+)
 
 /** Keyboard event names accepted by the native select's key handler. */
 export function keyName(payload: unknown): string | undefined {

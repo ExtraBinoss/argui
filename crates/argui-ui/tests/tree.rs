@@ -14,6 +14,15 @@ mod event;
 #[path = "tree/animation.rs"]
 mod animation;
 
+#[path = "tree/animation/binding_benchmark.rs"]
+mod binding_benchmark;
+
+#[path = "tree/transition/benchmark.rs"]
+mod transition_benchmark;
+
+#[path = "tree/transition/performance.rs"]
+mod transition_performance;
+
 #[test]
 fn replacing_editor_value_obeys_read_only_filters_and_emits_input() {
     use argui_ui::{EventHandlerId, EventListener, EventOwnerId, EventType, UiEventKind};

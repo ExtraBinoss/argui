@@ -64,6 +64,7 @@ pub struct Spring<T> {
 
 impl<T: MotionValue> Spring<T> {
     /// Creates a spring from current value, target, initial velocity, and config.
+    /// Snaps to the target when both rest thresholds are already satisfied.
     ///
     /// # Errors
     /// Returns a physics error if `config` contains invalid coefficients or thresholds.
@@ -77,9 +78,9 @@ impl<T: MotionValue> Spring<T> {
         let active = value.subtract(target).magnitude() > config.rest_delta
             || velocity.magnitude() > config.rest_speed;
         Ok(Self {
-            value,
+            value: if active { value } else { target },
             target,
-            velocity,
+            velocity: if active { velocity } else { T::zero() },
             config,
             active,
         })
@@ -109,18 +110,28 @@ impl<T: MotionValue> Spring<T> {
         self.active
     }
 
-    /// Changes the target while preserving the current value and velocity.
+    /// Changes the target while preserving the current value and velocity until
+    /// both rest thresholds are satisfied, then snaps exactly to the target.
     pub fn retarget(&mut self, target: T) {
         self.target = target;
         self.active = self.value.subtract(target).magnitude() > self.config.rest_delta
             || self.velocity.magnitude() > self.config.rest_speed;
+        if !self.active {
+            self.value = target;
+            self.velocity = T::zero();
+        }
     }
 
-    /// Replaces the current velocity and updates the active state.
+    /// Replaces the current velocity and updates the active state, snapping to
+    /// the target when both rest thresholds are satisfied.
     pub fn set_velocity(&mut self, velocity: T) {
         self.velocity = velocity;
         self.active = self.value.subtract(self.target).magnitude() > self.config.rest_delta
             || velocity.magnitude() > self.config.rest_speed;
+        if !self.active {
+            self.value = self.target;
+            self.velocity = T::zero();
+        }
     }
 
     /// Advances the spring by `elapsed`; returns whether its value changed.
@@ -128,6 +139,7 @@ impl<T: MotionValue> Spring<T> {
         if !self.active || elapsed == Duration::ZERO {
             return false;
         }
+        let previous = self.value;
         let seconds = elapsed.as_secs_f64();
         let displacement = self.value.subtract(self.target);
         let frequency = (self.config.stiffness / self.config.mass).sqrt();
@@ -161,7 +173,7 @@ impl<T: MotionValue> Spring<T> {
             self.velocity = T::zero();
             self.active = false;
         }
-        true
+        self.value != previous
     }
 }
 

@@ -11,11 +11,24 @@ struct TextVisual {
     decorations: Vec<PreparedDecoration>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 struct SceneItem {
     command: DisplayCommand,
     text: Option<Arc<TextVisual>>,
     bounds: Option<DamageRegion>,
+}
+
+impl PartialEq for SceneItem {
+    /// Compares scene content, skipping glyph and decoration scans for retained text visuals.
+    fn eq(&self, other: &Self) -> bool {
+        self.command == other.command
+            && self.bounds == other.bounds
+            && match (&self.text, &other.text) {
+                (Some(left), Some(right)) => Arc::ptr_eq(left, right) || left == right,
+                (None, None) => true,
+                _ => false,
+            }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -212,20 +225,22 @@ impl DamageSnapshot {
         if !tracking.enabled {
             return DamagePlan::Full;
         }
-        if self.items == current.items {
+        let (changed, mut regions) = if self.items.len() == current.items.len() {
+            let mut changed = false;
+            let mut regions = Vec::new();
+            for (old, new) in self.items.iter().zip(&current.items) {
+                if old != new {
+                    changed = true;
+                    regions.extend([old.bounds, new.bounds].into_iter().flatten());
+                }
+            }
+            (changed, regions)
+        } else {
+            (true, changed_middle(self, current))
+        };
+        if !changed {
             return DamagePlan::Unchanged;
         }
-        let mut regions = if self.items.len() == current.items.len() {
-            self.items
-                .iter()
-                .zip(&current.items)
-                .filter(|(old, new)| old != new)
-                .flat_map(|(old, new)| [old.bounds, new.bounds])
-                .flatten()
-                .collect::<Vec<_>>()
-        } else {
-            changed_middle(self, current)
-        };
         if let Some(effects) = effects {
             if current
                 .effect_layers

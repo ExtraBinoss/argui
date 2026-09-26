@@ -103,7 +103,6 @@ pub fn run_desktop_with_services(
     let bundle_path = std::env::var_os("ARGUI_APP_BUNDLE")
         .map(PathBuf::from)
         .or_else(dev_bundle_path);
-    let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
         services,
@@ -122,7 +121,6 @@ pub fn run_desktop_with_services(
                 RendererConfig::default()
                     .profiling(cfg!(debug_assertions) || cfg!(feature = "dev-metrics"))
                     .blur_algorithm(gallery_blur_algorithm())
-                    .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 host,
                 assets,
@@ -174,7 +172,6 @@ pub fn run_android(
                 .map(|path| path.join("gallery-core.mjs"))
         })
         .flatten();
-    let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
         Arc::new(ServiceRegistry::with_builtins()),
@@ -203,7 +200,6 @@ pub fn run_android(
                 RendererConfig::default()
                     .profiling(cfg!(debug_assertions) || cfg!(feature = "dev-metrics"))
                     .blur_algorithm(gallery_blur_algorithm())
-                    .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 text_engine,
                 host,

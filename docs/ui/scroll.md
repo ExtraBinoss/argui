@@ -16,12 +16,12 @@ nested clips, hit regions, quads, and prepared glyphs translate together without
 recomputing Taffy or reshaping text. Hover is recomputed under the stationary
 pointer after movement.
 
-Pixel deltas stay pixel precise. `ScrollPhysics::Hybrid` preserves momentum
-provided by the platform and starts Argui's exponential continuation only after
-native events become quiet. The integral is evaluated over elapsed time, so the
+Pixel deltas stay pixel precise. Scroll containers use light inertia by default:
+input moves content immediately, then Argui adds a short exponential continuation
+after events become quiet. The integral is evaluated over elapsed time, so the
 travel distance is stable at 60, 120, and 144 Hz. Line wheels use the configured
-logical line size and remain direct. `Native`, `Direct`, and fully configured
-`Inertial` policies are available per container. Overscroll is clamped by
+logical line size. `Hybrid`, `Native`, `Direct`, and fully configured `Inertial`
+policies are available per container. Overscroll is clamped by
 default; elastic resistance, limit, spring, and damping are explicit opt-ins.
 
 Sibling paint and hit-test order use stable `z_index` ordering. `Position::Sticky`
@@ -36,13 +36,25 @@ chrome without changing the scroll viewport. Hit testing records the track's
 actual position in paint order, so a later sibling painted above it owns the
 overlap while the remaining track stays interactive.
 
-In TSX, `scrollView` has no scrollbar by default. Setting `scrollbarSide`
-(`"left"` or `"right"`), `scrollbarWidth`, `scrollbarThumbColor`, or
-`scrollbarHoverColor` opts into its native vertical scrollbar. The left side
-is useful for a sidebar adjacent to the window edge. The thumb changes color
-on hover through retained native state; scrolling does not call JavaScript
-for each frame. The Rust API exposes the same choice through
-`ScrollbarStyle::side(ScrollbarSide::Left)`.
+In TSX, `scrollView` and `VirtualList` show native scrollbars by default when
+their content overflows. Set `scrollbarVisible={false}` to hide one while
+retaining scrolling. `scrollbarSide` selects `"left"` or `"right"` on a
+`scrollView`; `scrollbarWidth` sets the resting width in logical pixels.
+`scrollbarTrackColor`, `scrollbarThumbColor`, `scrollbarHoverColor`, and
+`scrollbarPressedColor` style the track and the thumb's resting, hovered, and
+dragged states. `scrollbarHoverWidth` expands the thumb and its draggable
+geometry together on hover, with a 140 ms native animation. The default track
+and thumb remain pill shaped throughout growth. Hover growth is
+enabled by default; set `scrollbarHoverWidth` equal to `scrollbarWidth` to keep
+a fixed width. The Rust API exposes the same geometry through `ScrollbarStyle::side`, `.width`,
+`.hover_width`, and `.hover_duration`. None of these interaction frames calls
+JavaScript or lays out the content again.
+
+`scrollMomentum` is available on `scrollView` and `VirtualList`. It accepts a
+number from 0 to 1: 0 is direct scrolling, while larger values retain more
+momentum after wheel or touchpad input stops. Leave it unset for the light
+inertia default. The gallery's **Examples → Scrollbars** page
+lets you compare Direct, Light, and Glide on the same viewport.
 
 `ScrollbarPartStyle` gives the track and thumb their own base `QuadStyle`,
 `StylePatch` values, and `StyleTransition`. Hover and thumb drag feed the same
@@ -60,8 +72,7 @@ scroll ancestor from the inside out. A focused control is revealed automatically
 and direct wheel, touch, or scrollbar input interrupts an active smooth request.
 
 `VirtualList` supports fixed and measured variable-height rows through one API.
-It computes a
-visible range plus bounded overscan and represents unseen space with two
+It computes a visible range plus bounded overscan and represents unseen space with two
 lightweight spacers. A logical list of one million rows therefore creates only
 tens of elements. Wheel movement uses the translation path inside a stable
 overscan chunk; crossing a chunk boundary rebuilds only the bounded visible
@@ -69,6 +80,10 @@ window. Variable rows are measured from their real layout, feed an `O(log n)`
 prefix index, rebuild the virtual window until it settles, and correct the
 retained offset to preserve the visible item. Generic keyed scroll anchoring
 also preserves the first visible keyed descendant when content above it changes.
+For genuinely uniform rows, set `variable={false}` and match `estimate` to the
+rendered row height; this avoids measurement corrections during fast scrolling.
+Increase `overscan` when fast input exposes the edge of a mounted chunk, while
+keeping the mounted range bounded.
 `VirtualList::scroll_to` navigates fixed or variable data with the same four
 alignment modes. Applications that retain a controlled offset can use
 `VList::window_changed` before notifying their model; offsets inside the same
@@ -124,5 +139,5 @@ have an offscreen/filter cost in the existing render graph; custom shaders retai
 their usual responsibility for output alpha and any expansion beyond the source.
 
 The former gallery's **Effects → Scroll shadow** demonstration is archived in
-`OLD_API/`. The active gallery's `VirtualList` page exercises the v2 viewport
-and bounded list window.
+`OLD_API/`. The active gallery's **Components → Scrolling** page compares a
+regular viewport with a bounded virtualized list window.

@@ -107,7 +107,7 @@ fn scroll_view_and_focus_scope_expose_native_behavior() {
     let scroll = registry
         .construct(builtin::SCROLL_VIEW, &NativeElementInput::new())
         .unwrap();
-    assert!(scroll.scroll.as_ref().unwrap().scrollbar.is_none());
+    assert!(scroll.scroll.as_ref().unwrap().scrollbar.is_some());
     assert_eq!(scroll.style.overflow.y, Overflow::Auto);
 
     let toggle_scope = registry
@@ -157,7 +157,14 @@ fn native_scroll_view_tracks_viewport_resize() {
         .unwrap();
     assert_eq!(short.scroll_regions.len(), 1);
     assert!(short.scroll_regions[0].max_offset.y > 100.0);
-    assert!(short.scroll_regions[0].scrollbar.is_none());
+    assert!(
+        short.scroll_regions[0]
+            .scrollbar
+            .as_ref()
+            .unwrap()
+            .vertical
+            .is_some()
+    );
     tree.scroll(
         Point::new(10.0, 10.0),
         ScrollDelta::Pixels(Point::new(0.0, -50.0)),
@@ -171,7 +178,27 @@ fn native_scroll_view_tracks_viewport_resize() {
         .unwrap();
     assert_eq!(tall.scroll_regions.len(), 1);
     assert!(tall.scroll_regions[0].max_offset.y < short.scroll_regions[0].max_offset.y);
-    assert!(tall.scroll_regions[0].scrollbar.is_none());
+    assert!(
+        tall.scroll_regions[0]
+            .scrollbar
+            .as_ref()
+            .unwrap()
+            .vertical
+            .is_some()
+    );
+
+    let fitting = layout
+        .compute(&mut tree, &mut text, Size::new(200.0, 300.0))
+        .unwrap();
+    assert_eq!(fitting.scroll_regions[0].max_offset.y, 0.0);
+    assert!(
+        fitting.scroll_regions[0]
+            .scrollbar
+            .as_ref()
+            .unwrap()
+            .vertical
+            .is_none()
+    );
 }
 #[test]
 fn media_fit_modes_and_image_sampling_are_validated() {

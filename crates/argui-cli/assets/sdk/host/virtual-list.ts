@@ -50,7 +50,9 @@ interface VirtualListBaseOptions {
   variable?: boolean
   /** Extra rows retained around the visible range. */
   overscan?: number
-  /** Show a native scrollbar; showing a colored thumb also enables it by default. */
+  /** Native scroll glide strength from 0 (direct) to 1 (longest glide). */
+  scrollMomentum?: number
+  /** Show a native scrollbar when content overflows; enabled by default. */
   scrollbarVisible?: boolean
   /** Native scrollbar thickness in logical pixels. */
   scrollbarWidth?: number
