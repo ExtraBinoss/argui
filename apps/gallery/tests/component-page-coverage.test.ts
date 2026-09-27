@@ -17,13 +17,11 @@ test('gallery contains the paired Solid and React widget pages', () => {
   }
 })
 
-test('each framework exports the same widgets and active sources avoid the archive', () => {
+test('each framework exports the same widgets', () => {
   const widgets = ['button', 'button-group', 'checkbox', 'switch', 'input-field', 'select',
     'tabs', 'slider', 'progress', 'popover', 'tooltip', 'virtual-list']
   for (const adapter of ['solid', 'react']) {
     const index = readFileSync(new URL(`../../../packages/widgets/src/${adapter}/index.ts`, import.meta.url), 'utf8')
-    const gallery = readFileSync(new URL(`../src/${adapter}/gallery.tsx`, import.meta.url), 'utf8')
     for (const widget of widgets) expect(index).toContain(`'./${widget}'`)
-    expect(gallery).not.toContain('OLD_API')
   }
 })

@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "test:ts": "bun run build:gallery && bun --conditions=browser test --path-ignore-patterns=OLD_API packages/host/tests/*.test.ts packages/host/tests/*.test.mjs packages/react/tests/*.test.ts packages/react/tests/*.test.tsx packages/solid/tests/*.test.ts packages/solid/tests/*.test.tsx packages/i18n/tests/*.test.ts packages/widgets/tests/*.test.ts packages/widgets/tests/*.test.tsx apps/gallery/tests/*.test.ts && node --test apps/gallery/tests/*.test.mjs",
+    "test:ts": "bun run build:gallery && bun --conditions=browser test packages/host/tests/*.test.ts packages/host/tests/*.test.mjs packages/react/tests/*.test.ts packages/react/tests/*.test.tsx packages/solid/tests/*.test.ts packages/solid/tests/*.test.tsx packages/i18n/tests/*.test.ts packages/widgets/tests/*.test.ts packages/widgets/tests/*.test.tsx apps/gallery/tests/*.test.ts && node --test apps/gallery/tests/*.test.mjs",
     "check:ts": "tsc --noEmit -p tsconfig.json",
     "generate:jsx": "bun packages/solid/scripts/generate-jsx.mjs && bun packages/react/scripts/generate-jsx.mjs && node scripts/sync-cli-sdk.mjs",
     "generate:assets": "bun apps/gallery/scripts/generate-assets.mjs",

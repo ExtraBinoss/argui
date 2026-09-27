@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
 import { buttonPaint } from '../src/shared/button-paint'
 import { keyName, nextEnabledOption, type SelectOption } from '../src/shared/types'
 import { neutralDark, neutralLight, widgetThemeDefinition, type WidgetTheme } from '../src/shared/theme'
@@ -41,18 +40,8 @@ test('select keys accept the native payload shape and ignore malformed data', ()
   expect(keyName(null)).toBeUndefined()
 })
 
-test('widget theme exposes every official Neutral role and system variants', () => {
-  const reference = readFileSync(new URL('../../../docs/references/shadcn-ui/cli/index.css', import.meta.url), 'utf8')
-  const cssBlock = (selector: string) => reference.match(new RegExp(`${selector} \\{([^}]+)\\}`))?.[1] ?? ''
-  const cssValue = (block: string, name: string) => {
-    const cssName = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`).replace(/(\D)(\d)/g, '$1-$2')
-    return block.match(new RegExp(`--${cssName}: ([^;]+);`))?.[1]
-  }
-  const lightCss = cssBlock(':root')
-  const darkCss = cssBlock('\\.dark')
+test('widget theme exposes every Neutral role and system variants', () => {
   for (const name of Object.keys(neutralLight) as (keyof typeof neutralLight)[]) {
-    expect(neutralLight[name]).toBe(cssValue(lightCss, name) ?? '')
-    expect(neutralDark[name]).toBe(cssValue(darkCss, name) ?? '')
     expect(widgetThemeDefinition.tokens[name]?.default).toBe(neutralLight[name])
     expect(widgetThemeDefinition.variants?.dark?.[name]).toBe(neutralDark[name])
   }

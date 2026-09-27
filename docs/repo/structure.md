@@ -13,7 +13,6 @@ need; TSX applications use the host and framework packages under `packages/`.
 | `crates/` | Rust engine, platform, and integration libraries |
 | `mobile/android/` | Gradle `NativeActivity` shell for the TSX gallery |
 | `packages/` | TypeScript host, Solid and React adapters, and shared widgets |
-| `web/` | Static browser helper scripts |
 | `docs/` | Architecture, contracts, platform limits, and contributor guides |
 | `scripts/` | Quality, profiling, packaging, release, and development tools |
 | `tests/scripts/` | Tests for repository automation |

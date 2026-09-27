@@ -61,6 +61,5 @@ input regions, native popups, and backend limits. Then use the focused guides:
   [Linux graphical testing](contributing/linux-testing.md), and
   [releases](contributing/releases.md)
 
-The `docs/references/shadcn-ui/` snapshot is source material for component
-work and tests, not an Argui API guide. The current API is defined by the
-Rust schema and the generated Solid and React JSX declarations.
+The current API is defined by the Rust schema and the generated Solid and
+React JSX declarations.

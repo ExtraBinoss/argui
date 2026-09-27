@@ -185,6 +185,6 @@ assets; widgets do not impose an icon library.
   and run `argui-generate-jsx` for both adapters.
 
 For gallery checks, use `bun run check:ts` and `bun run test:ts`; the latter
-selects Solid's browser condition and ignores `OLD_API/`. Follow the graphical
+selects Solid's browser condition. Follow the graphical
 testing procedure in `AGENTS.md`, or the user's explicit request to inspect the
 visible app themselves. The final `quality.sh` gate is governed by `AGENTS.md`.
