@@ -408,7 +408,7 @@ fn vite_config(options: &Options) -> String {
         "oxc: { jsx: { runtime: 'automatic', importSource: '@argui/react' } },"
     };
     format!(
-        "import {{ defineConfig }} from 'vite'\n{plugin}export default defineConfig(({{ mode }}) => ({{ root: import.meta.dirname, {adapter} resolve: {{ preserveSymlinks: true }}, define: {{ __ARGUI_DEV_ASSETS__: JSON.stringify(process.env.ARGUI_APP_RELEASE !== '1'), 'process.env.NODE_ENV': JSON.stringify('production') }}, ssr: {{ noExternal: true, resolve: {{ conditions: ['browser'] }} }}, build: mode === 'native' ? {{ ssr: 'src/main.tsx', outDir: 'dist/native', target: 'es2022', rollupOptions: {{ output: {{ entryFileNames: 'app.mjs' }} }} }} : {{ outDir: 'dist/web', target: 'es2022' }} }}))\n"
+        "import {{ defineConfig }} from 'vite'\n{plugin}export default defineConfig(({{ mode }}) => ({{ root: import.meta.dirname, {adapter} resolve: {{ preserveSymlinks: true }}, define: {{ __ARGUI_DEV_ASSETS__: JSON.stringify(process.env.ARGUI_APP_RELEASE !== '1'), 'process.env.NODE_ENV': JSON.stringify('production') }}, ssr: {{ noExternal: true, resolve: {{ conditions: ['browser'] }} }}, build: mode === 'native' ? {{ ssr: 'src/main.tsx', outDir: 'dist/native', target: 'es2022', rollupOptions: {{ output: {{ entryFileNames: 'app.mjs' }} }} }} : {{ outDir: 'dist/web', assetsDir: 'bundles', target: 'es2022' }} }}))\n"
     )
 }
 

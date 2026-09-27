@@ -64,7 +64,7 @@ case "$1" in
     if [ "$2" = build ]; then
       case "$*" in
         *native*) if [ "${ARGUI_FAKE_NO_BUNDLE:-}" != 1 ]; then mkdir -p dist/native; echo 'export const app=1' > dist/native/app.mjs; fi ;;
-        *web*) mkdir -p dist/web; echo '<html></html>' > dist/web/index.html ;;
+        *web*) mkdir -p dist/web/bundles; echo '<html></html>' > dist/web/index.html; echo 'bundle' > dist/web/bundles/app.js; echo 'wasm' > dist/web/bundles/app.wasm ;;
       esac
     fi
     if [ "${ARGUI_FAKE_VITE_FAIL:-}" = 1 ]; then exit 2; fi
@@ -207,6 +207,8 @@ fn solid_builds_both_targets_and_packages_native() {
     assert!(app.join("dist/desktop/app.mjs").is_file());
     assert!(app.join("dist/desktop/assets").is_dir());
     assert!(app.join("dist/web/index.html").is_file());
+    assert!(app.join("dist/web/bundles/app.js").is_file());
+    assert!(app.join("dist/web/bundles/app.wasm").is_file());
     assert!(
         app.join("node_modules/@argui/web-host/argui_app_web_bg.wasm")
             .is_file()
