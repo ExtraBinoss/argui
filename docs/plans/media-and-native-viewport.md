@@ -1,5 +1,7 @@
 # Optional media and native TSX viewport
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 The starting point is remote `codex/dsl-gallery-live` at `518a808`. This plan
 replaces the separate static-media crates and exposes an application-owned GPU
 viewport to Solid and React. A media decoder, GStreamer pipeline, video file,

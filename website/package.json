@@ -1,0 +1,32 @@
+{
+  "name": "argui-website",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "scripts": {
+    "dev": "bun run docs:build && nuxt dev --host 127.0.0.1",
+    "build": "bun run docs:build && bun scripts/check-gallery.mjs && nuxt build",
+    "generate": "bun run docs:build && bun scripts/check-gallery.mjs && nuxt generate",
+    "preview": "nuxt preview --host 127.0.0.1",
+    "typecheck": "bun run docs:build && nuxt typecheck",
+    "docs:build": "bun scripts/build-docs.mjs",
+    "gallery:build": "bun scripts/build-gallery.mjs",
+    "gallery:check": "bun scripts/check-gallery.mjs",
+    "test": "bun run docs:build && bun test tests/*.test.ts",
+    "test:browser": "bun tests/browser.mjs"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "1.0.2",
+    "marked": "15.0.12",
+    "nuxt": "4.5.2",
+    "pinia": "4.0.3",
+    "vue": "3.5.42"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4",
+    "shiki": "2.5.0",
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.11"
+  }
+}

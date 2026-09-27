@@ -97,8 +97,8 @@ let renderer = argui_render::RendererConfig::default().renderer_fallback(false);
 If every enabled configuration fails, `RuntimeEvent::RendererFailed` contains each
 attempt and its initialization error.
 
-Compositor support is detected at runtime. The development machine's Mutter 50.4
-does not expose either supported Wayland blur protocol and uses fallback.
+Compositor support is detected at runtime. When neither supported Wayland blur
+protocol is advertised, Argui paints the configured fallback color.
 
 References: [Wayland protocol](https://gitlab.freedesktop.org/wayland/wayland-protocols/-/blob/main/staging/ext-background-effect/ext-background-effect-v1.xml),
 [KDE WindowEffects](https://github.com/KDE/kwindowsystem/blob/master/src/platforms/xcb/kwindoweffects.cpp),

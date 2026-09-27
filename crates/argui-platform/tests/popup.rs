@@ -81,4 +81,10 @@ fn ui_zoom_preserves_physical_desktop_geometry() {
     for factor in [0.0, -1.0, f32::NAN, f32::INFINITY] {
         assert!(desktop.with_ui_zoom(factor).is_none());
     }
+    assert!(desktop.with_ui_zoom(f32::MAX).is_none());
+    let tiny = PopupEnvironment {
+        scale: f32::MIN_POSITIVE,
+        ..desktop
+    };
+    assert!(tiny.with_ui_zoom(f32::MIN_POSITIVE).is_none());
 }

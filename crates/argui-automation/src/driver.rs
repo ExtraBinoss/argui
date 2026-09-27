@@ -15,7 +15,7 @@ use argui_ui::{NodeId, TreeUpdate, UiEventKind, UiTree};
 use serde::Serialize;
 use web_time::Instant;
 
-const FONT: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+const FONT: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
 
 mod actions;
 mod frame;

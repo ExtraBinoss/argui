@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "totalBytes": 2494,
+  "totalBytes": 2715,
   "assets": [
     {
       "key": "gallery/moon.svg",
@@ -29,6 +29,13 @@
       "id": 5782066887110427,
       "bytes": 243,
       "path": "gallery/system.svg"
+    },
+    {
+      "key": "tabler/check.svg",
+      "kind": "svg",
+      "id": 4418227052333180,
+      "bytes": 221,
+      "path": "tabler/check.svg"
     },
     {
       "key": "tabler/chevron-down.svg",

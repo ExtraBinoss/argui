@@ -47,6 +47,7 @@ fn rectangular_masks_coalesce_and_invalid_or_empty_shapes_fail_safely() {
         ClipChain::default(),
         shape(Rect::default(), 4.0),
         shape(rect(0.0, 0.0, 0.5, 0.5), 0.0),
+        shape(rect(0.0, 0.0, 10.0, 0.5), 0.0),
     ] {
         assert!(region_rectangles(&[empty]).unwrap().is_empty());
     }

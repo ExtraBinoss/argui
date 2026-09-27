@@ -380,6 +380,7 @@ fn install_rejects_a_new_output_during_staging() {
 fn production_registry_matches_split_widget_files() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let registry = fs::read_to_string(root.join("components/registry.json")).unwrap();
+    assert_eq!(registry, include_str!("../registry.json"));
     let manifest: serde_json::Value = serde_json::from_str(&registry).unwrap();
     let names = manifest["components"]
         .as_object()

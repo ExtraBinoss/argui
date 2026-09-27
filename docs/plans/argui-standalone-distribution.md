@@ -1,5 +1,7 @@
 # Distribution autonome d’Argui et composants copiables
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 > **Archive : plan remplacé.** Suivre le [plan global Argui](argui-crate-theme-decisions.md). La proposition ci-dessous d’une seule crate publiée n’est plus retenue ; le nouveau plan reprend aussi les décisions CLI, thème, composants et mobiles.
 
 Statut : plan pour une prochaine tâche. Aucune étape ci-dessous n’est encore implémentée.

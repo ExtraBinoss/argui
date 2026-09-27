@@ -1,5 +1,7 @@
 # Cross-platform Argui automation plan
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 ## Goal
 
 Run the same TSX Argui app and TypeScript test without a visible window on

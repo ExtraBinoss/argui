@@ -32,6 +32,7 @@ pub(crate) const EMBEDDED: &[AssetInput<'static>] = &[
     AssetInput { key: "gallery/settings.svg", kind: AssetKind::Svg, id: 4003285612405311, bytes: include_bytes!("assets/gallery/settings.svg") },
     AssetInput { key: "gallery/sun.svg", kind: AssetKind::Svg, id: 2429037204418036, bytes: include_bytes!("assets/gallery/sun.svg") },
     AssetInput { key: "gallery/system.svg", kind: AssetKind::Svg, id: 5782066887110427, bytes: include_bytes!("assets/gallery/system.svg") },
+    AssetInput { key: "tabler/check.svg", kind: AssetKind::Svg, id: 4418227052333180, bytes: include_bytes!("assets/tabler/check.svg") },
     AssetInput { key: "tabler/chevron-down.svg", kind: AssetKind::Svg, id: 5981616865338806, bytes: include_bytes!("assets/tabler/chevron-down.svg") },
     AssetInput { key: "tabler/player-play.svg", kind: AssetKind::Svg, id: 6833585511893982, bytes: include_bytes!("assets/tabler/player-play.svg") },
     AssetInput { key: "tabler/search.svg", kind: AssetKind::Svg, id: 2000023927804256, bytes: include_bytes!("assets/tabler/search.svg") },

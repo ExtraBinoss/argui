@@ -1,4 +1,4 @@
-import { For, createSignal, onCleanup } from 'solid-js'
+import { For, createSignal, onCleanup, onMount } from 'solid-js'
 import type { ApplicationServices, ThemeRuntime } from '@argui/host'
 import { ThemeScope, useTheme, useThemeSnapshot } from '@argui/solid'
 import { Button, ButtonGroup, ButtonGroupSeparator, InputField, Popover, ScrollShadow, VirtualList, type WidgetTheme } from '@argui/widgets/solid'
@@ -19,6 +19,7 @@ import { LayoutScenarios } from './layout-scenarios'
 import { AnimationPage } from './animation-page'
 import { ExpressivePage } from './expressive-page'
 import { ScreenSpotlightPage } from './screen-spotlight-page'
+import { CustomElementsExample, CounterExample } from './docs-examples'
 import { mediaAssets } from '../../assets.generated'
 import { searchFromBackgroundKey } from '../search-key'
 import { applyGalleryTheme, colorFamilies, familySwatch, watchSystemFamily, type ColorFamily } from '../theme-colors'
@@ -41,13 +42,24 @@ const pages = [
   { id: 'animation', label: 'Animation', category: 'Examples' },
   { id: 'expressive', label: 'Expressive UI', category: 'Examples' },
   { id: 'screen-spotlight', label: 'Screen spotlight', category: 'Examples' },
+  { id: 'custom-elements', label: 'Custom elements', category: 'Examples' },
+  { id: 'counter', label: 'Counter state', category: 'Examples' },
 ] as const
 
 type PageId = typeof pages[number]['id']
 
+function initialPage(browser: boolean): PageId {
+  if (!browser || typeof window === 'undefined') return 'button'
+  const params = new URLSearchParams(window.location.search)
+  const example = params.get('example')
+  if (example === 'custom-elements' || example === 'counter') return example
+  const selected = params.get('component')
+  return pages.find(entry => entry.id === selected && entry.category === 'Widgets')?.id ?? 'button'
+}
+
 /** Renders a searchable sidebar, one widget page, and a compact settings popover. */
-export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: ApplicationServices }) {
-  const [page, setPage] = createSignal<PageId>('button')
+export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: ApplicationServices; browser: boolean }) {
+  const [page, setPage] = createSignal<PageId>(initialPage(props.browser))
   const [search, setSearch] = createSignal('')
   const [backgroundFocused, setBackgroundFocused] = createSignal(false)
   const [settingsOpen, setSettingsOpen] = createSignal(false)
@@ -55,6 +67,18 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: A
   const theme = useTheme<WidgetTheme>()
   const snapshot = useThemeSnapshot<WidgetTheme>()
   const selectedTheme = () => snapshot().variant ?? 'system'
+  onMount(() => {
+    if (!props.browser || typeof window === 'undefined') return
+    applyGalleryTheme(props.runtime, 'Neutral', 'light')
+    const receive = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== window.location.origin) return
+      if (event.data?.type !== 'argui:navigate') return
+      const selected = pages.find(entry => entry.id === event.data.component && entry.category === 'Widgets')
+      if (selected) setPage(selected.id)
+    }
+    window.addEventListener('message', receive)
+    onCleanup(() => window.removeEventListener('message', receive))
+  })
   onCleanup(watchSystemFamily(props.runtime, family))
   const chooseFamily = (next: ColorFamily) => {
     setFamily(next)
@@ -70,9 +94,11 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: A
     : page() === 'tabs' ? <TabsPage />
     : page() === 'slider' ? <SliderPage />
     : page() === 'progress' ? <ProgressPage />
-    : page() === 'popover' ? <PopoverPage />
-    : page() === 'tooltip' ? <TooltipPage />
+    : page() === 'popover' ? <PopoverPage desktop={!props.browser} />
+    : page() === 'tooltip' ? <TooltipPage desktop={!props.browser} />
     : page() === 'virtual-list' ? <VirtualListPage />
+    : page() === 'custom-elements' ? <CustomElementsExample />
+    : page() === 'counter' ? <CounterExample />
     : page() === 'layouting' ? <column width="100%" gap={16}><text color={theme().text} fontSize={24}>Layouting</text><LayoutScenarios /></column>
     : page() === 'scrollbars' ? <ScrollbarPage />
     : page() === 'expressive' ? <ExpressivePage />
@@ -84,7 +110,7 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: A
     onFocus={() => setBackgroundFocused(true)} onBlur={() => setBackgroundFocused(false)}
     onKey={(event) => { if (backgroundFocused()) setSearch((current) => searchFromBackgroundKey(current, event)) }}>
     <row width="100%" height="100%" background={theme().surface}>
-    <column id="gallery-sidebar" width={256} height="100%" shrink={0} padding={{ top: 16 }} gap={16} background={theme().sidebar}>
+    {!props.browser && <column id="gallery-sidebar" width={256} height="100%" shrink={0} padding={{ top: 16 }} gap={16} background={theme().sidebar}>
       <container padding={{ start: 24, end: 16 }}><text color={theme().text} fontSize={20}>Argui</text></container>
       <container padding={{ start: 16, end: 16 }}><InputField id="gallery-search" accessibleName="Search gallery" type="search"
         placeholder="Search gallery" value={search()} onValueChange={setSearch}
@@ -110,9 +136,9 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: A
           </ScrollShadow>
         </rectangle>
       </ThemeScope>
-    </column>
+    </column>}
     <column width="100%" height="100%" grow={1} minWidth={0}>
-      <row width="100%" padding={{ top: 12, right: 16, bottom: 4, left: 16 }} justifyContent="end">
+      {!(props.browser && (page() === 'custom-elements' || page() === 'counter')) && <row width="100%" padding={{ top: 12, right: 16, bottom: 4, left: 16 }} justifyContent="end">
         <Popover id="gallery-settings" trigger="Settings" placement="bottomEnd" contentWidth={300} blur={true}
           open={settingsOpen()} onOpenChange={setSettingsOpen}
           leading={<svg source={mediaAssets['gallery/settings.svg']} width={16} height={16} color={settingsOpen() ? theme().primary : theme().text} />}>
@@ -158,7 +184,7 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: A
               </Button></container>
             }} />
         </Popover>
-      </row>
+      </row>}
       <scrollView id="gallery-content" width="100%" height="100%" grow={1} scrollY={true}
         scrollbarSide="left" scrollbarWidth={3} scrollbarThumbColor={theme().border} scrollbarHoverColor={theme().textMuted}>
         <column width="100%" padding={24} gap={16}>{content()}</column>

@@ -3,8 +3,7 @@
 Read this with the [animation architecture](animation-architecture.md) before
 building a loader, gradient action, voice surface, or animated status. Motion
 must communicate a state and preserve a readable control. The gallery's
-[Expressive UI page](../../../apps/gallery/src/solid/expressive-page.tsx) is the
-native reference for the recipes below.
+Expressive UI page demonstrates the native recipes below.
 
 ## Place the effect
 

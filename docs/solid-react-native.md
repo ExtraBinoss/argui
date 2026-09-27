@@ -1,263 +1,53 @@
-# Solid and React native gallery
+# Solid and React host contract
 
-The gallery in `apps/gallery` renders Argui primitives through one Rust host.
-Solid Universal and React reconcile into the same transaction protocol; only
-`argui-host` materializes native `Element` descriptions, and `argui-runtime`
-owns the canonical `UiTree` on the UI thread. JavaScript does not own layout,
-paint, text shaping, or the accessibility tree.
+Solid Universal and React describe Argui elements through the same transaction
+protocol. `@argui/host` sends typed operations to `argui-host`; `argui-schema`
+defines their names and values. The Rust host reconciles those operations into
+the retained `UiTree`. JavaScript does not calculate layout, shape text, paint,
+or own the accessibility tree. The [architecture guide](architecture.md)
+describes the engine boundary.
 
-Applications written directly in Rust still use the existing `Render`/`AppModel`
-path and need no JavaScript engine. QuickJS is required only when the application
-uses the Solid or React TSX adapters; both paths share the native renderer.
+The desktop gallery embeds QuickJS. Bun builds and tests its TSX bundles; it
+is not the application runtime. The browser gallery initializes the WASM host
+and renders to a WebGPU canvas. `apps/gallery/src/web-mount.ts` bridges the
+same generated ABI to the browser host. A Rust application can use
+`argui-runtime` without either TSX adapter or QuickJS.
 
-Every built-in TSX primitive accepts the same typed accessibility properties.
-Custom components can compose roles, labels, states, relations, focus and
-actions without a framework-specific accessibility tree. See the
-[accessibility guide](ui/accessibility.md).
+## Identity and state
 
-## Build and run
+Framework `key` preserves reconciliation identity. Native `id` is optional and
+addressable for popup anchors, accessibility relations, and tests. Keep both
+stable across updates. Controlled widgets receive `value` and
+`onValueChange`; overlays use `open` and `onOpenChange`. See the
+[widget guide](ui/README.md) for the current component exports.
 
-Build the QuickJS application:
+Each framework adapter mounts one shared root and disposes it when the host
+ends. The CLI templates show the exact [Solid](../crates/argui-cli/assets/templates/solid-main.tsx)
+and [React](../crates/argui-cli/assets/templates/react-main.tsx) bootstrap
+functions. The native gallery uses the corresponding
+[Solid](../apps/gallery/src/solid/main.tsx) and
+[React](../apps/gallery/src/react/main.tsx) entry points.
 
-```sh
-./scripts/build-gallery.sh
-```
+## Platform boundary
 
-The command builds the Solid and React bundles, schema contract, and native
-QuickJS executable. Bun runs build scripts and TypeScript tests only; it is
-not shipped as an application runtime. Use `./scripts/linux-hidden-display.sh`
-for native Linux checks and inspect a saved capture. The application uses
-neither a browser nor a WebView.
+The browser host needs WebGPU. Native platform services such as native
+outside-window popups, native window movement, global shortcuts, and screen
+overlays require the appropriate desktop backend and are not Web capabilities.
+Feature availability must be checked before showing a demonstration that
+requires them. The [desktop guide](platform/desktop.md) describes the backend
+limits; [native mobile](native-mobile.md) records the Android shell and iOS
+integration boundary.
 
-## Shared TSX widgets
+The packaged Android gallery is a QuickJS Solid app. The repository does not
+include an iOS application shell or Xcode project. Native accessibility,
+rendering, and input support on one platform do not establish screen reader
+or interaction behavior on another; validate the target device and backend.
 
-Gallery controls are provided by the workspace package
-[`@argui/widgets`](../packages/widgets/package.json). It has `/solid` and
-`/react` entry points for six widgets: `Button`, `ButtonGroup`, `InputField`,
-`Select`, `Popover`, and `VirtualList`. Their props use the same public names. The root
-theme provider supplies the palette once; a local `ThemeScope` can override
-part of it for a subtree. Ordinary widgets generate their native IDs while
-mounted; give an explicit `id` for a test selector, anchor, or accessibility
-relation. The [layout guide](ui/layout.md) explains size, growth, grid,
-scrolling, and RTL on all three authoring surfaces.
+## Checks
 
-### Popover
-
-`Popover` owns its anchor, popup, dismissal, and focus restoration. Its trigger
-keeps its natural size; `contentWidth` sizes only the popup. Use `width` when
-the surrounding layout should also size the trigger.
-
-```tsx
-<Popover trigger="Filters" contentWidth={320}>
-  {/* Popup content */}
-</Popover>
-```
-
-The default is an uncontrolled, nonmodal popup. Escape and an outside pointer
-press dismiss it. Focus remains on the trigger unless `initialFocus="first"`
-is set for a popup with an input or another first control. Tab navigation is
-not trapped inside the popup. For controlled state, pass both `open` and
-`onOpenChange`; the type contract rejects `open` alone.
-
-```tsx
-<Popover trigger="Filters" open={open} onOpenChange={setOpen}>
-  {/* Popup content */}
-</Popover>
-```
-
-`accessibleLabel` replaces the trigger text as the accessible name when the
-visible label needs more context. `leading` and `trailing` accept application
-provided content beside the trigger text. The optional `id` provides a stable
-selector for automation. Surface, blur, radius, padding, width, border, and
-shadow defaults come from the shared `overlay*` theme tokens.
-
-## TSX internationalization
-
-[`@argui/i18n`](../packages/i18n/README.md) loads flat JSON catalogs into the
-Rust Fluent localizer. Its core entry provides `loadI18n(config)`, `tr(id, args?)`, and
-`selectLocale(locale)`. Import the framework adapter from
-`@argui/i18n/solid` or `@argui/i18n/react` and call `useI18n()` in a component to
-subscribe to locale changes. Message parsing and formatting stay in Rust; JSON
-catalogs imported by Vite participate in hot reload with the TSX bundle.
-
-## Runtime decision
-
-QuickJS is the sole JavaScript runtime for the native gallery and the current
-mobile path. Earlier desktop
-prototypes ran the same Solid bundle, but neither produced a viable mobile
-package here: Bun's standalone targets do not include Android or iOS, and the
-pinned `rusty_v8` Android ARM64 archive needed by `deno_core` returned HTTP
-404. No Deno Android APK or iOS proof exists. Maintaining those hosts would
-add code without validating the cross-platform target, so their runner code
-and Gradle profile were removed. This is a project selection based on this
-prototype, not a claim that V8 is inherently unavailable on mobile.
-
-The active gallery opens on Button and has one Solid and one React page each
-for ButtonGroup, InputField, Select, Popover, and VirtualList. Its previous pages and
-widgets are preserved for reference in `OLD_API/` and are excluded from active
-exports and builds.
-
-The measurements below were collected on the earlier gallery. They describe
-that historical workload and must be repeated before being used as v2
-performance claims.
-
-## Media imports
-
-Place an SVG, PNG, JPEG, or WebP source below `apps/gallery/assets`, then run
-`bun apps/gallery/scripts/generate-assets.mjs`. The generated TypeScript map
-exports typed `AssetRef` values for `<svg source={...} />` and
-`<image source={...} />`. The same manifest embeds the selected bytes in the
-QuickJS runner. Rust decodes the files and registers renderer handles
-before the first frame. The included Tabler icons are plain SVG assets, so the
-native vector renderer can tint them; no framework-specific DOM icon component
-is involved. An image ID is restricted to JavaScript's exact integer range,
-and an unknown ID is rejected before a host commit.
-
-Video playback is not exposed as an Argui primitive in this tranche. A real
-player needs decoded frames, presentation timestamps, an audio clock, bounded
-queues, GPU texture updates, lifecycle handling, and mobile packaging. Argui's
-existing image/SVG asset registry does not provide those operations. GStreamer
-offers [decode/playback components](https://gstreamer.freedesktop.org/documentation/playback/index.html)
-and [an application sample sink](https://gstreamer.freedesktop.org/documentation/app/appsink.html),
-with [platform packages](https://gstreamer.freedesktop.org/documentation/installing/)
-for the desktop and mobile targets; adopting it requires a dedicated native
-media integration and device validation. There is no nonfunctional `Video`
-component or video-file import in this release.
-
-## Platform validation boundary
-
-The desktop Linux gallery uses the native Argui renderer. Android launches the
-same Solid TSX gallery through `NativeActivity` with embedded fonts and assets.
-On a Pixel 8a (Android API 37, 1080 × 2400),
-the app filled the available viewport, navigated between pages, opened Select,
-changed its value by touch, and rendered SVG and raster media. Button activation
-updated its counter; disabled and busy buttons did not activate. Animation Lab
-scrolled to its spring and held-keyframe scenes. These checks used saved
-captures, direct touch input, and an Android log without a fatal app error.
-Android runs the QuickJS Solid gallery by default. During development, the
-gallery hot-reload script can load either the Solid or React bundle into the
-same QuickJS host; release builds embed the Solid bundle.
-
-The [Bun executable targets](https://bun.sh/docs/bundler/executables) omit
-Android and iOS. The pinned `rusty_v8` archive required for this Android ARM64
-build returned HTTP 404; there is no Deno mobile RAM result. QuickJS is the
-only installed JavaScript gallery runtime on the device.
-
-Android's `uiautomator` exposed the gallery as one `android.view.View`; it did
-not expose individual Button, Select, or navigation nodes. The installed
-AccessKit Winit Android adapter expects `GameActivity$InputEnabledSurfaceView`,
-and TalkBack was not enabled for this test. Accessibility semantics and keyboard
-behavior are covered by host and desktop tests, but Android screen-reader
-behavior remains unverified. The native TSX gallery has not been launched on
-iOS or tested with VoiceOver.
-
-After the full-viewport correction, `dumpsys meminfo` reported the following
-QuickJS gallery samples on the Pixel. PSS and RSS include native rendering,
-graphics, Java activity overhead, and the embedded runtime; they are not
-QuickJS heap measurements. Graphics dominates the totals and needs a separate
-surface/swapchain profile before treating this as an acceptable mobile budget.
-
-| Screen | Total PSS | Total RSS | Native heap PSS | Graphics PSS |
-| --- | ---: | ---: | ---: | ---: |
-| Button | 474,826 KiB | 572,140 KiB | 83,510 KiB | 326,136 KiB |
-| Animation Lab | 447,893 KiB | 546,324 KiB | 86,002 KiB | 292,704 KiB |
-
-Earlier samples with a partially filled viewport are not directly comparable
-because the rendered surface size changed.
-
-## Why Animation Lab can still stutter
-
-The current touch-scroll path is native: Android delivers pointer movement to
-`argui-runtime`, which updates the Rust scroll offset and schedules a frame.
-The renderer then prepares and draws the retained scene. QuickJS does not
-receive a scroll transaction for each movement. The Button loading rotation
-and the continuous Animation Lab scenes also advance in Rust from declarative
-loop properties; they do not call Solid or React once per animation frame.
-QuickJS still participates when a component mounts, a control changes state,
-or navigation changes the page. Those events can affect switching latency,
-but the available trace does not implicate JavaScript execution in continuous
-scroll or loop-frame stutter.
-
-On the Pixel 8a debug build, an active Animation Lab scroll still damaged the
-full 1080 × 2400 surface (about 2.59 million pixels). In diagnostic samples,
-frame preparation took about 5.7–6.5 ms, GPU command encoding 20.7–28.2 ms,
-the render phase 27–40 ms, and the UI phase 5.3–6.2 ms. SurfaceFlinger frame
-intervals had a 21.48 ms p95 and 32.48 ms p99 in that scroll run. These are
-different timing scopes and must not be added together. They show a real
-native render/frame-pacing problem for this scene; they do not measure a
-QuickJS bottleneck. The user can still see stutter in the loading indicator
-and Animation Lab, and Animation Lab scrolling is still not consistently
-smooth. This work is unfinished.
-
-Paint culling reduced work for offscreen children: in one 161-node fixture,
-fewer than 20 subtrees needed painting after a scroll. On the device, visible
-GPU layers fell from 37 to 14 in a comparable view. With loops paused, scroll
-encoding fell from roughly 19–21 ms to 6.7–7.7 ms, and the full paused frame
-from roughly 36–41 ms to 12–15 ms. Active loops still force enough repaint
-to miss the frame budget. An experimental scroll-copy damage path encoded
-around 31 ms in its measured case, so it was removed rather than retained as
-an unproven optimization. The previously installed experimental APK also
-showed transient layout corruption during scrolling. After removing that
-path, the user confirmed that scrolling no longer breaks the layout. This
-does not resolve the remaining frame stutter or prove that the experimental
-path was the only cause of the visual defect.
-
-Accessibility updates also needed separation from the frame loop. The
-retained semantic tree now skips rebuilding when only decorative compositor
-motion changes. A direct diagnostic measured about 195–263 microseconds for
-the guard over 59 semantic nodes, compared with roughly 3.35–3.7 ms for an
-unconditional rebuild in the same idle scene. Focus, semantic changes, and
-moving accessible controls still require updates. This improvement does not
-by itself establish Android TalkBack support.
-
-## Measured native tree cost
-
-On an Intel Core Ultra 5 125H (Linux x86_64, Rust 1.98.0), five release-mode
-test process runs mounted 10,000 text children, changed one text property, and
-moved the last child before the first. Combined host commit plus `UiTree::update`
-times were 4.2–12.3 ms for the isolated property (median 8.7 ms) and
-7.0–18.3 ms for the move (median 9.3 ms). The host rematerialized two nodes
-(the root and changed child). The tree recognized 9,999 shared subtrees for
-the property change and classified the move at the parent in one visit. Reusing
-the tree index allocation and ID slices reduced typical move cost, but one
-sample still crossed a 16.7 ms frame budget. These are diagnostic process
-samples with visible machine-load variance, not latency percentiles or
-input-to-presentation measurements; large reorderable lists still need a
-dedicated frame profile.
-
-## Desktop JavaScript engine samples behind the decision
-
-Before selecting QuickJS, the same Solid gallery bundle was run on Linux x86_64
-with three native hosts. The Bun and Deno runners are no longer in the build.
-The binaries below are **debug, unstripped** artifacts; their size is not a
-release package size. RSS was sampled five seconds after mounting the Button
-page. Bun runs as an application process plus a Bun child, so its memory is
-the sum of both processes.
-
-| Host | Debug binary | RSS at 5 s | Mount timing available |
-| --- | ---: | ---: | --- |
-| Bun | 506,523,456 B | 154,432 kB, both processes | Process start to first native batch: median 137.4 ms, range 90.1–151.9 ms over five runs. |
-| `deno_core` | 662,526,920 B | 150,564 kB | Solid mount in an initialized V8 isolate: 42 ms in one debug test. |
-| QuickJS | 511,766,336 B | 134,648 KiB | Full test including mount, interactions, and disposal: 138–150 ms; this only bounds mount from above. |
-
-These timing scopes differ. They cannot select the fastest cold-start host yet;
-a release build and the same start-to-first-frame probe are needed. The RSS
-figures are diagnostic samples, not peak memory or heap-only measurements. The
-QuickJS row was resampled after the responsive gallery changes on a private
-1600 × 1200 Mutter display, five seconds after the Button page mounted. The
-Bun and Deno rows remain older prototype samples and are not directly
-comparable to this build.
-
-The QuickJS Button page still used a JavaScript timer for its loading icon in
-this historical sample. The current loading icon uses a native rotation loop;
-its device CPU and frame cost are measured separately. Another development
-sample for the QuickJS Solid Button page recorded RSS 134,648 KiB, PSS
-104,614 KiB, private clean plus dirty memory 94,056 KiB, and 1.2% CPU over ten
-seconds. These are process measurements, not an isolated JavaScript heap or a
-release memory budget.
-
-The benchmark is reproducible with
-`cargo nextest run --release -p argui-host --all-features --test transaction --offline --nocapture`.
-The gallery path also has tests for the bundled Solid app, React parity and
-real embedded-engine mounts; a device input-to-presentation measurement is
-still needed for the runtime decision.
+`bun run check:ts` checks generated TSX types. `bun run test:ts` builds both
+gallery adapters and runs their host interaction tests. A typecheck alone does
+not prove that a native transaction mounts; run the owning host tests as
+well. For actual graphical checks on Linux, use the
+[private-display procedure](contributing/linux-testing.md) and inspect its
+saved captures.

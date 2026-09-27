@@ -9,15 +9,16 @@ It copies the element's background onto the wrapper so that background can
 continue under transparent system bars while text and controls remain inset.
 The containing window still needs to draw edge to edge on the platform.
 
-On Android, the Winit host compares `WindowExtAndroid::content_rect()` with the
-full drawable window. It samples the rect after each platform event batch
-because Winit consumes Android content-rect changes without forwarding a
-separate event; updated bars, rotation, or keyboard geometry is picked up as
-soon as Android reports it. On iOS, it compares the Winit outer window bounds
+On Android, the platform bridge reads `getRootWindowInsets()` from the active
+`NativeActivity` decor view. Android 11 and later supply system-bar and
+display-cutout insets through `WindowInsets.Type`; older releases use the
+available legacy inset API. The runtime samples after each platform event
+batch because Winit consumes Android content-rect changes without forwarding
+a separate event. It also refreshes on creation, resize, scale-factor changes,
+and redraws. On iOS, it compares the Winit outer window bounds
 with the safe-area bounds returned by `inner_position()` and `inner_size()`.
 The renderer and layout viewport use the full iOS outer size; safe-area padding
-is applied only when the app calls `Element::safe_area`. Insets are also
-refreshed on window creation, resize, scale-factor changes, and redraws. Other
+is applied only when the app calls `Element::safe_area`. Other
 Winit backends default to zero because Winit does not expose a portable
 safe-area query there.
 
@@ -31,7 +32,7 @@ label the cause of an Android inset or synthesize browser CSS viewport values.
 A browser adapter can read those values and pass them through the same command.
 Convert physical measurements to logical pixels before injecting them.
 
-```rust,ignore
-let environment = cx.environment();
-let view = Element::column(children).safe_area(environment.safe_area_insets);
-```
+Apply the reported insets with
+`Element::safe_area(environment.safe_area_insets)` when building a window view.
+The [mobile guide](../native-mobile.md#safe-areas) shows a complete Rust
+function using this API.

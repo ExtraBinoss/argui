@@ -16,6 +16,9 @@ const LATEST: &str = "https://api.github.com/repos/ExtraBinoss/argui/releases/la
 const MAX_ARCHIVE_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_CHECKSUM_BYTES: u64 = 1024;
 
+#[path = "../tests/update/mod.rs"]
+mod tests;
+
 /// Checks the latest release and installs a newer verified CLI archive.
 ///
 /// `options` accepts only `--check`, which reports availability without
@@ -23,6 +26,15 @@ const MAX_CHECKSUM_BYTES: u64 = 1024;
 /// extraction, or replacement fails; the installed binary remains unchanged
 /// until a fully verified replacement has been staged.
 pub(crate) fn run(options: &[String]) -> Result<(), String> {
+    run_with_release_endpoint(options, LATEST)
+}
+
+/// Runs the updater against the selected release metadata endpoint.
+/// `options` are CLI flags and `latest_url` supplies the trusted lookup URL.
+///
+/// # Errors
+/// Returns an error for an invalid option, failed lookup, or unsafe update.
+fn run_with_release_endpoint(options: &[String], latest_url: &str) -> Result<(), String> {
     let check_only = match options {
         [] => false,
         [option] if option == "--check" => true,
@@ -34,7 +46,7 @@ pub(crate) fn run(options: &[String]) -> Result<(), String> {
         .user_agent(format!("argui-cli/{}", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|error| format!("cannot configure update client: {error}"))?;
-    let latest = latest_release(&client)?;
+    let latest = latest_release(&client, latest_url)?;
     let current = Version::parse(env!("CARGO_PKG_VERSION"))
         .map_err(|error| format!("invalid installed CLI version: {error}"))?;
     if latest <= current {
@@ -48,26 +60,43 @@ pub(crate) fn run(options: &[String]) -> Result<(), String> {
     let executable = std::env::current_exe()
         .and_then(fs::canonicalize)
         .map_err(|error| format!("cannot locate the running Argui CLI: {error}"))?;
-    let destination = executable
-        .parent()
-        .ok_or("the running Argui CLI has no parent directory")?;
-    let tag = format!("v{latest}");
-    let asset = asset_name(&tag, target);
-    let url = format!("{REPOSITORY}/releases/download/{tag}/{asset}");
-    let mut archive = tempfile::NamedTempFile::new_in(destination)
-        .map_err(|error| format!("cannot stage update beside the CLI: {error}"))?;
-    let digest = download_archive(&client, &url, archive.as_file_mut())?;
-    let checksum = download_small(&client, &format!("{url}.sha256"), MAX_CHECKSUM_BYTES)?;
-    verify_checksum(&checksum, &asset, &digest)?;
-    let mut replacement = tempfile::NamedTempFile::new_in(destination)
-        .map_err(|error| format!("cannot stage replacement beside the CLI: {error}"))?;
-    extract_binary(archive.path(), replacement.as_file_mut(), target)?;
-    replace_binary(replacement, &executable)?;
+    install_release(&client, &latest, target, &executable, REPOSITORY)?;
     println!(
         "Updated Argui CLI from v{current} to v{latest} at {}.",
         executable.display()
     );
     Ok(())
+}
+
+/// Installs one release archive from `repository` into `executable`.
+/// `client` applies HTTP limits, `version` and `target` select the release
+/// asset, and `repository` is the asset URL root. The existing executable is
+/// replaced only after the archive and checksum have both been verified.
+///
+/// # Errors
+/// Returns an error if staging, download, verification, or replacement fails.
+fn install_release(
+    client: &Client,
+    version: &Version,
+    target: &str,
+    executable: &Path,
+    repository: &str,
+) -> Result<(), String> {
+    let destination = executable
+        .parent()
+        .ok_or("the running Argui CLI has no parent directory")?;
+    let tag = format!("v{version}");
+    let asset = asset_name(&tag, target);
+    let url = format!("{repository}/releases/download/{tag}/{asset}");
+    let mut archive = tempfile::NamedTempFile::new_in(destination)
+        .map_err(|error| format!("cannot stage update beside the CLI: {error}"))?;
+    let digest = download_archive(client, &url, archive.as_file_mut())?;
+    let checksum = download_small(client, &format!("{url}.sha256"), MAX_CHECKSUM_BYTES)?;
+    verify_checksum(&checksum, &asset, &digest)?;
+    let mut replacement = tempfile::NamedTempFile::new_in(destination)
+        .map_err(|error| format!("cannot stage replacement beside the CLI: {error}"))?;
+    extract_binary(archive.path(), replacement.as_file_mut(), target)?;
+    replace_binary(replacement, executable)
 }
 
 /// Returns the supported release triple for the compilation target.
@@ -89,10 +118,14 @@ fn release_target() -> Result<&'static str, String> {
     }
 }
 
-/// Looks up the latest stable GitHub release and returns its semantic version.
-/// `client` applies an HTTP timeout and a GitHub-compatible user agent.
-fn latest_release(client: &Client) -> Result<Version, String> {
-    let bytes = download_small(client, LATEST, 64 * 1024)?;
+/// Looks up a release endpoint and returns its semantic version.
+/// `client` applies an HTTP timeout and a GitHub-compatible user agent;
+/// `url` identifies the release metadata endpoint.
+///
+/// # Errors
+/// Returns an error if the response cannot be downloaded or has no valid tag.
+fn latest_release(client: &Client, url: &str) -> Result<Version, String> {
+    let bytes = download_small(client, url, 64 * 1024)?;
     let body: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("invalid GitHub release response: {error}"))?;
     let tag = body["tag_name"]

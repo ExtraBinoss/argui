@@ -5,6 +5,15 @@ target/
 /apps/*/dist/
 /apps/gallery/web-host/pkg/
 /apps/web-host/pkg/
+/website/node_modules/
+/website/.nuxt/
+/website/.output/
+/website/dist
+/website/public/gallery/
+/website/app/data/docs-index.json
+/website/app/data/doc-pages/
+/website/public/search-index.json
+/website/test-results/
 *.profraw
 lcov.info
 coverage/

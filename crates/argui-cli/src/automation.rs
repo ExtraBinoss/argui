@@ -13,6 +13,9 @@ use serde_json::{Value, json};
 
 use crate::standalone;
 
+#[path = "../tests/automation/mod.rs"]
+mod tests;
+
 /// Builds and runs one real TypeScript test against its native TSX app.
 /// `cwd` anchors paths and `args` contains optional app, test file, and output.
 ///

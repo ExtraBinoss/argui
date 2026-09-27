@@ -3,17 +3,21 @@
 `ApplicationConfig` owns runtime identity and the initial `WindowConfig`.
 Use one stable reverse-DNS identifier in runtime and packaging metadata:
 
-```rust,ignore
+```rust
 use argui_platform::{
     ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig,
 };
 
-let identity = ApplicationIdentity::new(
-    ApplicationId::new("com.example.notes")?,
-    "Example Notes",
-    IconSet::new(),
-);
-let config = ApplicationConfig::new(identity, WindowConfig::default());
+/// Builds an example configuration using this repository's gallery ID.
+/// Returns an error if the application ID is invalid.
+pub fn example_config() -> Result<ApplicationConfig, argui_platform::ApplicationIdError> {
+    let identity = ApplicationIdentity::new(
+        ApplicationId::new("dev.argui.gallery")?,
+        "Argui Gallery",
+        IconSet::new(),
+    );
+    Ok(ApplicationConfig::new(identity, WindowConfig::default()))
+}
 ```
 
 The runtime applies identity to Wayland app ID, X11 WM_CLASS, Winit icons, Web
@@ -35,8 +39,14 @@ guarantee that the first frame has already presented.
 `false` on WebAssembly. The Web default keeps an embedded canvas from stealing
 page focus and scroll while loading. A click or touch still focuses it.
 
-```rust,ignore
-let window = WindowConfig::default().with_focus_on_launch(true);
+```rust
+use argui_platform::WindowConfig;
+
+/// Creates a window that accepts keyboard focus immediately on Web.
+/// Returns the configured window.
+pub fn focused_web_window() -> WindowConfig {
+    WindowConfig::default().with_focus_on_launch(true)
+}
 ```
 
 Enable it for a full-page Web application that should accept keyboard input
@@ -61,11 +71,14 @@ current factor when an application wants to display it.
 Disable the runtime-owned shortcuts and pinch gesture when an application needs
 to reserve them for a product-specific canvas:
 
-```rust,ignore
-use argui_platform::UiZoomConfig;
+```rust
+use argui_platform::{ApplicationConfig, UiZoomConfig};
 
-let config = ApplicationConfig::new(identity, window)
-    .with_ui_zoom(UiZoomConfig::disabled());
+/// Turns off runtime-owned zoom gestures for the given application.
+/// Returns the updated configuration.
+pub fn without_ui_zoom(config: ApplicationConfig) -> ApplicationConfig {
+    config.with_ui_zoom(UiZoomConfig::disabled())
+}
 ```
 
 Disabling UI zoom leaves ordinary application keyboard and pinch handling
@@ -73,24 +86,11 @@ unchanged.
 
 ## Packaging identity
 
-Argui does not package applications. Keep a packager's values aligned with
-`ApplicationIdentity`:
-
-```toml
-[package.metadata.packager]
-product-name = "Example Notes"
-identifier = "com.example.notes"
-icons = [
-  "icons/32x32.png",
-  "icons/128x128.png",
-  "icons/icon.icns",
-  "icons/icon.ico",
-]
-```
-
-`cargo packager --release` owns installed bundle names, desktop entries, icons,
-and Windows resources. If a Linux packager derives its desktop-file ID from the
-executable, set `with_linux_application_id` to that filename.
+Argui does not package applications. Keep the installed bundle ID, desktop
+entry, and icons aligned with `ApplicationIdentity`. If a Linux packager derives
+the desktop-file name from the executable instead of the reverse-DNS ID, use
+`ApplicationIdentity::with_linux_application_id` with that actual filename,
+without the `.desktop` suffix.
 
 ## Tray
 
@@ -119,11 +119,14 @@ argui-platform = { version = "0.4.0", features = ["global-shortcuts"] }
 argui-runtime = { version = "0.4.0", features = ["global-shortcuts"] }
 ```
 
-```rust,ignore
+```rust
 use argui_platform::{ApplicationConfig, GlobalShortcut};
 
-let config = ApplicationConfig::new(identity, window)
-    .with_global_shortcut(GlobalShortcut::new("show-search", "CmdOrCtrl+Space"));
+/// Adds the search launcher shortcut to an application.
+/// Returns the updated configuration.
+pub fn with_search_shortcut(config: ApplicationConfig) -> ApplicationConfig {
+    config.with_global_shortcut(GlobalShortcut::new("show-search", "CmdOrCtrl+Space"))
+}
 ```
 
 `CmdOrCtrl` resolves to Command on macOS and Control elsewhere. Other accepted
@@ -157,32 +160,5 @@ emit `RuntimeEvent::GlobalShortcutsUnavailable`.
 `AppCommand::OpenWindow` and `CloseWindow`. Their surfaces share one WGPU
 device.
 
-## Transparent windows and custom chrome
-
-```rust,ignore
-use argui_platform::{WindowConfig, WindowLevel};
-
-let overlay = WindowConfig {
-    decorations: false,
-    transparent: true,
-    native_shadow: cfg!(any(target_os = "windows", target_os = "macos")),
-    level: WindowLevel::AlwaysOnTop,
-    ..WindowConfig::default()
-};
-```
-
-Transparent windows use premultiplied surface composition and clear to
-transparent black. `Interaction::window_drag` marks the draggable element;
-`MoveAndToggleMaximize` toggles maximize on double-click. Interactive children
-remain normal hit targets.
-
-`SetWindowMousePassthrough` changes input for the complete window. Pixels
-outside the native window already belong to other applications.
-
-Native undecorated shadows are available on Windows and macOS. A GPU shadow must
-fit inside the surface and therefore enlarges its hit rectangle. Always-on-top
-works on Windows, macOS, and X11, but standard Wayland may reject it.
-
-`PlatformEvent::Opened` reports `WindowCapabilities`. Unsupported commands
-emit `RuntimeEvent::CommandFailed`; applications should adapt from the reported
-capabilities rather than assume an OS behavior.
+For transparent windows, custom chrome, monitor coordinates, input regions, and
+the per-backend limits, use [Desktop windows and native surfaces](desktop.md).

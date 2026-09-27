@@ -1,143 +1,137 @@
-# Scroll, stacking, and virtual lists
+# Scrolling and virtual lists
 
-`ScrollConfig` keeps input policy explicit. Winit's cross-platform convention is
-preserved: positive wheel deltas move content toward the pointer, so Argui's
-normal polarity subtracts them from the content offset. Wayland and browser
-backends already translate their native sign convention before Argui receives
-the event. `ScrollPolarity::Inverted` deliberately reverses it; applications may
-change that setting at runtime. Axes, logical line size, and a multiplier are
-also container-owned configuration.
+Use `scrollView` for a bounded viewport. Give it a resolvable height for
+vertical scrolling or width for horizontal scrolling, either directly or
+through a bounded flex parent with `grow={1}`. The content must exceed that
+bound. A `scrollView` retains every child; use `VirtualList` when mounting all
+rows would be expensive.
 
-Scroll offsets are retained by stable `NodeId`. Nested regions are searched from
-the deepest hit to the root. `ScrollPropagation::Chain` transfers only the
-unconsumed part of each axis to the next ancestor, `Contain` stops chaining while
-allowing an explicit elastic edge, and `None` clamps and consumes. Geometry,
-nested clips, hit regions, quads, and prepared glyphs translate together without
-recomputing Taffy or reshaping text. Hover is recomputed under the stationary
-pointer after movement.
+## A scroll viewport in TSX
 
-Pixel deltas stay pixel precise. Scroll containers use light inertia by default:
-input moves content immediately, then Argui adds a short exponential continuation
-after events become quiet. The integral is evaluated over elapsed time, so the
-travel distance is stable at 60, 120, and 144 Hz. Line wheels use the configured
-logical line size. `Hybrid`, `Native`, `Direct`, and fully configured `Inertial`
-policies are available per container. Overscroll is clamped by
-default; elastic resistance, limit, spring, and damping are explicit opt-ins.
+`scrollY` is enabled and `scrollX` disabled by default. The native scrollbar
+appears when content overflows. `scrollbarVisible={false}` hides it without
+disabling wheel, touchpad, or other scroll input.
 
-Sibling paint and hit-test order use stable `z_index` ordering. `Position::Sticky`
-is constrained against its nearest scroll viewport during the incremental
-translation pass. It therefore stays pinned without a layout pass. Window
-layers and portals own floating, popover, modal, and debug content independently
-from scroll clipping.
-
-Scrollbar tracks use four independent `Edges` insets. Composite widgets can
-therefore reserve any side for resize handles, inline actions, or overlapping
-chrome without changing the scroll viewport. Hit testing records the track's
-actual position in paint order, so a later sibling painted above it owns the
-overlap while the remaining track stays interactive.
-
-In TSX, `scrollView` and `VirtualList` show native scrollbars by default when
-their content overflows. Set `scrollbarVisible={false}` to hide one while
-retaining scrolling. `scrollbarSide` selects `"left"` or `"right"` on a
-`scrollView`; `scrollbarWidth` sets the resting width in logical pixels.
-`scrollbarTrackColor`, `scrollbarThumbColor`, `scrollbarHoverColor`, and
-`scrollbarPressedColor` style the track and the thumb's resting, hovered, and
-dragged states. `scrollbarHoverWidth` expands the thumb and its draggable
-geometry together on hover, with a 140 ms native animation. The default track
-and thumb remain pill shaped throughout growth. Hover growth is
-enabled by default; set `scrollbarHoverWidth` equal to `scrollbarWidth` to keep
-a fixed width. The Rust API exposes the same geometry through `ScrollbarStyle::side`, `.width`,
-`.hover_width`, and `.hover_duration`. None of these interaction frames calls
-JavaScript or lays out the content again.
-
-`scrollMomentum` is available on `scrollView` and `VirtualList`. It accepts a
-number from 0 to 1: 0 is direct scrolling, while larger values retain more
-momentum after wheel or touchpad input stops. Leave it unset for the light
-inertia default. The gallery's **Examples → Scrollbars** page
-lets you compare Direct, Light, and Glide on the same viewport.
-
-`ScrollbarPartStyle` gives the track and thumb their own base `QuadStyle`,
-`StylePatch` values, and `StyleTransition`. Hover and thumb drag feed the same
-retained transition registry as ordinary elements, so colors, borders, opacity,
-corner radii, and gradient properties animate on the paint-only path. The
-scrollbar never asks the application to rebuild its tree for an interaction
-frame. Both axes share the same track click, thumb capture, and drag behavior.
-`Always`, `Hidden`, and delayed/fading `Auto` visibility are container-owned;
-idle auto scrollbars schedule no frames.
-
-`ScrollRequest` targets an exact container offset, a rectangle, or an element.
-Each axis independently supports start, center, end, and nearest alignment,
-logical margins, instant movement, or a typed tween. Element reveal walks every
-scroll ancestor from the inside out. A focused control is revealed automatically,
-and direct wheel, touch, or scrollbar input interrupts an active smooth request.
-
-`VirtualList` supports fixed and measured variable-height rows through one API.
-It computes a visible range plus bounded overscan and represents unseen space with two
-lightweight spacers. A logical list of one million rows therefore creates only
-tens of elements. Wheel movement uses the translation path inside a stable
-overscan chunk; crossing a chunk boundary rebuilds only the bounded visible
-window. Variable rows are measured from their real layout, feed an `O(log n)`
-prefix index, rebuild the virtual window until it settles, and correct the
-retained offset to preserve the visible item. Generic keyed scroll anchoring
-also preserves the first visible keyed descendant when content above it changes.
-For genuinely uniform rows, set `variable={false}` and match `estimate` to the
-rendered row height; this avoids measurement corrections during fast scrolling.
-Increase `overscan` when fast input exposes the edge of a mounted chunk, while
-keeping the mounted range bounded.
-`VirtualList::scroll_to` navigates fixed or variable data with the same four
-alignment modes. Applications that retain a controlled offset can use
-`VList::window_changed` before notifying their model; offsets inside the same
-mounted chunk stay on the engine's translation-only scroll path.
-
-## Scroll-driven graphic effects
-
-Enable `argui-effects`' optional `scroll` feature and register its definitions
-with `RendererConfig::effects(argui_effects::registry()?)`. The widget itself
-does not depend on the effects crate:
-
-```rust
-let list = VList::new("results", 32.0, 240.0, offset)
-    .effect(argui_effects::EdgeFade::new(20.0).scroll())
-    .build(items.len(), theme, |index| row(&items[index]));
+```tsx both
+<scrollView width="100%" height={160} scrollY={true}
+  scrollbarWidth={6} scrollbarHoverWidth={10}
+  scrollbarThumbColor="#64748b" scrollbarHoverColor="#2563eb">
+  <column width="100%" gap={4}>
+    {Array.from({ length: 10 }, (_, index) =>
+      <rectangle width="100%" height={32} shrink={0}
+        padding={{ start: 8, end: 8 }} background="#f1f5f9">
+        <text color="#0f172a">{`Row ${index + 1}`}</text>
+      </rectangle>)}
+  </column>
+</scrollView>
 ```
 
-Any scroll container accepts the same effect through
-`ScrollConfig::default().effect(effect)`. `TreeView` uses the configuration on
-its `list`; headers and virtual spacers remain part of the same scroll extent.
-Nothing is enabled implicitly on application lists.
+The track and thumb belong to the same native viewport as scrolling. For the
+vertical bar, `scrollbarSide` selects `"left"` or `"right"`;
+`scrollbarEndInset` controls its top and bottom ends. The thumb's resting,
+hovered, and dragged colors are `scrollbarThumbColor`,
+`scrollbarHoverColor`, and `scrollbarPressedColor`. The track uses
+`scrollbarTrackColor`. `scrollbarHoverWidth` changes the draggable geometry
+with a native 140 ms width transition. Set it equal to `scrollbarWidth` for a
+fixed width. `scrollMomentum` ranges from 0 (direct) to 1 (longer glide); an
+omitted value uses the native default. The active [scrollbar example](../../apps/gallery/src/solid/scrollbar-page.tsx)
+lets you compare these controls.
 
-`EdgeFade` changes content alpha rather than painting the background color over
-it. `EdgeShadow` composites a configurable color over the viewport, including
-transparent gaps between children. Choose its color from the current theme;
-the gallery uses its foreground at 22% alpha on light surfaces and 6% on dark
-surfaces to keep both axes visible without a bright halo. Both expose
-width in logical pixels, intensity and `[left, top, right, bottom]` strengths.
-Their `.filter()` methods also work on ordinary layers without scrolling.
-`.scroll_with(threshold, ramp)` controls reveal distance; `.scroll()` uses a
-zero threshold and a smooth 12 px reveal. The default fade width is 20 px.
-Bands are capped at half the corresponding viewport dimension. Zero width,
-zero intensity and disabled edges avoid scroll-effect layers entirely.
+`onScroll` can report position changes to application code, but input,
+clipping, scrollbar drag, sticky positioning, and movement are handled by the
+native engine. A scroll callback is unnecessary just to move content.
 
-Custom WGSL uses the existing effect registry and ABI. Bind an existing named
-parameter with `ScrollEffect::new(layer).bind(filter_index, parameter, metric)`.
-`ScrollMetric` supplies clamped offsets, normalized progress, remaining distances,
-smooth per-edge strengths, logical viewport dimensions, or normalized local
-coordinate mappings for transformed viewports. Types are checked when binding;
-rebinding the same target replaces its previous source. Offset and remaining
-vectors are in logical pixels; viewport-size bindings use `LogicalPixels` and
-therefore receive the renderer's DPI scaling automatically.
-Use `.when_edges(strengths, threshold, ramp)` to explicitly skip an entire layer
-when its selected edges are invisible. Zero-valued bindings alone do not disable
-custom shaders, since zero can be a meaningful input to another effect.
+## The Rust viewport
 
-Bindings resolve during painting, not through application callbacks or layout.
-Effects run in declaration order on the scrolling content, excluding the
-container background, border, scrollbar and separately painted portals. Stable
-scrollbar gutters are removed from the effect viewport. No overflow means no
-extra layer, and idle effects request no animation frames. Active effects still
-have an offscreen/filter cost in the existing render graph; custom shaders retain
-their usual responsibility for output alpha and any expansion beyond the source.
+Rust elements express overflow on their layout style and scrolling policy in
+`ScrollConfig`. This example has 256 logical pixels of rows inside a 160 pixel
+viewport:
 
-The former gallery's **Effects → Scroll shadow** demonstration is archived in
-`OLD_API/`. The active gallery's **Components → Scrolling** page compares a
-regular viewport with a bounded virtualized list window.
+```rust
+use argui_ui::{Axes, Element, Overflow, ScrollConfig, length};
+
+let content = Element::column((1..=8).map(|index| {
+    Element::text(format!("Row {index}"))
+        .height(length(32.0))
+        .shrink(0.0)
+}));
+let viewport = Element::column([content])
+    .height(length(160.0))
+    .overflow(Axes { x: Overflow::Hidden, y: Overflow::Auto })
+    .scroll_config(ScrollConfig::default());
+```
+
+`ScrollConfig` sets axes, wheel polarity and line size, multiplier, physics,
+overscroll, chaining, anchoring, and an optional `ScrollbarStyle`. Default
+physics is light inertia and overscroll is clamped. For nested regions,
+`ScrollPropagation::Chain` passes only unconsumed movement to an ancestor;
+`Contain` stops that chain, and `None` clamps and consumes it. Native scroll
+offsets are retained by stable node identity. `Position::Sticky` follows the
+nearest scroll viewport while its siblings move.
+
+## Large lists
+
+`VirtualList` from `@argui/widgets/solid` or `@argui/widgets/react` renders
+only a native-requested visible range with overscan. Give it a viewport bound,
+an extent estimate, and a stable `itemKey` derived from data identity rather
+than the row index. The key is separate from a native `id`.
+
+```tsx solid
+import { VirtualList } from '@argui/widgets/solid'
+
+const records = Array.from({ length: 1000 }, (_, index) => ({
+  id: `record-${index + 1}`,
+  name: `Record ${index + 1}`,
+}))
+
+export function Records() {
+  return <VirtualList count={records.length} width="100%" height={240}
+    estimate={40} variable={false} overscan={4}
+    itemKey={(index) => records[index]!.id}
+    renderItem={(index) =>
+      <row width="100%" height={40} alignItems="center" padding={8}>
+        <text color="#0f172a">{records[index]!.name}</text>
+      </row>}
+  />
+}
+```
+
+Use `variable={false}` only when the rendered row extent really matches
+`estimate`. The default variable mode measures mounted rows and corrects the
+offset as estimates become known. Lists with at most 12 items intentionally
+mount every row. Increase `overscan` if rapid scrolling exposes the edge of
+the mounted range, while keeping that range bounded. After inserts, removals,
+or reordering in the middle, increment `dataVersion` so the native measurements
+are reset. The active [scrolling example](../../apps/gallery/src/solid/virtual-list-page.tsx)
+shows both kinds of viewport.
+
+The equivalent Rust API is `VirtualList::fixed` or `VirtualList::variable`:
+
+```rust
+use argui_ui::{Element, VirtualList};
+
+let list = VirtualList::fixed(1000, 40.0, 240.0);
+let viewport = list.build("records", 0.0, |index| {
+    Element::text(format!("Record {}", index + 1))
+});
+```
+
+`VirtualList::scroll_to` computes an offset for an index. For ordinary
+elements, `ScrollRequest::reveal` or `ScrollRequest::offset` can be sent with
+`argui_runtime::Context::scroll`; reveal requests traverse nested scroll
+ancestors. Focusing a control also reveals it. Direct input interrupts a
+smooth request.
+
+## Scroll edge treatments
+
+`shadowWidth` on `scrollView` fades content only at edges with hidden content;
+zero disables it. `shadowIntensity` controls its strength. The
+`ScrollShadow` widget wraps that native behavior and chooses a size from the
+widget theme. Keep the viewport at the full surface width and put content
+padding inside it if the fade and scrollbar should reach the surface edge.
+For Rust effects, enable `argui-effects`' `scroll` feature, register
+`argui_effects::registry()` with the renderer, then attach
+`argui_effects::EdgeFade::new(20.0).scroll()` through
+`ScrollConfig::effect`. `EdgeShadow` paints a chosen color instead of fading
+alpha. Effects use scroll metrics at paint time; they require an offscreen
+filter while active.

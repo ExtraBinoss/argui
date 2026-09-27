@@ -1,6 +1,109 @@
 use super::*;
 
 #[test]
+fn typed_listener_values_reject_mismatches_and_preserve_text_fallbacks() {
+    use argui_ui::FromHandlerValue;
+
+    let listener = EventListener::new(EventType::Click, EventHandlerId::new(EventOwnerId(30), 0))
+        .handler_value(true);
+    let mut tree = UiTree::new(Element::container([]).on(listener));
+    let node = tree.node_id_at(0).unwrap();
+    let delivered = tree.event_deliveries(
+        node,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(bool::from_handler_event(&delivered[0]), Some(true));
+    assert_eq!(f32::from_handler_event(&delivered[0]), None);
+
+    let changed = UiEvent::new(node, None, UiEventKind::TextChanged("typed".into()));
+    assert_eq!(
+        String::from_handler_event(&changed).as_deref(),
+        Some("typed")
+    );
+    let unrelated = UiEvent::new(
+        node,
+        None,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(String::from_handler_event(&unrelated), None);
+}
+
+#[test]
+/// Range and split handlers convert keyboard and semantic input into controlled values.
+fn continuous_handlers_map_keys_and_accessibility_actions() {
+    use argui_ui::{ContinuousValuePhase, FromHandlerValue, RangeHandlerValue, SplitHandlerValue};
+
+    let input = |key, state| KeyInput {
+        key,
+        state,
+        modifiers: argui_core::Modifiers::default(),
+        repeat: false,
+        text: None,
+    };
+    let range = EventListener::new(EventType::Key, EventHandlerId::new(EventOwnerId(31), 0))
+        .range_handler_value(RangeHandlerValue::new(
+            5.0,
+            0.0,
+            10.0,
+            2.0,
+            false,
+            false,
+            ContinuousValuePhase::Change,
+        ));
+    let mut tree = UiTree::new(Element::container([]).on(range));
+    let node = tree.node_id_at(0).unwrap();
+    let pressed = tree.event_deliveries(
+        node,
+        UiEventKind::KeyInput(input(Key::ArrowRight, KeyState::Pressed)),
+    );
+    assert_eq!(f32::from_handler_event(&pressed[0]), Some(8.0));
+    let released = tree.event_deliveries(
+        node,
+        UiEventKind::KeyInput(input(Key::ArrowRight, KeyState::Released)),
+    );
+    assert!(released.is_empty());
+
+    let range = EventListener::new(
+        EventType::SemanticAction,
+        EventHandlerId::new(EventOwnerId(32), 0),
+    )
+    .range_handler_value(RangeHandlerValue::new(
+        5.0,
+        0.0,
+        10.0,
+        2.0,
+        false,
+        false,
+        ContinuousValuePhase::Commit,
+    ));
+    let mut tree = UiTree::new(Element::container([]).on(range));
+    let node = tree.node_id_at(0).unwrap();
+    let incremented = tree.event_deliveries(
+        node,
+        UiEventKind::SemanticAction {
+            action: SemanticAction::Increment,
+            value: None,
+        },
+    );
+    assert_eq!(f32::from_handler_event(&incremented[0]), Some(8.0));
+
+    let split = EventListener::new(EventType::Key, EventHandlerId::new(EventOwnerId(33), 0))
+        .split_handler_value(SplitHandlerValue::new(50.0, 20.0, 100.0, 35.0, true, false));
+    let mut tree = UiTree::new(Element::container([]).on(split));
+    let node = tree.node_id_at(0).unwrap();
+    let moved = tree.event_deliveries(
+        node,
+        UiEventKind::KeyInput(input(Key::ArrowRight, KeyState::Pressed)),
+    );
+    assert_eq!(f32::from_handler_event(&moved[0]), Some(60.0));
+    let reset = tree.event_deliveries(
+        node,
+        UiEventKind::KeyInput(input(Key::Home, KeyState::Pressed)),
+    );
+    assert_eq!(f32::from_handler_event(&reset[0]), Some(20.0));
+}
+
+#[test]
 fn pressed_pointer_move_filter_accepts_active_contacts_only() {
     let listener = EventListener::new(
         EventType::PointerMove,

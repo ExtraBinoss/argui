@@ -341,6 +341,16 @@ class ReleasePolicyTests(unittest.TestCase):
             release.publish(plan)
             run.assert_not_called()
 
+    def test_release_notes_name_the_runtime_and_cli_instead_of_removed_crates(self):
+        notes = release.release_notes({
+            'version': '0.4.0',
+            'all_packages': ['argui-core', 'argui-runtime', 'argui-cli'],
+        })
+        self.assertIn('argui-runtime = "0.4.0"', notes)
+        self.assertIn('scripts/install-cli.sh', notes)
+        self.assertIn('crates.io/crates/argui-cli/0.4.0', notes)
+        self.assertNotIn('argui = "0.4.0"', notes)
+
     def test_bump_updates_internal_requirements_and_preserves_external_pins(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

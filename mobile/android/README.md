@@ -5,7 +5,7 @@ Android app. A small `NativeActivity` subclass draws behind the system bars;
 Winit and Argui render the UI. Bun builds the JavaScript bundle, and Gradle
 builds the Rust shared library into the APK or AAB.
 
-## Background activity UI
+## Native surfaces
 
 Android represents long-running, user-visible work with a foreground service
 and an ongoing notification. The shared Rust API owns the activity title,
@@ -13,17 +13,20 @@ status, progress, lifetime, and worker-facing update handle. The Java adapter
 under `crates/argui-runtime/src/mobile/android/java/dev/argui/android` maps that
 state to Android's notification template and service lifecycle.
 
-The gallery renders edge to edge. Its status and navigation bars are
-transparent, and the current theme background is painted underneath them. The
-native host pads text and controls by the detected Android `WindowInsets`,
-including display cutouts. Native callers can override those values in logical
-pixels with `WindowConfig::with_safe_area_insets(Insets)`; the Solid gallery uses
-automatic detection.
+The gallery draws edge to edge with transparent status and navigation bars.
+Argui detects Android `WindowInsets`, including display cutouts, and exposes
+them to Rust window views as `WindowEnvironment::safe_area_insets`. Applications
+apply that padding with `Element::safe_area`; detection alone does not move the
+gallery's TSX controls away from system bars. Native callers can override the
+detected logical-pixel values with `WindowConfig::with_safe_area_insets(Insets)`.
+See [safe areas](../../docs/platform/window-insets.md) for the contract.
 
-To test the reference integration, open **Background activity** in the mobile
-gallery and start the demo. Android 13 or newer asks for notification
-permission on first use. Accept it, leave the app, and verify that the progress
-notification remains visible while the foreground service is active.
+The Android shell packages a `dataSync` foreground service, but the current
+gallery has no **Background activity** page or control that starts it. An
+application can start the service through `MobileActivity::begin` from a visible
+user action. Android 13 and later may ask for notification permission. See
+[mobile background activity](../../docs/native-mobile.md#background-activity-progress)
+for the Rust API and platform limits.
 
 ## Install the build tools
 
@@ -64,8 +67,8 @@ ARGUI_ANDROID_ABIS=arm64-v8a ./scripts/android-gallery.sh apk
 ```
 
 The JavaScript gallery uses QuickJS on Android. Bun remains its TSX build tool.
-The runtime decision and memory measurements are in
-`docs/solid-react-native.md`.
+The [Solid and React host contract](../../docs/solid-react-native.md) describes
+how the bundle reaches the Rust renderer.
 
 ## Build a release AAB
 

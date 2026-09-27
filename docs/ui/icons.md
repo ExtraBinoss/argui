@@ -4,22 +4,30 @@ Argui's SVG and image primitives accept an application asset reference. Widgets 
 
 ## Gallery
 
-The gallery keeps a small Tabler pack and its own navigation icons under `apps/gallery/assets/`. `assets.config.json` names directories as packs and can map individual files to keys. For example:
+The gallery keeps a small Tabler pack and its own navigation icons under
+`apps/gallery/assets/`. Its checked-in `assets.config.json` names directories
+as packs and maps individual illustration files:
 
 ```json
 {
-  "packs": { "tabler": "tabler", "my-icons": "my-icons" },
-  "files": { "brand/logo.svg": "brand/logo.svg" },
+  "packs": { "tabler": "tabler", "gallery": "gallery" },
+  "files": {
+    "illustration/orbit.png": "illustration/orbit.png",
+    "illustration/orbit.svg": "illustration/orbit.svg",
+    "photo/saturn.jpg": "photo/saturn.jpg"
+  },
   "entries": ["src/solid/main.tsx", "src/react/main.tsx"]
 }
 ```
 
 Reference a file with a literal key in TSX:
 
-```tsx
+```tsx both
 import { mediaAssets } from '../../assets.generated'
 
-<svg source={mediaAssets['my-icons/spark.svg']} width={18} height={18} />
+export function SearchIcon() {
+  return <svg source={mediaAssets['tabler/search.svg']} width={18} height={18} />
+}
 ```
 
 Import `mediaAssets` directly from `assets.generated` in a module that uses it.

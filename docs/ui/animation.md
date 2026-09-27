@@ -1,165 +1,113 @@
 # Animation
 
-`argui-animation` provides typed timelines, keyframes, motion and physics on
-native and WebAssembly. The runtime supplies one monotonic frame clock; an idle
-application requests no animation frames.
+Argui advances typed motions on one runtime frame clock on native platforms
+and WebAssembly. A settled motion does not keep requesting frames. A layout
+property such as width triggers layout, a background color triggers paint,
+and a transform or group opacity can use the retained compositor. The first
+composited frame may still need paint to establish its layer; choose the
+property for the effect you want, then inspect the presented result.
 
-`argui-ui` binds animation values to typed properties with `Element::bind`.
+## TSX: native loops and transitions
 
-## Five-minute start
+The built-in visual primitives expose native loops. The surface and its text
+move together here; the moving rectangle still reserves only its original
+120 pixel width in layout.
 
-Create a motion, set its target, and bind it to a retained element property:
+```tsx both
+<rectangle width={280} height={56} padding={8} background="#e2e8f0">
+  <rectangle width={120} height={40} padding={8} background="#2563eb"
+    loopMs={900} loopTranslateX={120} loopPlaying={true}>
+    <text color="#ffffff">Moving label</text>
+  </rectangle>
+</rectangle>
+```
+
+`loopMs` is the duration of one leg. Transform targets include
+`loopTranslateX`, `loopTranslateY`, and `loopScale`. Other targets include
+`loopOpacity`, `loopBackground`, `loopWidth`, `loopRadius`, and `loopGap` on
+their supported primitives. Loops alternate to the target and back;
+`rotationLoopMs` continuously rotates. `loopPlaying={false}` pauses the
+current phase. `loopSteps` makes discrete jump-end steps and is scheduled only
+at visible changes. The schema requires a 1–60,000 ms duration and positive
+step count. `loopWidth` requires an authored pixel `width`, `loopRadius`
+requires `radii`, `loopGap` requires `gap`, and `loopBackground` requires a
+solid base background. `rotationLoopMs` cannot be combined with another
+transform loop.
+
+For a state change or a changed authored value, use a transition. Hover and
+press paint are native on `rectangle`, so JavaScript need not update the tree
+for their intermediate frames:
+
+```tsx both
+<rectangle width={160} height={44} radii={8}
+  background="#e2e8f0" hoverBackground="#bfdbfe"
+  transitionMs={160} transitionTimingFunction="cubic-bezier(0.2, 0, 0, 1)">
+  <text color="#0f172a">Hover me</text>
+</rectangle>
+```
+
+`transitionMs` accepts 1–60,000 ms. `transitionTimingFunction` accepts
+`linear` or `cubic-bezier(x1, y1, x2, y2)` and requires `transitionMs`.
+`transitionSpring` selects the spring driver instead of a timed tween; do
+not combine it with `transitionMs` or `transitionTimingFunction`. See the
+active [animation scenes](../../apps/gallery/src/solid/animation-page.tsx)
+for transform, steps, opacity, color, and width loops.
+
+## Rust: typed property motion
+
+`argui-animation::Motion<T>` retains the presented value and target.
+`Element::bind` connects it to a typed `argui-ui::property` selector. Keep the
+motion alive across UI rebuilds if the same element should continue its
+animation.
 
 ```rust
 use argui_animation::{Duration, Motion, Tween};
 use argui_ui::{Element, property};
 
 let opacity = Motion::new(1.0_f32);
-opacity.animate_to(0.4, Tween::new(Duration::from_millis(240)));
-let panel = Element::container([])
+let panel = Element::container([Element::text("Fading panel")])
     .opacity(1.0)
-    .bind(property::LayerOpacity, opacity);
-```
-
-Retargeting starts from the currently presented value; spring drivers also
-preserve velocity. Group opacity changes do not change hit testing or semantics,
-so disable interaction or hide semantics separately when invisible content
-must be inert.
-
-## Curves
-
-The `curves` module includes `LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
-`STANDARD`, `EMPHASIZED`, `ACCELERATE`, `DECELERATE` and `BACK_OUT`. A custom
-curve implements one small trait. Input is normalized; output may overshoot.
-
-```rust
-use argui_animation::{Curve, Easing};
-
-struct Anticipate;
-
-impl Curve for Anticipate {
-    fn sample(&self, progress: f32) -> f32 {
-        progress * progress * (2.7 * progress - 1.7)
-    }
-}
-
-let easing = Easing::curve(Anticipate);
-assert!(easing.sample(0.25) < 0.0);
-```
-
-Springs intentionally remain separate from curves. A spring carries velocity
-and physical state, whereas a curve only transforms normalized progress.
-
-## What can animate implicitly
-
-| Family | Compatible values | Update cost |
-| --- | --- | --- |
-| Group opacity and transform | scalar opacity, `Transform2D` components | composite |
-| Surface paint | solid colors, border colors/widths, corner radii | paint |
-| Gradients | matching kind, points and stop topology | paint |
-| Layers | masks, shadow components and typed effect parameters | paint/composite |
-| Layout | same-unit width/height/min/max, padding, gap, grow/shrink and pixel insets | layout |
-| Scroll | `Point` offsets | scroll |
-
-The first transition to a composited value may require one paint to establish
-its layer; subsequent opacity and transform frames remain compositor updates.
-
-Explicit `Element::bind` motions have final precedence over implicit style
-transitions. This makes it safe to give one property direct application control
-while the remaining container values animate implicitly.
-
-## Gallery example
-
-The Solid/React TSX gallery's **Animation** page demonstrates native loops,
-implicit transitions, composition, spring retargeting and held keyframes. Its
-Solid source is [`animation-page.tsx`](../../apps/gallery/src/solid/animation-page.tsx).
-The **Expressive UI** page adds five examples of retained gradient layers,
-spinners, and status motion; see
-[`expressive-page.tsx`](../../apps/gallery/src/solid/expressive-page.tsx).
-Gallery build and hot-reload instructions are in the
-[gallery README](../../apps/gallery/README.md).
-
-## Ownership and scheduling
-
-`argui-animation` owns interpolation and timing without Winit, Taffy or WGPU.
-`argui-ui` binds declarations to stable nodes, the runtime schedules frames,
-and layout/paint resolve values before the renderer receives drawing commands
-and shader uniforms. The renderer owns no timeline state.
-
-`Render::wants_animation_frame` opts a presentation into scheduling;
-`Render::animation_frame` receives the shared `Frame`. Retained property motions
-use a compact registry built during reconciliation. A shared motion advances
-once even when several properties consume it. Settled motions leave scheduling.
-Held caret keyframes publish their next visible-change deadline instead of
-keeping a display-linked loop alive. The native event loop sleeps until that
-deadline; ordinary input still wakes it immediately. This preserves a single
-ordered animation clock without paying for idle 60 Hz redraws.
-
-Paint changes reuse layout and shaped text. Transform and group-opacity changes
-reuse layout, shaped text, paint primitives, and GPU uploads through the retained
-compositor while updating hit geometry. Layout properties invalidate retained
-layout nodes, subject to ancestor dependencies and explicit layout boundaries.
-
-## Timelines and property motions
-
-`Timeline<T>` owns typed `Keyframes<T>` and `Timing`. It supports play, pause,
-resume, reverse, seek, restart, finish, cancel, playback-rate changes and
-retargeting from the presented value. Timing includes delays, iterations,
-direction and fill modes; keyframes support per-keyframe easing and holds.
-Easing includes linear, cubic Bézier, steps, piecewise linear and custom closures.
-
-`Motion<T>` retains its value, target, driver and lifecycle across application
-rebuilds. `Element::bind` attaches it to a typed property: transforms, paint,
-layout dimensions, scroll offsets, layers, shadows, gradients or effect parameters.
-Retargeting starts at the presented value; springs also preserve velocity.
-
-```rust
-use argui_animation::{Duration, Motion, Tween};
-use argui_ui::{Element, property};
-
-let opacity = Motion::new(1.0_f32);
+    .bind(property::LayerOpacity, opacity.clone());
 opacity.animate_to(0.4, Tween::new(Duration::from_millis(240)));
-let panel = Element::container([])
-    .opacity(1.0)
-    .bind(property::LayerOpacity, opacity);
 ```
 
-`Schedule`, `ScheduleBuilder` and `Cue` compose sequences, parallel groups,
-dependencies and staggered timing. Typed `Contribution<T>` values resolve replace,
-add and accumulate composition in stable `(priority, order)` order.
+`LayerOpacity` fades the group including descendants. `property::Opacity`
+changes the element's painted quad opacity; it is a different property.
+Neither one makes invisible content automatically noninteractive or removes
+its accessibility semantics. Disable interaction or hide semantics separately
+when that behavior is needed.
 
-## Physics
+`Motion::animate_to` retargets from the current presented value.
+`Motion::spring_to` also preserves velocity and returns an error for invalid
+physics parameters. A direct binding has final precedence over an implicit
+style transition for the same property. `Timeline<T>` and `Keyframes<T>` offer
+delays, iteration, direction, fill, per-keyframe easing, and holds;
+`ScheduleBuilder` composes cues and staggered work. Curves include linear,
+cubic Bézier, steps, piecewise linear, and a thread-safe custom function.
+Spring, decay, and inertia drivers are separate from easing curves because
+they retain velocity.
 
-`Spring<T>` supports scalar, color, point, size and rectangle motion through
-`MotionValue`. It solves underdamped, critically damped and overdamped systems
-analytically; temporal partitioning does not change the trajectory.
+## What updates
 
-`Decay<T>` integrates exponential velocity decay. Scalar `Inertia` follows that
-decay until it crosses an optional bound, then creates a bounce spring from the
-same value and velocity. Rest-speed and rest-distance thresholds snap the final
-value and stop frame requests. See [scroll](scroll.md) for the consumer policy.
+| Property family | Typical update path |
+| --- | --- |
+| Transform and group opacity | Composition, with hit geometry updated for transforms |
+| Solid or compatible gradient paint, border, radius, shadow | Paint or layer update |
+| Width, height, minimum/maximum, padding, gap, grow/shrink, pixel insets | Layout |
+| Scroll offset | Scroll translation |
 
-## Style transitions
+Gradient interpolation requires compatible kinds and stop structure;
+incompatible values switch discretely. A complete `LayoutStyle` replacement
+is also discrete. Reduced-motion preference finishes active property motions
+at their targets and prevents subsequent motion from running across frames
+while it is active. Hidden retained pages do not schedule their native loops.
+Explicit width, gap, and other layout property motions are supported;
+insertion, removal, and reordering do not automatically create captured
+before/after geometry transitions.
 
-`StylePatch` is a sparse typed property patch. `StyleTransition` selects a tween
-or spring and can override it by `PropertyKey`, state entry or state exit.
-Focused, hovered, pressed and disabled states compose deterministically.
-Compatible values interpolate; incompatible values, such as linear versus radial
-gradients, switch discretely at the midpoint.
-
-The retained transition registry handles interaction changes and authored style
-changes across rebuilds. It preserves spring velocity and yields to explicit
-`Element::bind` motions as the final composition layer. `StateSelector` targets
-the element or the nearest named `StateScopeId`; descendants can respond to a
-control's state without depending on its widget recipe. Conditions also combine
-state and named container queries with `all`, `any` and `not`.
-
-Reduced motion finishes active property motions at their target and prevents
-future motions from running across frames while the preference is active.
-See [preferences](interaction.md#system-preferences) and
-[conditional styling](styling.md) for environment and rule resolution.
-
-Explicit layout-property animation is supported. Captured before/after geometry
-transitions for insertion, removal and reordering remain in the
-[roadmap](../roadmap.md). The
-[animation tests](../../crates/argui-animation/tests/) exercise the current API.
+`argui-animation` owns timing and interpolation, `argui-ui` resolves bound
+values on stable nodes, and the runtime schedules frames. The renderer does
+not own timeline state. The [animation tests](../../crates/argui-ui/tests/tree/animation.rs)
+cover compositor, stepped, reduced-motion, and hidden-page scheduling.
+Transitions for conditional Rust styles are described in
+[styling](styling.md#rust-conditional-styles).

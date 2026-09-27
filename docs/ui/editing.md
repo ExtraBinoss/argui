@@ -6,24 +6,11 @@
 starts at the focused node and walks ancestors until a modal boundary. A disabled
 local binding blocks the same action in a parent.
 
-```rust,ignore
-const SAVE: ActionId = ActionId("mail.save-draft");
-let state = ActionState::new("Save draft")
-    .enabled(self.dirty)
-    .shortcut(Shortcut::primary("s"));
-let save = cx.on_action(SAVE, state.clone(), |model, _, cx| {
-    model.save_in_memory();
-    cx.notify();
-});
-
-Element::column([
-    Button::new("save", &state.label, theme.button())
-        .enabled(state.enabled)
-        .build()
-        .action(SAVE),
-])
-.action_scope(ActionScope::new([save])?)
-```
+The [runtime action test](../../crates/argui-runtime/tests/model/handler.rs)
+shows a current `Render` implementation: it creates an action binding with
+`Context::on_action`, attaches `ActionId` to an `Element`, and installs the
+binding through `ActionScope::new`. Keep the action's enabled state and its
+visible control in sync.
 
 Use the same `ActionState` for the binding and its controls. Invocation always
 rechecks the retained scope. `prevent_default()` cancels a default action;
@@ -137,9 +124,10 @@ constraints, reset behavior, and persistence.
 
 ## Examples and tests
 
-The Solid and React TSX gallery's **Input** page demonstrates native editing,
-search, disabled state, and submit validation in
-[`apps/gallery/src/solid/inputs.tsx`](../../apps/gallery/src/solid/inputs.tsx). Rust editor
+The Solid and React gallery's **InputField** pages demonstrate editing,
+search, disabled state, and submit behavior in
+[Solid](../../apps/gallery/src/solid/input-field-page.tsx) and
+[React](../../apps/gallery/src/react/input-field-page.tsx). Rust editor
 behavior is covered by the [text-input tests](../../crates/argui-ui/tests/text_input.rs)
 and the tests under `crates/argui-ui/tests/text_input/`. For GUI checks, follow
 the [private display procedure](../contributing/linux-testing.md) and inspect

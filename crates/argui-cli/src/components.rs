@@ -244,7 +244,7 @@ pub fn list(
     {
         crate::source_cache::registry(&app.argui_version)?
     } else {
-        include_str!("../../../components/registry.json").to_owned()
+        include_str!("../registry.json").to_owned()
     };
     let published = project
         .as_ref()

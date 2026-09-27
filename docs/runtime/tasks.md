@@ -1,6 +1,6 @@
 # Owned asynchronous tasks
 
-Enable the `tasks` feature on `argui`. Tokio is the native backend; Web uses
+Enable the `tasks` feature on `argui-runtime`. Tokio is the native backend; Web uses
 browser-local futures and does not bundle Tokio. One lazy native executor is
 shared by the application's windows, with at most four worker threads.
 
@@ -55,6 +55,6 @@ the operation terminates. Cancellation suppresses its callback even if the
 function finishes later. Browser code uses async operations or cooperative
 chunks; this API does not create Web Workers.
 
-Open **Examples → Async tasks** in the Widget Gallery. It searches 10,000
-generated example draft titles, supports `id:500`, and reports a real parsing
-error for `id:abc`. The 200 ms delay is debounce, not simulated I/O.
+The current Solid and React gallery has no async-tasks example. Exercise task
+ownership and cancellation through the `argui-runtime` model tests, then test
+the application-specific async result and error states in the consuming app.

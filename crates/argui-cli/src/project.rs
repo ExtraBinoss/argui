@@ -3,6 +3,9 @@
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
 
+#[path = "../tests/project/errors.rs"]
+mod tests;
+
 /// A TSX adapter supported by the component registry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

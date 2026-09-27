@@ -1,5 +1,7 @@
 # Five functional priorities for TSX applications
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 This plan starts from `codex/dsl-gallery-live` after the optional `argui-media`
 and native `GpuCanvas` work. Its goal is to let a Solid or React application use
 Argui's native capabilities without rebuilding common controls or writing a

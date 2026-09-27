@@ -65,7 +65,7 @@ claim, use the inspector or traces to compare frame time, update class, GPU
 time, damaged pixels, and idle frame requests on the actual target. A unit test
 proving `Composite` is useful but does not measure browser smoothness.
 
-Further details: [animation API](../../../docs/ui/animation.md),
-[retained compositor](../../../docs/rendering/compositor.md),
-[gradient/color model](../../../docs/rendering/primitives.md), and
-[pipeline audit](../../../docs/rendering/animation-performance-review.md).
+The authoring properties are declared in the generated JSX types and native
+schema. Choose layout motion only for reflow, paint motion for changing fills
+or borders, and compositor motion for a transform or group opacity over
+retained content. A stopped or hidden scene must stop requesting frames.

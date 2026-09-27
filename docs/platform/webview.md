@@ -2,7 +2,13 @@
 
 `argui-webview` provides retained WebView sessions, a bounded residency pool,
 an Argui layout slot, native Wry views, and browser iframes. Enable the
-`argui/webview` feature.
+`webview` feature on `argui-runtime` and depend on `argui-webview` for its
+session and layout types.
+
+```toml
+argui-runtime = { version = "0.4.0", features = ["webview"] }
+argui-webview = "0.4.0"
+```
 
 | Host | Backend | Status |
 | --- | --- | --- |
@@ -33,9 +39,17 @@ These development packages are needed only when the WebView feature is enabled.
 Create `WebViewState` outside `render()`, then place its view in the element
 tree:
 
-```rust,ignore
-let state = WebViewState::new(WebViewSource::url("https://example.com")?);
-let element = WebView::new(&state).build();
+```rust
+use argui_ui::Element;
+use argui_webview::{WebView, WebViewError, WebViewSource, WebViewState};
+
+/// Creates one retained webpage session and its Argui layout slot.
+/// `url` must be an HTTP(S) page; invalid URLs return an error.
+pub fn webpage_slot(url: &str) -> Result<(WebViewState, Element), WebViewError> {
+    let state = WebViewState::new(WebViewSource::url(url)?);
+    let element = WebView::new(&state).build();
+    Ok((state, element))
+}
 ```
 
 The runtime reads final layout bounds and mounts the native or browser view above
@@ -73,14 +87,23 @@ inspection. Argui does not report a false remote `Loaded` event.
 
 `WebViewState::with_options` validates immutable permissions:
 
-```rust,ignore
-let state = WebViewState::with_options(
-    WebViewSource::url(url)?,
-    WebViewOptions::webpage()
-        .compatibility(WebCompatibility::compatible(relay_url)?)
-        .popups(PopupPolicy::Block)
-        .allow_downloads(false),
-)?;
+```rust
+use argui_webview::{
+    PopupPolicy, WebCompatibility, WebViewError, WebViewOptions, WebViewSource, WebViewState,
+};
+
+/// Creates a browser-compatible page session using a trusted relay origin.
+/// `url` is the page and `relay_url` is the relay's HTTP(S) origin.
+/// Returns an error for an invalid URL or incompatible security policy.
+pub fn compatible_page(url: &str, relay_url: &str) -> Result<WebViewState, WebViewError> {
+    WebViewState::with_options(
+        WebViewSource::url(url)?,
+        WebViewOptions::webpage()
+            .compatibility(WebCompatibility::compatible(relay_url)?)
+            .popups(PopupPolicy::Block)
+            .allow_downloads(false),
+    )
+}
 ```
 
 Browser `PopupPolicy::Sandboxed` keeps the popup sandboxed; `External` allows
@@ -93,14 +116,9 @@ inner page keeps its own origin. It can support origin-dependent APIs such as
 `localStorage`, but cannot bypass third-party cookie, authentication, or
 framing restrictions.
 
-```sh
-python3 crates/argui-webview/src/browser/relay/server.py \
-  --app-origin http://127.0.0.1:8081 \
-  --public-origin http://127.0.0.1:8082 \
-  --port 8082 --allowed-origin https://example.com
-```
-
-The included server is a development reference. A production relay must keep
+The included `crates/argui-webview/src/browser/relay/server.py` server is a
+development reference. Run it with the actual application, relay, and allowed
+website origins; `--help` describes the required options. A production relay must keep
 its response CSP, exact HTTP(S) allowlist, message origin checks, and dedicated
 origin. It never proxies destination pages or grants Argui IPC.
 
@@ -119,15 +137,15 @@ data types.
 ## Verification
 
 ```sh
+cargo nextest run -p argui-webview --all-features
 python3 crates/argui-webview/tests/browser/relay/server.py
-node crates/argui-webview/tests/browser/relay/client.mjs
-
-CHROME_PATH=/path/to/chrome \
-PUPPETEER_MODULE=/path/to/puppeteer/puppeteer.js \
-node crates/argui-webview/tests/browser/dom.mjs
 ```
 
 Rust tests in `crates/argui-webview/tests` cover sanitization, navigation,
-mounts, options, and cache policy. `tests/browser/dom.mjs` exercises the browser
-integration with `CHROME_PATH` and `PUPPETEER_MODULE` set. Run browser and native
-checks through the [private Linux display](../contributing/linux-testing.md).
+mounts, options, and cache policy. The browser checks are
+`crates/argui-webview/tests/browser/dom.mjs` and
+`crates/argui-webview/tests/browser/relay/client.mjs`; both require an installed
+Puppeteer module and a Chrome or Chromium executable. Set `PUPPETEER_MODULE`
+and `CHROME_PATH` to those actual locations and run each Node script through
+the [private Linux display](../contributing/linux-testing.md). The relay client
+starts and stops its own local server.

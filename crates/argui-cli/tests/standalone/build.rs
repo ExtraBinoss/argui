@@ -7,6 +7,9 @@ use std::{
     process::{Command, Output},
 };
 
+#[path = "build/automation.rs"]
+mod automation;
+
 /// Creates one executable fake tool in an isolated PATH.
 fn script(path: &Path, body: &str) {
     fs::write(path, body).unwrap();
@@ -72,7 +75,7 @@ case "$1" in
       cp assets.generated.json assets.dev.generated.json
       echo 'export const mediaAssets = {}' > assets.generated.ts
     fi ;;
-  *.mjs) mkdir -p "$4"; echo 'export default {}' > "$4/test.mjs" ;;
+  *.mjs) if [ "${ARGUI_FAKE_BUNDLE_FAIL:-}" = 1 ]; then exit 2; fi; mkdir -p "$4"; echo 'export default {}' > "$4/test.mjs" ;;
   *) exit 3 ;;
 esac
 "##,
@@ -101,8 +104,8 @@ case "$(cat argui.json)" in
   *'"framework": "rust"'*) binary=demo ;;
   *) binary=argui-app-native ;;
 esac
-printf '#!/bin/sh\nif [ -n "${ARGUI_AUTOMATION_GATE:-}" ]; then dd bs=1 count=1 of=/dev/null 2>/dev/null; sleep 0.35; fi\nif [ -n "${ARGUI_AUTOMATION_OUT:-}" ]; then mkdir -p "$ARGUI_AUTOMATION_OUT"; echo '\''{"ok":true,"steps":[]}'\'' > "$ARGUI_AUTOMATION_OUT/report.json"; fi\nexit 0\n' > "$target/$profile/$binary"
-chmod +x "$target/$profile/$binary"
+printf '#!/bin/sh\nif [ "${ARGUI_FAKE_HOST_EARLY_EXIT:-}" = 1 ]; then exit 0; fi\nif [ -n "${ARGUI_AUTOMATION_GATE:-}" ]; then dd bs=1 count=1 of=/dev/null 2>/dev/null; sleep 0.35; fi\nif [ -n "${ARGUI_AUTOMATION_OUT:-}" ]; then mkdir -p "$ARGUI_AUTOMATION_OUT"; echo '\''{"ok":true,"steps":[]}'\'' > "$ARGUI_AUTOMATION_OUT/report.json"; fi\nexit 0\n' > "$target/$profile/$binary"
+if [ "${ARGUI_FAKE_NO_EXEC:-}" = 1 ]; then chmod -x "$target/$profile/$binary"; else chmod +x "$target/$profile/$binary"; fi
 if [ "${ARGUI_FAKE_CARGO_FAIL:-}" = 1 ]; then exit 2; fi
 "##,
     );
@@ -180,6 +183,9 @@ fn format_uses_generated_app_dependency_and_supports_check() {
     let log = fs::read_to_string(root.join("commands.log")).unwrap();
     assert!(log.contains("--config .oxfmtrc.json --check src vite.config.ts"));
     assert!(log.contains("--config .oxfmtrc.json src vite.config.ts"));
+    let no_bun = cli(root, &["format"], &[("PATH", "/nonexistent")]);
+    assert!(!no_bun.status.success());
+    assert!(String::from_utf8_lossy(&no_bun.stderr).contains("bun unavailable"));
     fs::remove_file(app.join("node_modules/oxfmt/bin/oxfmt")).unwrap();
     let missing = cli(root, &["format"], &[]);
     assert!(!missing.status.success());

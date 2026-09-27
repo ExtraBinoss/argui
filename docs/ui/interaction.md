@@ -1,137 +1,138 @@
-# Interaction
+# Interaction in TSX and Rust
 
-Winit events enter through `argui-platform`. The runtime converts pointer
-coordinates to logical pixels and dispatches renderer-independent events through
-the retained UI tree.
+Argui sends platform input through the runtime to a retained UI tree. A native
+node handles focus, hit testing, and event delivery; Solid and React callbacks
+receive payloads from that same host. These are Argui events, not browser DOM
+events or React synthetic events. `@argui/host` defines their public payloads
+in [`events.ts`](../../packages/host/src/events.ts).
 
-```text
-winit -> platform -> runtime -> UI dispatch -> model update
-                                      |
-                               focus and hit state
+## Build a clickable surface
+
+Use a widget `Button` for ordinary actions. For a custom control, keep the
+focus and click boundary around the painted surface. `focusScope` is unpainted;
+the child `rectangle` carries the hover, press, and focus paint. This Solid
+example is a named keyboard and pointer action:
+
+```tsx solid
+import { useTheme } from '@argui/solid'
+import type { WidgetTheme } from '@argui/widgets/solid'
+
+export function SaveControl(props: { onSave: () => void }) {
+  const theme = useTheme<WidgetTheme>()
+
+  return <focusScope role="button" accessibleName="Save document"
+    focusable keyboardActivation="enterOrSpace" onClick={props.onSave}>
+    <rectangle width={120} height={36} radii={theme().radius}
+      background={theme().secondary} hoverBackground={theme().secondaryHover}
+      pressedBackground={theme().primary} focusBorderColor={theme().focusRing}>
+      <row width="100%" height="100%" alignItems="center" justifyContent="center">
+        <text color={theme().text}>Save</text>
+      </row>
+    </rectangle>
+  </focusScope>
+}
 ```
 
-## Identity and dispatch
+`keyboardActivation="enterOrSpace"` routes keyboard activation to `onClick`.
+The same click path is available to assistive technology. `focusOnTabNavigation`
+can remove a focusable custom node from sequential Tab navigation while
+leaving it available for programmatic focus. Use `accessibleDisabled` or the
+`enabled` control prop when the action is unavailable; do not only dim its
+paint. See [Accessibility](accessibility.md) for state and action metadata.
 
-Every retained element has a stable `NodeId`. Unkeyed nodes preserve identity
-at the same structural position; keyed siblings preserve it when reordered.
-Duplicate keys are errors.
+## Direct input and state
 
-Listeners are created with `Context::listener` and attached with
-`Element::on`. Dispatch runs capture from root to target, target listeners,
-then bubbling to root. `stop_propagation`, `stop_immediate_propagation`, and
-`prevent_default` act on the shared event control. Passive listeners cannot
-prevent defaults.
+Generated TSX declarations expose `onPointerDown`, `onPointerMove`,
+`onPointerUp`, `onPointerCancel`, `onPointerEnter`, `onPointerLeave`, `onWheel`,
+`onClick`, and `onContextMenu` on `touchArea`. `focusScope` exposes `onKey` and
+`onCaptureKey` for keyboard input. Pointer payloads may include window and
+local coordinates and node dimensions; read their optional fields before
+doing geometry. A key payload includes `key`, `state`, modifiers, and `repeat`.
+The `Slider` widget is the maintained example of pointer, keyboard, and
+semantic value input sharing one state transition.
 
-TSX controls in `@argui/widgets/solid` and `@argui/widgets/react` expose
-component callbacks such as `onClick` and `onInput`. They use the same native
-dispatch and accessibility behavior. Use lower-level listeners when capture or
-deliberate ancestor delegation is the design.
+In Rust, `argui-ui` dispatches listeners attached with `Element::on` through
+capture, target, and bubble phases. `Context::listener` creates model
+callbacks. `prevent_default`, `stop_propagation`, and
+`stop_immediate_propagation` control that shared dispatch; passive listeners
+cannot prevent a default. Hit testing checks painted order in reverse and
+respects ancestor clips. Rust `HitTestStyle` can select bounds, rounded or
+elliptical hits and expand them with hit slop independently of the pixels.
+There is no equivalent general hit-shape prop on every TSX primitive.
 
-`EventType::TextEdit` carries `UiEventKind::TextEdited(TextEdit)` through that
-same pipeline. `Context::edit_callback` invalidates automatically;
-`edit_event_handler` leaves invalidation to the app. The legacy
-`EventType::Input`/`TextChanged(String)` path is still supported, but a complete
-value is copied only when that event has a listener on the propagation path.
+The native runtime keeps transitions beside retained node identities. In
+Solid, use `<For>` for reactive keyed lists; in React, use stable `key` values.
+Native `id` names a node for anchors, accessibility relations, and tests.
+Changing a label should not change that ID. A list's framework `key` and
+native `id` serve different purposes.
 
-Hit regions follow paint order and are tested in reverse. A target must pass its
-own hit shape and every ancestor clip. Paint and hit-test ordering change
-together.
+## Text editing
 
-## Pointer and gestures
+`InputField` wraps native `textInput`. It delegates caret, selection,
+composition, undo, and text buffer handling to the native editor. Use
+`value`/`onValueChange` for controlled text, `defaultValue` for native-owned
+text, and `onSubmit` to receive the submitted string. With a controlled value,
+apply `onValueChange` updates promptly so the displayed value can follow the
+edit. A controlled field with no change callback must say `readOnly`.
 
-Mouse, touch, and pen use one `PointerEvent` with contact ID, device kind,
-phase, pressure, buttons, primary-contact state, and timestamp.
+```tsx solid
+import { createSignal } from '@argui/solid'
+import { InputField } from '@argui/widgets/solid'
 
-`capture_pointer` keeps movement and release targeted at one element outside
-its bounds. Release, cancellation, or focus loss ends capture and emits
-`LostPointerCapture`.
-
-The opt-in gesture arena recognizes tap, pan, pinch, and rotation. `PanGesture`
-sets axis, threshold, capture, and delivery:
-
-- immediate delivery suits ranges and direct manipulation;
-- frame-coalesced delivery keeps the newest movement sample per frame;
-- started, ended, and cancelled phases are never dropped.
-
-Pinch and rotation can run together. Velocity uses a bounded recent history.
-Touch can drive scroll containers while the same contacts remain available to
-configured gestures. Default scrolling starts only after touch slop, selects a
-viewport compatible with the contact's dominant axis, and does not run while a
-widget has captured that pointer. This keeps taps stable and isolates direct
-manipulation from a surrounding scroll area.
-
-Document text selection follows browser-style mouse behavior. Pressing directly
-on selectable text anchors at that glyph; starting a drag in non-interactive
-whitespace anchors at the nearest selectable text and extends across the
-document. Interactive hit regions such as buttons, editors, resize handles, and
-custom gestures keep ownership of the pointer and never trigger this fallback.
-
-## Keyboard and focus
-
-Physical key transitions reach the focused node with modifiers and repeat state.
-Tab and Shift-Tab traverse the active scope. Keyboard and accessibility
-activation produce the same typed click path as pointer activation.
-
-`FocusScope::restoring` restores the previous target.
-`FocusScope::trapped` also wraps Tab traversal.
-`FocusScope::modal` removes background nodes from active accessibility.
-Initial focus can target the first focusable descendant or a stable key.
-
-`Context::request_focus` and `clear_focus` resolve after layout. Missing,
-duplicate, disabled, or out-of-scope targets do not receive an implicit fallback.
-`FocusVisible` is active for keyboard or programmatic focus, not pointer focus.
-
-Text editing runs after raw key dispatch. `TextInputFilter` applies the same
-policy to keyboard, paste, and IME commits. Details are in
-[actions and text editing](editing.md).
-
-## Interaction styles
-
-`Interaction` defines behavior. `Element::when` attaches typed
-`StylePatch` values for hover, press, focus, named state, and container
-conditions. Matching rules compose in declaration order; a later value replaces
-only the same property.
-
-`Element::state_scope` creates a control boundary. Descendant hover, focus,
-and press can style that scope. A nested scope with the same identity shadows
-its ancestor.
-
-`HitTestStyle` is independent of paint:
-
-- `PointerEvents` selects box, descendants, both, or neither;
-- `HitShape` selects bounds, rounded rectangle, or ellipse;
-- hit slop enlarges a touch target without changing layout or pixels.
-
-Transforms and clips apply before hit testing. Style properties keep their
-invalidation class: color updates paint, transforms update retained composition
-and hit geometry, and dimensions update layout. Transitions retain tracks beside
-stable node IDs and stop requesting frames when settled.
-
-Container queries are for deliberate presentation changes that Flexbox or Grid
-cannot infer. See [responsive styling](styling.md).
-
-## Accessibility
-
-The semantic tree reuses UI node IDs. A semantic-only update does not run layout,
-text shaping, paint recording, or WGPU submission.
-
-Native windows use AccessKit. The Web adapter maintains real HTML controls beside
-the canvas and patches only changed semantic nodes. Both send actions, focus,
-and edited values through the same UI event path.
-
-Modal scopes expose only the modal's ancestor path and subtree, preventing
-assistive technology from focusing background controls. Decorative descendants
-can use `semantic_hidden(true)` to avoid duplicate announcements.
-
-## System preferences
-
-`SystemPreferences` reports color scheme, reduced motion, and high contrast,
-including each value's source. Application overrides win. Reduced motion settles
-active motions at their target while preserving the property's invalidation
-class.
-
-Run the combined keyboard, modal, accessibility, and multitouch example:
-
-```sh
-cargo run -p argui --example accessibility
+export function SearchField(props: { search: (query: string) => void }) {
+  const [query, setQuery] = createSignal('')
+  return <InputField label="Search" type="search" value={query()}
+    onValueChange={setQuery} onSubmit={props.search} />
+}
 ```
+
+At the lower Rust layer, `EventType::TextEdit` carries a range replacement
+instead of copying the whole text for every keystroke. The native `Input`
+event remains available when a complete edited value is needed. Details of
+filters, IME, and history are in [Text editing](editing.md).
+
+## Floating controls and focus
+
+`Popover` owns its trigger anchor, `popupWindow`, dismissal, and focus
+restoration. It is nonmodal by default: opening it leaves focus on the
+trigger. Set `initialFocus="first"` to move focus to its first focusable
+child. Outside pointer input or Escape dismisses it. `width` sizes the trigger
+and `contentWidth` sizes the popup independently. Without `width`, the trigger
+keeps its natural size. `accessibleLabel` overrides the visible trigger string
+for its accessible name; `leading` and `trailing` accept application-owned
+content. `closeLabel` can add a close button inside the popup. `placement`
+chooses the preferred side and alignment before viewport fitting.
+
+```tsx solid
+import { createSignal } from '@argui/solid'
+import { InputField, Popover } from '@argui/widgets/solid'
+
+export function Filters() {
+  const [open, setOpen] = createSignal(false)
+  return <Popover trigger="Filters" open={open()} onOpenChange={setOpen}
+    contentWidth={280} initialFocus="first">
+    <InputField label="Query" type="search" defaultValue="" />
+  </Popover>
+}
+```
+
+Use `defaultOpen` for a locally managed initial state or pair `open` with
+`onOpenChange` to control a Popover. `Select` uses a trapped option list,
+supports arrows, Home, End, Enter, and Escape, and restores focus after
+dismissal. `Tooltip` opens on hover or focus, closes after leaving the trigger
+and popup or pressing Escape, and shows the plain string in `content`. Its
+default `contentWidth` is 220 logical pixels. These
+contracts are different from a modal dialog, which needs `containment="modal"`
+and background focus exclusion at the native popup or scope level.
+
+Popover and Tooltip use a translucent `overlaySurface` and blur by default.
+Set `opaque` for the regular opaque surface, or `blur={false}` to keep the
+translucency without backdrop blur. The `overlay*` theme tokens set their
+padding, radius, border, blur, and in-window shadow. A requested native
+outside-window popup omits that in-window shadow at its surface edge.
+
+`allowOutsideWindow` on Popover, Select, Tooltip, or `popupWindow` requests a
+separate native popup that can pass the owner window edge. Runtime support and
+the window backend decide whether it is created; otherwise content falls back
+inside the window. The current Linux native popup path uses X11. Do not use a
+native popup demo as proof of Wayland, mobile, or Web support.

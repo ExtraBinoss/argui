@@ -1,5 +1,8 @@
 use argui_ui::TreeUpdate;
 
+#[path = "../../tests/app/frame_route/mod.rs"]
+mod tests;
+
 /// Keeps a compositor-only frame only when no fresh layout will replace its scene.
 ///
 /// `composite_frame` is the result of any motion sampled earlier in this frame.

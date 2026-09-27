@@ -30,4 +30,7 @@
   server without a compositor cannot prove visual alpha composition. Inject a
   pointer into the clear and dim regions and verify the X11 target window.
 
-The API and backend matrix are in [the desktop window contract](../../../docs/platform/desktop-windows.md).
+Backend boundary: X11 can place a screen-sized overlay and apply X Shape input
+regions. Ordinary Wayland toplevels have surface-local input regions but no
+portable absolute placement or always-on-top guarantee. WebAssembly has no
+native desktop window. Keep the overlay behind an explicit capability check.

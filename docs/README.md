@@ -1,44 +1,66 @@
-# Repository documentation
+# Argui documentation
 
-These guides explain repository boundaries, engine contracts, platform limits,
-testing, and releases. The website will be rebuilt for the TSX API separately.
+Argui is a retained Rust UI engine with Solid and React TSX adapters. The
+desktop TSX host embeds QuickJS; the Web host runs the same Rust renderer in
+WebAssembly on a WebGPU canvas. Rust applications can use the runtime directly.
+These guides document the current 0.4 source and its platform limits.
+Application commands run from a generated project; contributor commands name
+the repository root explicitly.
 
-Start with:
+## Start here
 
-1. [Architecture](architecture.md) for the frame and event flow.
-2. [Repository structure](repo/structure.md) to find the crate that owns a change.
-3. [Solid and React native gallery](solid-react-native.md) for the shared host, selected QuickJS runtime, and measured limits.
-4. [Development guide](contributing/development.md) and [code quality](contributing/code-quality.md) before opening a pull request.
+1. [Getting started](getting-started.md): prerequisites, CLI projects, native
+   and browser runs, and the checked-in Rust and TSX templates.
+2. [Argui CLI](cli.md): 0.4 installation, every application command, build
+   targets, tests, and component installation.
+3. [Crates and features](crates.md): which Rust dependencies to add and how
+   optional Cargo features affect an application.
+4. [Architecture](architecture.md): ownership, reconciliation, invalidation,
+   rendering, and platform boundaries.
+5. [Solid and React host contract](solid-react-native.md): the transaction
+   bridge, identity, state, and browser versus desktop capabilities.
+6. [Gallery](../apps/gallery/README.md): runnable Solid and React controls.
 
-For applications using the previous TSX API, see [the v2 migration guide](migration-tsx-v2.md).
+## Build an interface
 
-## Engine and application contracts
-
-| Area | Guide |
+| Need | Guide |
 | --- | --- |
-| Models and lifetime | [Models](runtime/models.md) · [Tasks](runtime/tasks.md) |
-| Layout and input | [Layout](ui/layout.md) · [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
-| UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
-| Rendering | [Primitives](rendering/primitives.md) · [Text fidelity](rendering/text.md) · [Adaptive damage](rendering/damage.md) · [Compositor](rendering/compositor.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
-| Localization | [Internationalization](i18n.md) |
-| TSX widgets and assets | [Gallery and framework adapters](../apps/gallery/README.md) · [Application icons](ui/icons.md) |
+| Custom components and reactive state | [Custom components and state](ui/custom-components.md) |
+| Sizing, flex, grid, RTL | [Layout](ui/layout.md) |
+| Native scrolling and virtualization | [Scrolling](ui/scroll.md) |
+| Paint, borders, shadows, colors | [Styling](ui/styling.md) |
+| Transitions, loops, and frame cost | [Animation](ui/animation.md) |
+| Widget exports and state contracts | [UI and widgets](ui/README.md) |
+| Focus, events, input, semantics | [Interaction](ui/interaction.md) · [Accessibility](ui/accessibility.md) |
+| Theme runtime and tokens | [Theme](ui/theme.md) |
+| Application assets | [Icons and media](ui/icons.md) |
 
-## Platform integration
+## Windows and platform services
 
-| Area | Guide |
-| --- | --- |
-| Windows and application setup | [Application](platform/application.md) |
-| Android and iOS | [Native mobile](native-mobile.md) · [Safe areas](platform/window-insets.md) |
-| Native services | [File picker](platform/file-picker.md) · [WebView](platform/webview.md) · [Updater](platform/updater.md) |
-| Desktop surfaces | [Backdrops](platform/desktop-backdrops.md) · [Native popovers](platform/native-popovers.md) |
+Start with [desktop windows](platform/desktop.md) for monitors, logical and
+physical coordinates, zoom, resizing, movement, decorations, transparency,
+input regions, native popups, and backend limits. Then use the focused guides:
 
-## Maintainer guides
+- [Application setup](platform/application.md) and
+  [safe areas](platform/window-insets.md)
+- [Desktop backdrops](platform/desktop-backdrops.md) and
+  [popups beyond the window](platform/desktop.md#popups-beyond-the-window)
+- [File picker](platform/file-picker.md), [WebView](platform/webview.md), and
+  [updater](platform/updater.md)
+- [Android and iOS boundary](native-mobile.md)
 
-- [Performance](performance/optimizations.md): contracts and measurements.
-- [Native automation](automation.md): deterministic captures and performance reports.
-- [Linux graphical testing](contributing/linux-testing.md): private displays and
-  capture-based checks.
-- [Releases](contributing/releases.md): packaging, crates.io, and GitHub automation.
-- [Roadmap](roadmap.md): open work only.
+## Engine and maintainers
 
-Commands in these guides run from the repository root unless stated otherwise.
+- [Models and lifetime](runtime/models.md) and [owned tasks](runtime/tasks.md)
+- [Rendering primitives](rendering/primitives.md), [text](rendering/text.md),
+  [damage](rendering/damage.md), [compositor](rendering/compositor.md),
+  [effects](rendering/effects.md), and [GPU canvases](rendering/gpu-canvas.md)
+- [Internationalization](i18n.md) and [native automation](automation.md)
+- [Repository structure](repo/structure.md), [development](contributing/development.md),
+  [code quality](contributing/code-quality.md),
+  [Linux graphical testing](contributing/linux-testing.md), and
+  [releases](contributing/releases.md)
+
+The `docs/references/shadcn-ui/` snapshot is source material for component
+work and tests, not an Argui API guide. The current API is defined by the
+Rust schema and the generated Solid and React JSX declarations.

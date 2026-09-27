@@ -1,5 +1,7 @@
 # Argui CLI and web target plan
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 ## Goal
 
 One installed `argui` CLI creates, checks, builds, and runs Solid or React

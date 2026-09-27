@@ -1,5 +1,7 @@
 # Plan : parité des widgets Argui avec shadcn/ui
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 Statut : mise en œuvre en cours. Ce document complète le [plan global Argui](argui-crate-theme-decisions.md), en particulier le thème commun, les composants copiables par `argui add` et les cibles native + Web des mêmes sources TSX.
 
 ## Objectif et frontière
@@ -33,7 +35,7 @@ Statut : mise en œuvre en cours. Ce document complète le [plan global Argui](a
 
 - [`components/registry.json`](../../components/registry.json) déclare actuellement les 63 composants Solid et React de l'inventaire, dont les cinq widgets de départ : `button`, `input-field`, `select`, `popover`, `dialog`. `input-field` est l'équivalent le plus proche d'`input`, mais son API et ses états doivent être comparés à la référence. **Présent ne veut pas dire parité terminée.**
 - Les sources vivent dans [`packages/widgets/src/solid`](../../packages/widgets/src/solid/) et [`packages/widgets/src/react`](../../packages/widgets/src/react/), avec types/helpers partagés. Le registre généré porte une version, une URL source et un checksum par fichier ; l'installation autonome hors du dépôt suit le plan CLI global.
-- La [navigation de galerie](../../apps/gallery/src/gallery-pages.ts) expose une page par composant et par framework, avec recherche et catégories, ainsi que des pages Examples. Les entrées couvrent leurs états et interactions dans les deux frameworks.
+- La navigation de galerie (now in `apps/gallery/src/solid/gallery.tsx` and `apps/gallery/src/react/gallery.tsx`) expose une page par composant et par framework, avec recherche et catégories, ainsi que des pages Examples. Les entrées couvrent leurs états et interactions dans les deux frameworks.
 - Garder les widgets faciles à copier. Mutualiser seulement les types, les algorithmes neutres du framework, les tokens et les primitives dont plusieurs composants ont un vrai besoin. Éviter une seconde grosse bibliothèque de comportement ou de CSS à installer chez l'utilisateur.
 
 ## Checklist de parité

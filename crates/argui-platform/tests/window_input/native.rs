@@ -4,7 +4,8 @@
 fn exercise() {
     use argui_core::{Point, Rect, Size};
     use argui_platform::{
-        WindowConfig, WindowInputRegion, apply_window_input_region, window_capabilities,
+        WindowConfig, WindowInputRegion, WindowInputRegionError, apply_window_input_region,
+        window_capabilities,
     };
     use winit::{
         application::ApplicationHandler,
@@ -99,10 +100,25 @@ fn exercise() {
                     .sum::<u32>(),
                 800 * 600
             );
-            assert!(
-                apply_window_input_region(&window, &WindowInputRegion::Exclude(hole), f64::NAN)
-                    .is_err()
-            );
+            for scale in [f64::NAN, f64::INFINITY, 0.0, -1.0] {
+                assert_eq!(
+                    apply_window_input_region(&window, &WindowInputRegion::Exclude(hole), scale),
+                    Err(WindowInputRegionError::InvalidGeometry)
+                );
+            }
+            for invalid in [
+                Rect::new(Point::new(f32::NAN, 0.0), Size::new(1.0, 1.0)),
+                Rect::new(Point::new(0.0, f32::INFINITY), Size::new(1.0, 1.0)),
+                Rect::new(Point::new(0.0, 0.0), Size::new(f32::NAN, 1.0)),
+                Rect::new(Point::new(0.0, 0.0), Size::new(1.0, f32::INFINITY)),
+                Rect::new(Point::new(0.0, 0.0), Size::new(-1.0, 1.0)),
+                Rect::new(Point::new(0.0, 0.0), Size::new(1.0, -1.0)),
+            ] {
+                assert_eq!(
+                    apply_window_input_region(&window, &WindowInputRegion::Exclude(invalid), 1.0),
+                    Err(WindowInputRegionError::InvalidGeometry)
+                );
+            }
             event_loop.exit();
         }
         fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
@@ -117,4 +133,24 @@ fn exercise() {
 fn native_window_input() {
     #[cfg(target_os = "linux")]
     exercise();
+}
+
+#[test]
+fn input_region_errors_identify_geometry_backend_and_platform_failures() {
+    use argui_platform::WindowInputRegionError;
+
+    assert!(
+        WindowInputRegionError::InvalidGeometry
+            .to_string()
+            .contains("geometry")
+    );
+    assert!(
+        WindowInputRegionError::Unsupported
+            .to_string()
+            .contains("unsupported")
+    );
+    assert_eq!(
+        WindowInputRegionError::Platform("X Shape rejected".into()).to_string(),
+        "X Shape rejected"
+    );
 }

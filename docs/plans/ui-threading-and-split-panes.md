@@ -1,5 +1,7 @@
 # UI threading and future split panes
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 Status: architecture proposal. A future video editor is the motivating use
 case; this document does not start an editor implementation.
 

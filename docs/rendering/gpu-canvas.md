@@ -165,7 +165,7 @@ The element accepts the normal width, height, position, rotation, opacity,
 visibility and backdrop filter properties. `alt` supplies accessible image
 semantics; `alt=""` marks purely decorative output.
 
-```tsx
+```tsx both
 <gpuCanvas
   canvas_id={previewCanvasId}
   width="100%"

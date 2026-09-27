@@ -4,6 +4,9 @@ use super::Manifest;
 use crate::sdk;
 use std::{fs, path::Path, process::Command};
 
+#[path = "../../tests/standalone/build/assets.rs"]
+mod tests;
+
 /// Checks the generated Rust or TSX sources without using an Argui checkout.
 ///
 /// # Errors

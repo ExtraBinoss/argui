@@ -7,21 +7,24 @@ argui-platform = { version = "0.4.0", features = ["file-picker"] }
 ```
 
 ```rust
-use argui_platform::file_picker::{FileDialog, FileFilter, FilePickerMode};
+use argui_platform::file_picker::{
+    FileDialog, FileDialogError, FileFilter, FilePickerMode, PickedFile,
+};
 
-let selected = FileDialog::new(FilePickerMode::Files)
-    .title("Choose images")
-    .filter(FileFilter::new("Images", ["png", "jpg", "webp"]))
-    .open()
-    .await?;
-
-if let Some(files) = selected {
-    for file in files {
-        // On desktop, file.path() returns a Path without requiring UTF-8.
-        println!("{}", file.file_name());
-    }
+/// Opens a multi-file image chooser and returns the selected file handles.
+/// Returns `Ok(None)` when the chooser yields no selection, or an error if it fails.
+pub async fn choose_images() -> Result<Option<Vec<PickedFile>>, FileDialogError> {
+    FileDialog::new(FilePickerMode::Files)
+        .title("Choose images")
+        .filter(FileFilter::new("Images", ["png", "jpg", "webp"]))
+        .open()
+        .await
 }
 ```
+
+On desktop, `PickedFile::path()` returns a `Path` without requiring UTF-8;
+`file_name()` gives the displayed name. Browser handles do not expose a native
+filesystem path.
 
 Modes are `File`, `Files`, `Folder`, `Folders` and `Save`. Shared options include
 title, extension filters, initial directory and suggested name. `Save` selects

@@ -3,8 +3,8 @@ import { ThemeProvider, render, useNativeHost } from '@argui/solid'
 import { widgetThemeDefinition, type WidgetTheme } from '@argui/widgets/solid'
 import { Gallery } from './gallery'
 
-/** Mounts the five-widget Solid gallery into a native Argui host. */
-export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () => void {
+/** Mounts the Solid gallery into a native or browser Argui host. */
+export function mountGallery(bridge: NativeBridge, expectedAbiHash: string, browser = false): () => void {
   const host = new NativeHost(bridge, expectedAbiHash)
   const runtime = createThemeRuntime<WidgetTheme>(bridge, widgetThemeDefinition)
   const services = new ApplicationServices(bridge)
@@ -14,7 +14,7 @@ export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () 
   host.setProperty(root, 'height', '100%')
   const dispose = render(() => (
     <ThemeProvider runtime={runtime}>
-      <Gallery runtime={runtime} services={services} />
+      <Gallery runtime={runtime} services={services} browser={browser} />
     </ThemeProvider>
   ) as unknown as NativeNode, root)
   host.setRoot(root)

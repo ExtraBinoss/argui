@@ -1,5 +1,7 @@
 # API TSX v2 : contrat simple avant reconstruction des widgets
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 Statut : **plan de migration v2 en cours d'implémentation** au 26 septembre
 2026, à partir de `fd8d28d2`. Ce document fixe la direction demandée et les
 cinq premiers widgets ; les questions historiques restent visibles. Il remplace les conventions TSX

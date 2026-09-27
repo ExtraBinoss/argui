@@ -242,7 +242,7 @@ pub fn overview(cwd: &Path) -> Result<(), String> {
         "missing"
     };
     let message = format!(
-        "Argui {}  ·  TSX CLI\n\nSystem   {} / {}\nProject  {context}\nTools    Bun {js}  ·  Rust {rust}\n\nGet started\n  argui init solid --dir my-app      Create a Solid native/Web app\n  argui init react --dir my-app      Create a React native/Web app\n  argui init rust --dir my-app       Create a native Rust app\n  argui doctor                       Check build prerequisites\n  argui --help                       All commands\n\nIf Argui is useful to you or your app, give it a star or talk with us on Discord:\n  https://github.com/ExtraBinoss/argui  ·  https://discord.gg/66rjffMmD\n",
+        "Argui {}  ·  TSX CLI\n\nSystem   {} / {}\nProject  {context}\nTools    Bun {js}  ·  Rust {rust}\n\nGet started\n  argui init solid --dir my-app      Create a Solid native/Web app\n  argui init react --dir my-app      Create a React native/Web app\n  argui init rust --dir my-app       Create a native Rust app\n  argui doctor                       Check build prerequisites\n  argui --help                       All commands\n\nIf Argui is useful to you or your app, give it a star or talk with us on Discord:\n  https://github.com/ExtraBinoss/argui  ·  https://discord.gg/xY9CWSc65\n",
         env!("CARGO_PKG_VERSION"),
         env::consts::OS,
         env::consts::ARCH

@@ -1,5 +1,7 @@
 # Layout Argui v2 : comparaison Web, Iced et Slint
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 Statut : **recherche ayant guidé l'implémentation v2**, 26 septembre 2026.
 Ce texte conserve les hypothèses et les comparaisons initiales ; le contrat
 effectivement livré est décrit dans [le guide de layout](../ui/layout.md).

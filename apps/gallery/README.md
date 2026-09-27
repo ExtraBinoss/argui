@@ -1,86 +1,67 @@
-# Argui TSX gallery
+# Argui gallery
 
-The gallery has widget pages plus `Examples / Layouting`, `Examples / Animation`,
-`Examples / Expressive UI`, and `Examples / Scrollbars`. Expressive UI shows
-five retained gradient and throbber recipes. The Scrolling widget page compares native scrolling
-with a virtualized list. Solid is the default; React implements the same pages
-and examples.
+The gallery mounts the same Rust element tree through Solid and React. Each
+adapter has 12 widget pages: Button, ButtonGroup, Checkbox, InputField,
+Popover, Progress, Select, Slider, Switch, Tabs, Tooltip, and VirtualList.
+The Examples section demonstrates layout, scrollbars, animation, expressive
+motion, and the desktop Screen spotlight. `ScrollShadow` is also exported by
+the widget package and used for the gallery navigation.
+
+## Run it
+
+From the repository root:
 
 ```sh
+bun install --frozen-lockfile
 bun run dev
 bun run dev:react
 bun run dev:web:solid
 bun run dev:web:react
 ```
 
-`bun run dev` starts the native Solid gallery; `bun run dev:react` starts the
-native React gallery. The `dev:web:*` commands start the browser galleries.
-The Web commands regenerate the JSX contract, compile the gallery's WASM host,
-then start Vite. Rust edits rebuild WASM and reload the browser; TSX edits use
-Vite's normal reload. A WASM rebuild resets application state.
-An already installed matching `wasm-bindgen` is reused without downloading it.
-Open the local URL printed by Vite; the React page is `/react.html`. Both Web
-pages mount the same TSX scenes and Rust renderer as the native gallery. The
-current browser renderer requires WebGPU and reports a startup error when the
-browser does not provide a WebGPU adapter.
+The first two commands start the native QuickJS gallery with Solid or React.
+The Web commands regenerate the JSX contract, compile the WASM host, and start
+Vite; the React page is `/react.html`. Rust edits rebuild WASM and reload the
+browser, resetting gallery state. Browser rendering needs WebGPU. On Linux,
+run graphical checks through
+[the private-display helper](../../docs/contributing/linux-testing.md) and
+inspect a saved capture.
 
-The shared widget package exports `Button`, `ButtonGroup`, `Checkbox`,
-`Switch`, `InputField`, `Select`, `Tabs`, `Slider`, `Progress`, `Popover`, and
-`VirtualList` from `@argui/widgets/solid` or `@argui/widgets/react`.
-Public props use the same camelCase names in both frameworks.
-The [ButtonGroup guide](../../docs/ui/button-group.md) shows joined actions,
-search, vertical orientation, and RTL composition.
-The [Popover guide](../../docs/ui/popover.md) defines the controlled state,
-width, focus, and overlay theme contract.
-The [controls guide](../../docs/ui/controls.md) covers the five new controls.
-The [theme guide](../../docs/ui/theme.md) lists the official Neutral tokens,
-System mode, and accepted hex, Oklch, RGB, and RGBA values.
+## Code and capabilities
 
-```tsx
-<column gap={12} padding={16}>
-  <text>Hello</text>
-  <Button variant="default" onClick={save}>Save</Button>
-  <InputField label="Name" value={name} onValueChange={setName} />
-</column>
+`src/solid/gallery.tsx` and `src/react/gallery.tsx` own the page navigation;
+their page modules are the runnable examples. The controls come from
+`@argui/widgets/solid` and `@argui/widgets/react`; the current export and state
+contracts are documented in [UI and widgets](../../docs/ui/README.md).
+Assets are generated from `assets.config.json` by
+`scripts/generate-assets.mjs`. The selected QuickJS host lives under
+`quickjs-host/`; the browser bridge is in `src/web-mount.ts` and the WASM host
+under `web-host/`.
+
+The Screen spotlight requires an X11 desktop backend with compositing and
+shaped input regions. It is not a browser or Wayland capability. Native
+outside-window popups also depend on the runtime's `native-popups` feature;
+the browser host keeps popup content inside its canvas. See
+[desktop windows](../../docs/platform/desktop.md) for the supported backend
+matrix and coordinate rules.
+
+## Native TSX hot reload
+
+For the selected adapter, the helper builds an initial bundle, watches TSX
+changes with Vite, and delivers successful rebuilds to the running QuickJS
+host. Run a Linux desktop window inside the private display:
+
+```sh
+./scripts/linux-hidden-display.sh ./scripts/gallery-hot-reload.sh desktop solid
 ```
 
-Create one theme runtime when mounting the app and provide it once at the root.
-Widgets read the inherited theme; `ThemeScope` can override selected tokens for
-a subtree.
+Use `react` for the React adapter. For an installed Android debug gallery,
+`./scripts/gallery-hot-reload.sh android solid` pushes changed bundles through
+`adb`; the script also accepts `react` for development. Android release
+packages embed Solid. See [Android packaging](../../mobile/android/README.md)
+for the build and installation steps.
 
-```tsx
-const runtime = createThemeRuntime(bridge, widgetThemeDefinition)
-root.render(
-  <ThemeProvider runtime={runtime}>
-    <App />
-  </ThemeProvider>,
-)
-```
-
-`InputField` and `Select` support `value`, `defaultValue`, and `onValueChange`.
-`Select` and `Popover` also support `open`, `defaultOpen`, and `onOpenChange`.
-`VirtualList` requires a stable `itemKey` function; native scrolling determines
-which bounded range is mounted.
-
-Icons belong to the application. `Button` accepts JSX children, and the other
-widgets expose optional `leading` or `trailing` slots. For example, a gallery
-can provide its own assets without adding an icon dependency to the widget:
-
-```tsx
-<Button onClick={save}>
-  <row gap={8} alignItems="center">
-    <svg source={mediaAssets['gallery/settings.svg']} width={16} height={16} />
-    <text color={theme.text}>Save</text>
-  </row>
-</Button>
-<InputField label="Search" leading={
-  <svg source={mediaAssets['tabler/search.svg']} width={16} height={16} />
-} />
-<Select label="Language" options={languages} trailing={
-  <svg source={mediaAssets['tabler/chevron-down.svg']} width={16} height={16} />
-} />
-```
-
-The old gallery and widget implementation is preserved as a read-only reference
-under the repository root's `OLD_API/` directory. Active builds and exports do
-not import that archive.
+Run `bun run check:ts` for generated types and `bun run test:ts` for both
+adapter and host interactions. A successful typecheck alone does not prove
+that a transaction mounts, and a headless host test does not establish visual
+quality; use a private-display capture for graphical changes.

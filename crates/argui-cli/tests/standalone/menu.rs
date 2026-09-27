@@ -40,6 +40,11 @@ sys.exit(status)
 
 /// Runs interactive init inside a private pseudoterminal with real key input.
 fn drive(root: &Path, args: &[&str], keys: &[&[u8]]) -> Output {
+    drive_with_path(root, args, keys, None)
+}
+
+/// Runs the menu with an optional isolated tool path for terminal-control errors.
+fn drive_with_path(root: &Path, args: &[&str], keys: &[&[u8]], path: Option<&Path>) -> Output {
     let encoded = keys
         .iter()
         .map(|key| {
@@ -49,7 +54,12 @@ fn drive(root: &Path, args: &[&str], keys: &[&[u8]]) -> Output {
         })
         .collect::<Vec<_>>()
         .join(",");
-    Command::new("python3")
+    let python = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+        .map(|directory| directory.join("python3"))
+        .find(|candidate| candidate.is_file())
+        .expect("python3 is required for terminal tests");
+    let mut command = Command::new(python);
+    command
         .args([
             "-c",
             DRIVE_PTY,
@@ -58,9 +68,11 @@ fn drive(root: &Path, args: &[&str], keys: &[&[u8]]) -> Output {
             &encoded,
         ])
         .args(args)
-        .arg("--no-install")
-        .output()
-        .unwrap()
+        .arg("--no-install");
+    if let Some(path) = path {
+        command.env("PATH", path);
+    }
+    command.output().unwrap()
 }
 
 #[test]
@@ -179,4 +191,30 @@ fn interactive_menu_requires_one_target() {
         serde_json::from_slice(&fs::read(temp.path().join("app/argui.json")).unwrap()).unwrap();
     assert_eq!(state["framework"], "solid");
     assert_eq!(state["targets"], serde_json::json!(["web"]));
+}
+
+#[test]
+/// Terminal setup failures provide a flag-based way to retry initialization.
+fn interactive_menu_reports_missing_or_disappearing_stty() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let bin = root.join("bin");
+    fs::create_dir(&bin).unwrap();
+    let missing = drive_with_path(root, &["init", "--dir", "missing"], &[], Some(&bin));
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stdout).contains("interactive init needs a terminal"));
+    assert!(!root.join("missing").exists());
+
+    let stty = bin.join("stty");
+    fs::write(
+        &stty,
+        "#!/bin/sh\nif [ \"$1\" = -g ]; then echo saved; /bin/rm \"$0\"; exit 0; fi\nexit 1\n",
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&stty, fs::Permissions::from_mode(0o755)).unwrap();
+    let vanished = drive_with_path(root, &["init", "--dir", "vanished"], &[], Some(&bin));
+    assert!(!vanished.status.success());
+    assert!(String::from_utf8_lossy(&vanished.stdout).contains("cannot enable terminal input"));
+    assert!(!root.join("vanished").exists());
 }

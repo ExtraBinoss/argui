@@ -5,11 +5,22 @@ browser. Desktop apps use the QuickJS host; browser apps use the Rust renderer
 compiled to WebAssembly inside a canvas.
 Commands and project files are the same on Linux, macOS, and Windows.
 
+The [website CLI guide](../../docs/cli.md) covers the 0.4 `curl | bash`
+installer, Windows installer, prerequisites, and command reference. The
+published 0.4 archives are required for those installers. Until then, build
+the CLI from this checkout:
+
 ```sh
-cargo install --path crates/argui-cli
+cargo install --path crates/argui-cli --locked
 argui
 argui doctor
 argui doctor web
+```
+
+A generated app needs the 0.4 crates to be published or patched to this
+checkout before its Rust host can build. Once the crates are available, use:
+
+```sh
 argui init solid --dir my-app --yes
 cd my-app
 argui check

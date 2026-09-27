@@ -37,7 +37,7 @@ impl Default for TextEngine {
             Self::from_embedded_fonts(
                 [
                     include_bytes!("../assets/fonts/NotoSans-Regular.ttf").as_slice(),
-                    include_bytes!("../../../assets/fonts/NotoSansArabic.ttf").as_slice(),
+                    include_bytes!("../assets/fonts/NotoSansArabic.ttf").as_slice(),
                 ],
                 "Noto Sans",
                 "Noto Sans",

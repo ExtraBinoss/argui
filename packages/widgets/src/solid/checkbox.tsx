@@ -1,11 +1,12 @@
 import { createSignal } from 'solid-js'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { useTheme } from '@argui/solid'
+import type { AssetRef } from '@argui/host'
 import type { WidgetTheme } from '../shared/theme'
 import type { BooleanControlOptions } from '../shared/new-controls'
 
 /** Props for a native checkbox with local or controlled state. */
-export type CheckboxProps = BooleanControlOptions
+export type CheckboxProps = BooleanControlOptions & { checkedIcon?: AssetRef }
 
 /** Renders a focusable checkbox whose checked state is exposed to accessibility. */
 export function Checkbox(props: CheckboxProps): JSX.Element {
@@ -33,7 +34,9 @@ export function Checkbox(props: CheckboxProps): JSX.Element {
         border={{ width: 1, color: checked() ? theme().primary : theme().input }}
         focusBorderColor={theme().focusRing} opacity={enabled() ? 1 : 0.5}>
         <row width="100%" height="100%" alignItems="center" justifyContent="center">
-          {checked() ? <text color={theme().primaryForeground} fontSize={13} weight={700}>✓</text> : null}
+          {checked() ? props.checkedIcon
+            ? <svg source={props.checkedIcon} width={12} height={12} color={theme().primaryForeground} />
+            : <text color={theme().primaryForeground} fontSize={13} weight={700}>✓</text> : null}
         </row>
       </rectangle>
       {props.label ? <text color={theme().text}>{props.label}</text> : null}

@@ -257,6 +257,21 @@ def release_plan(base, fetch=registry_versions):
                      'reason': reason}
 
 
+def release_notes(plan):
+    """Describe the published crates and the CLI assets added after the release."""
+    version = plan['version']
+    return (f'Argui {version} is available on crates.io.\n\n'
+            f'```toml\n[dependencies]\nargui-runtime = "{version}"\n```\n\n'
+            'The CLI archives for Linux, macOS, and Windows are attached after '
+            'the release pipeline finishes. Then install the verified CLI on '
+            'Linux or macOS with:\n\n'
+            '```sh\ncurl -fsSL https://raw.githubusercontent.com/ExtraBinoss/argui/main/scripts/install-cli.sh | bash\n```\n\n'
+            '[Website and live widget gallery](https://extrabinoss.github.io/argui/)\n\n'
+            'Published crates:\n\n' + '\n'.join(
+                f'- [{name}](https://crates.io/crates/{name}/{version})'
+                for name in plan['all_packages']))
+
+
 def bump(value):
     current, _ = workspace()
     if version_key(value) <= version_key(current):
@@ -297,12 +312,7 @@ def publish(plan):
     if existing.returncode == 0:
         print(f'GitHub release {plan["tag"]} already exists')
         return
-    notes = (f'Argui {plan["version"]} is available on crates.io.\n\n'
-             f'```toml\n[dependencies]\nargui = "{plan["version"]}"\n```\n\n'
-             '[Website and live widget gallery](https://extrabinoss.github.io/argui/)\n\n'
-             'Published crates:\n\n' + '\n'.join(
-                 f'- [{name}](https://crates.io/crates/{name}/{plan["version"]})'
-                 for name in plan['all_packages']))
+    notes = release_notes(plan)
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md') as body:
         body.write(notes)
         body.flush()

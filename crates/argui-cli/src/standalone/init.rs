@@ -10,6 +10,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[path = "../../tests/standalone/init/rollback.rs"]
+mod tests;
+
 /// Validated inputs for one init operation.
 pub(super) struct Options {
     /// Final application directory.

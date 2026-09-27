@@ -1,5 +1,7 @@
 # Audit des crates pour l'API TSX v2
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 État du 26 septembre 2026 sur ce checkout. Cet audit étudie le graphe Rust, les exports, les features et les consommateurs visibles. Il ne connaît pas tous les utilisateurs des versions publiées. La rupture assumée du contrat TSX v2 ne prouve pas qu'un export Rust public puisse être retiré sans migration.
 
 ## Méthode et limites

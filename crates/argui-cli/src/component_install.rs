@@ -7,6 +7,9 @@ use std::{fs, io::Read, path::Path};
 
 const MAX_FILE: u64 = 256 * 1024;
 
+#[path = "../tests/component_install/limits.rs"]
+mod tests;
+
 /// Installs all requested framework/name pairs into one standalone application.
 /// `requests` may mix adapters; sources and conflicts are validated as one batch.
 ///

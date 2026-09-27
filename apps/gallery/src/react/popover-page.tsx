@@ -3,8 +3,8 @@ import { useState, type ReactElement } from 'react'
 import { useTheme } from '@argui/react'
 import { InputField, Popover, type WidgetTheme } from '@argui/widgets/react'
 
-/** Shows a trigger anchored to content in a native popup window. */
-export function PopoverPage(): ReactElement {
+/** Shows popover surfaces, including a desktop-only outside-window sample. */
+export function PopoverPage(props: { desktop: boolean }): ReactElement {
   const [open, setOpen] = useState(false)
   const theme = useTheme<WidgetTheme>()
   return <column width="100%" gap={16}>
@@ -26,11 +26,11 @@ export function PopoverPage(): ReactElement {
         <text color={theme.textMuted}>The first control receives focus.</text>
       </Popover>
     </row>
-    <row width="100%" justifyContent="end">
+    {props.desktop && <row width="100%" justifyContent="end">
       <Popover id="gallery-outside-popover" trigger="Outside window" placement="rightStart"
         allowOutsideWindow={true} opaque={true} contentWidth={240} closeLabel="Done">
         <text color={theme.text}>This native popup may extend past the window edge.</text>
       </Popover>
-    </row>
+    </row>}
   </column>
 }

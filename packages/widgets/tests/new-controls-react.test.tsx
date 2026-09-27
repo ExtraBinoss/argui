@@ -25,7 +25,7 @@ test('React controls mount and their native pointer and motion contracts remain 
   const { host, runtime, deliver } = nativeControlsFixture()
   const root = createRoot(host)
   act(() => root.render(<ThemeProvider runtime={runtime}><column>
-    <Checkbox accessibleName="Accept" defaultValue={false} />
+    <Checkbox accessibleName="Accept" defaultValue={false} checkedIcon={{ kind: 'svg', id: 7 }} />
     <Switch accessibleName="Enable" defaultValue={true} />
     <Tabs accessibleName="Views" items={[{ value: 'one', label: 'One', content: <text>First</text> }]} />
     <Slider accessibleName="Volume" defaultValue={25} />
@@ -40,6 +40,7 @@ test('React controls mount and their native pointer and motion contracts remain 
   act(() => deliver({ node: checkbox.id, callback: checkbox.listeners.get(click.id)!, payload: { kind: 'click' } }))
   const stateProperty = checkbox.type.properties.find((property) => property.name === 'checkedState')!
   expect(checkbox.values.get(stateProperty.id)?.value).toBe('checked')
+  expect(propertyValue(checkbox, 'source')).toEqual({ kind: 'svg', id: 7 })
   const switchNode = mountedRole(root.nativeRoot(), 'switch')!
   expect(propertyValue(switchNode, 'transitionMs')).toBe(150)
   expect(propertyValue(switchNode, 'transform')).toMatchObject({ translateX: 14 })

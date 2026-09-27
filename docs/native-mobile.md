@@ -22,24 +22,11 @@ until those checks are complete.
 
 ## Rust application integration
 
-For a Rust application, keep its model and view in a normal Rust library. The
-library can expose the construction function used by its desktop or mobile
-launchers:
-
-```rust,ignore
-pub fn build() -> (
-    ApplicationConfig,
-    RendererConfig,
-    TextEngine,
-    impl AppModel,
-) {
-    // Construct the application used by every launcher.
-}
-```
-
-A native Rust launcher calls `argui_runtime::run_application_with_text_engine`;
-mobile launchers call the equivalent function through runtime's mobile modules.
-Embed resources needed at startup with `include_bytes!`.
+For a Rust application, keep its `AppModel`, `ApplicationConfig`, renderer
+configuration, and optional `TextEngine` in a library shared by launchers.
+A desktop launcher calls `argui_runtime::run_application_with_text_engine`;
+mobile launchers use the target-specific entry points below. Embed resources
+needed at startup with `include_bytes!`.
 
 Mobile entry features are explicit and target-gated. A Rust application selects
 the engine and platform features it uses:
@@ -72,24 +59,13 @@ name = "main"
 crate-type = ["cdylib"]
 ```
 
-```rust,ignore
-use argui_runtime::mobile::android::AndroidApp;
-
-fn launch(android_app: AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
-    let (app, renderer, text, model) = shared_app::build();
-    argui_runtime::mobile::android::run_application_with_text_engine(
-        android_app,
-        app,
-        renderer,
-        text,
-        model,
-        |_| {},
-    )?;
-    Ok(())
-}
-
-argui_runtime::android_main!(launch);
-```
+Export the entry with `argui_runtime::android_main!(launch)`, where `launch`
+accepts `argui_runtime::mobile::android::AndroidApp` and returns a `Result`.
+Inside it, call `argui_runtime::mobile::android::run_application_with_text_engine`
+with the activity, application configuration, renderer configuration, text
+engine, model, and runtime-event callback. The repository's concrete Android
+host is [the gallery runner](../apps/gallery/quickjs-host/src/runner.rs) with
+its [entry macro](../apps/gallery/quickjs-host/src/lib.rs).
 
 The repository shell is in `mobile/android`. Its small Java `NativeActivity`
 subclass sets up the edge-to-edge gallery; Winit and Argui render the UI. The
@@ -121,9 +97,10 @@ started background work. `argui_platform::mobile::MobileActivity` starts it
 with an ongoing progress notification and a monochrome icon. On Android 13 and
 later, the app asks for notification permission before starting; if the user
 declines, enable notifications in system settings and try again. Start this API
-from a visible user action. Android 15 and later limit background `dataSync`
-foreground-service use to a cumulative six hours per 24-hour period; the
-notification does not make arbitrary or indefinite background work permitted.
+from a visible user action. For apps targeting Android 15 or later, Android
+limits background `dataSync` foreground-service use to a cumulative six hours
+per 24-hour period; see [Android's foreground-service timeout rules](https://developer.android.com/develop/background-work/services/fgs/timeout).
+The notification does not make indefinite background work permitted.
 Other Android shells do not need the repository helper to run Argui, but must
 package `crates/argui-runtime/src/mobile/android/java` and declare the service,
 permissions, and notification icon before calling `MobileActivity::begin`.
@@ -138,23 +115,14 @@ builds a static library:
 crate-type = ["staticlib"]
 ```
 
-```rust,ignore
-fn launch() -> Result<(), Box<dyn std::error::Error>> {
-    let (app, renderer, text, model) = shared_app::build();
-    argui_runtime::mobile::ios::run_application_with_text_engine(
-        app,
-        renderer,
-        text,
-        model,
-        |_| {},
-    )?;
-    Ok(())
-}
+Export an entry with `argui_runtime::ios_main!(name, launch)`, where `launch`
+takes no arguments and returns a `Result`. The launch function can call
+`argui_runtime::mobile::ios::run_application_with_text_engine` with the
+application configuration, renderer configuration, text engine, model, and
+runtime-event callback. The macro contract is cross-compiled in
+[the runtime mobile tests](../crates/argui-runtime/tests/mobile/ios.rs).
 
-argui_runtime::ios_main!(start_argui_app, launch);
-```
-
-The consuming Xcode project calls `start_argui_app()`; Winit starts
+The consuming Xcode project calls the exported `name`; Winit starts
 `UIApplicationMain` and owns the UIKit window. The application owner provides
 the Xcode project, bundle identity, icons, deployment target, signing, and
 provisioning. There is no iOS sample shell or packaging script in this
@@ -166,11 +134,14 @@ repository.
 and left insets. Apply them to readable content while keeping a full-bleed
 background outside:
 
-```rust,ignore
-fn view(environment: WindowEnvironment) -> Element {
-    full_bleed_background(
-        app_content().safe_area(environment.safe_area_insets),
-    )
+```rust
+use argui_runtime::WindowEnvironment;
+use argui_ui::Element;
+
+/// Insets `content` using the safe area reported for this window.
+/// Returns an element whose background still paints behind system bars.
+pub fn inset_content(content: Element, environment: WindowEnvironment) -> Element {
+    content.safe_area(environment.safe_area_insets)
 }
 ```
 
@@ -198,7 +169,9 @@ matching its dominant axis. A captured drag, such as a slider or table column
 separator, wins over default scrolling for that contact. Applications that
 intentionally want reversed touch movement can opt out per scroll region:
 
-```rust,ignore
+```rust
+use argui_ui::ScrollConfig;
+
 let config = ScrollConfig::default().natural_touch_scroll(false);
 ```
 
@@ -207,14 +180,17 @@ let config = ScrollConfig::default().natural_touch_scroll(false);
 The shared API offers one owner for a native progress surface and a cloneable
 reporter suitable for background work:
 
-```rust,ignore
-let mut activity = argui_platform::mobile::MobileActivity::begin(
-    "Download",
-    "Starting",
-)?;
-let progress = activity.progress();
-// A worker may call progress.update(percent, "Downloading…") as work proceeds.
-activity.finish()?;
+```rust
+use argui_platform::mobile::{MobileActivity, MobileActivityError};
+
+/// Reports one mobile background operation and finishes its native status surface.
+/// Returns an error if the OS cannot start, update, or finish that surface.
+pub fn report_download() -> Result<(), MobileActivityError> {
+    let mut activity = MobileActivity::begin("Download", "Starting")?;
+    let progress = activity.progress();
+    progress.update(50, "Downloading…")?;
+    activity.finish()
+}
 ```
 
 The portable contract is semantic rather than visual. Rust shares the activity

@@ -38,7 +38,7 @@ are ordered offsets from 0 to 1; radial centers and radii are relative to the
 painted rectangle. A static gradient can move or fade through its compositor
 layer without recalculating stops in JavaScript:
 
-```tsx
+```tsx both
 import type { BrushValue } from '@argui/host'
 
 const glow: BrushValue = {

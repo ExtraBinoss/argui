@@ -9,6 +9,9 @@ use std::{
 
 const MAX_BYTES: u64 = 256 * 1024;
 
+#[path = "../tests/source_cache/validation.rs"]
+mod tests;
+
 /// Returns one UTF-8 file from the app's exact Argui release tag.
 ///
 /// `version` is the app's Argui version; `path` is a validated repository-relative

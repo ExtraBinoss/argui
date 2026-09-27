@@ -59,11 +59,12 @@ const components = Object.fromEntries(names.map((name) => [name, {
 const files = Object.fromEntries([...sourceFiles].sort(([a], [b]) => a.localeCompare(b)))
 const registry = { version: 2, arguiVersion: version, files, components }
 const output = `${JSON.stringify(registry, null, 2)}\n`
+const registryPaths = ['components/registry.json', 'crates/argui-cli/registry.json']
 if (process.argv.includes('--check')) {
-  if (readFileSync(join(root, 'components/registry.json'), 'utf8') !== output) {
+  if (registryPaths.some((path) => readFileSync(join(root, path), 'utf8') !== output)) {
     throw new Error('Component registry is stale; run node scripts/generate-component-registry.mjs')
   }
 } else {
-  writeFileSync(join(root, 'components/registry.json'), output)
+  for (const path of registryPaths) writeFileSync(join(root, path), output)
 }
 console.log(`Registered ${names.length} paired components and ${sourceFiles.size} source files`)

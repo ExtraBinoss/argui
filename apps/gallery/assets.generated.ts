@@ -32,6 +32,7 @@ const releaseAssets = {
   "gallery/settings.svg": { kind: "svg", id: 4003285612405311 },
   "gallery/sun.svg": { kind: "svg", id: 2429037204418036 },
   "gallery/system.svg": { kind: "svg", id: 5782066887110427 },
+  "tabler/check.svg": { kind: "svg", id: 4418227052333180 },
   "tabler/chevron-down.svg": { kind: "svg", id: 5981616865338806 },
   "tabler/player-play.svg": { kind: "svg", id: 6833585511893982 },
   "tabler/search.svg": { kind: "svg", id: 2000023927804256 },

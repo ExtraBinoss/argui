@@ -1,5 +1,7 @@
 # Plan global : distribution, CLI, crates et thème d’Argui
 
+> Historical proposal. This page records an earlier repository state and is not the current Argui API. Use [the maintained documentation](../README.md) and source code for release decisions.
+
 Statut : décisions et plan de mise en œuvre pour une prochaine tâche. **Aucun changement de code n’est demandé par ce document.** Il remplace [l’ancien plan de distribution](argui-standalone-distribution.md), notamment sa proposition « une seule crate Rust » ; les exigences CLI et composants pertinentes y sont reprises ici.
 
 ## Périmètre
@@ -14,10 +16,10 @@ Statut : décisions et plan de mise en œuvre pour une prochaine tâche. **Aucun
 
 - Le workspace a **25 crates publiables**. [`scripts/release.py`](../../scripts/release.py) publie tous les membres publiables à chaque nouvelle version commune.
 - [`argui-theme`](../../crates/argui-theme/) expose `Theme<T>`, des valeurs et schémas de tokens typés, des variantes, des overrides, `ThemeRuntime` et `ThemeChange`. Le runtime stocke/expose surtout `ThemeOverrides` et `ThemeSource` ; aucune application du dépôt n’instancie `ThemeRuntime`. Son comportement avancé est vérifié par des tests isolés.
-- [`argui-reactive`](../../crates/argui-reactive/) fournit des propriétés observables, calculs, transactions et liens génériques. Son seul consommateur de production dans le dépôt est `ThemeRuntime`. Les apps Rust disposent déjà de leurs modèles et notifications ; Solid/React ont leur propre état réactif.
-- La galerie utilise actuellement [`palette()`](../../packages/widgets/src/shared/theme.ts) et [`theme-variables.ts`](../../apps/gallery/src/theme-variables.ts), avec des signaux Solid ou l’état React. Ces chemins ne passent pas par `ThemeRuntime`.
+- `argui-reactive` (removed) fournit des propriétés observables, calculs, transactions et liens génériques. Son seul consommateur de production dans le dépôt est `ThemeRuntime`. Les apps Rust disposent déjà de leurs modèles et notifications ; Solid/React ont leur propre état réactif.
+- La galerie utilise actuellement [`palette()`](../../packages/widgets/src/shared/theme.ts) et `theme-variables.ts` (removed), avec des signaux Solid ou l’état React. Ces chemins ne passent pas par `ThemeRuntime`.
 - [`argui-inspect`](../../crates/argui-inspect/) contient les instantanés d’arbre, données de frames/CPU/GPU, historique et traces JSON. [`argui-runtime`](../../crates/argui-runtime/Cargo.toml) en dépend aujourd’hui sans feature optionnelle ; l’automation en consomme les données.
-- [`argui-shader`](../../crates/argui-shader/) fait environ 252 lignes Rust et n’a qu’un consommateur de production local : `argui-render`. [`argui-android`](../../crates/argui-android/) et [`argui-ios`](../../crates/argui-ios/) font respectivement environ 97 et 38 lignes et enveloppent principalement les entrées mobiles du runtime.
+- `argui-shader` (removed) fait environ 252 lignes Rust et n’a qu’un consommateur de production local : `argui-render`. `argui-android` (removed) et `argui-ios` (removed) font respectivement environ 97 et 38 lignes et enveloppent principalement les entrées mobiles du runtime.
 - Le [CLI actuel](../../crates/argui-cli/src/lib.rs) initialise seulement des apps TSX, clone le dépôt hors checkout, exige `argui add <solid|react> <nom>...`, et ne connaît ni `list components` ni menu interactif. [`Project::target`](../../crates/argui-cli/src/project.rs) est aujourd’hui un choix exclusif `Native` **ou** `Web` ; `argui.json` ne stocke pas encore un ensemble de cibles ni la sélection de capacités. Le [registre](../../components/registry.json) connaît cinq composants et leurs chemins, sans version ni URL source par composant.
 
 ## Décisions de consolidation

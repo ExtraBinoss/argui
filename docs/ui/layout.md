@@ -1,95 +1,98 @@
-# Layout in Rust, Solid, and React
+# Layout
 
-Argui uses the same retained Flexbox and Grid engine for Rust elements and
-TSX primitives. A parent chooses how its children are arranged. Use `row` for
-horizontal composition, `column` for vertical composition, and `grid` when
-items need tracks or spans. Use `container` for a neutral box and `scrollView`
-for a bounded scrolling viewport.
+Argui lays out Rust `Element` trees and Solid/React TSX primitives with the
+same retained Taffy engine. The parent controls its children's arrangement:
+`row` and `column` use flex layout, `grid` uses tracks, and `container` is a
+neutral block. Dimensions and spacing are in logical pixels unless a value is
+a percentage.
 
-## Size and remaining space
+## Preferred size, growth, and constraints
 
-`width` and `height` are preferred sizes in logical pixels. A flex item may
-shrink below a preferred size when its parent has less room. A percentage such
-as `width="50%"` is relative to the containing block; it does not mean the
-remaining half after siblings have taken space. `grow={1}` consumes remaining
-flex space. For a rigid item, set `shrink={0}` and a preferred size, or give it
-equal minimum and maximum bounds when the size must never change.
+`width` and `height` are preferred sizes. Flex children can shrink below them.
+`grow` takes remaining space after preferred sizes and gaps have been measured;
+`width="50%"` measures half the containing block instead. Use `shrink={0}` for
+a rigid item, and `minWidth={0}` when a flexible item with long content must
+shrink. `auto` leaves sizing to content and layout. There is no `fill` value.
 
-```tsx
-<row gap={12} width="100%">
-  <column width={240} shrink={0}>Navigation</column>
-  <column grow={1} minWidth={0}>Contenu</column>
+```tsx both
+<row width="100%" gap={12}>
+  <rectangle width={180} shrink={0} background="#e2e8f0" padding={12}>
+    <text color="#0f172a">Navigation</text>
+  </rectangle>
+  <rectangle grow={1} minWidth={0} background="#dbeafe" padding={12}>
+    <text color="#0f172a">This content wraps as the available width changes.</text>
+  </rectangle>
 </row>
 ```
 
-`minWidth={0}` lets the second child shrink below its text's intrinsic width.
-Without it, long unbroken content may overflow. `auto` uses content and parent
-rules. `fill` is deliberately absent: a percentage and flex growth have
-different meanings. `minWidth`, `maxWidth`, `minHeight`, and `maxHeight` give
-explicit bounds in logical pixels, percentages, or `auto`; `aspectRatio` is
-the preferred width divided by height.
+The equivalent Rust builders use `snake_case`. `length` expresses logical
+pixels; Rust `percent(0.5)` expresses 50%.
 
-## Spacing and direction
+```rust
+use argui_ui::{Element, length};
 
-The parent normally owns `gap` between children and `padding` inside its box.
-Use `margin` for an individual child's outer spacing. An insets value can be a
-single number or an object with `top`, `right`, `bottom`, `left`, `start`, and
-`end`. `start` and `end` follow `directionScope` (`ltr` or `rtl`). Use physical
-or logical horizontal sides in a given value; the native boundary rejects a
-mixture of the two conventions.
-
-```tsx
-<column directionScope="rtl" padding={{ start: 20, end: 12, top: 8 }} gap={8}>
-  <text>مرحبا</text>
-</column>
+let navigation = Element::container([Element::text("Navigation")])
+    .width(length(180.0))
+    .shrink(0.0);
+let content = Element::container([Element::text("Content")])
+    .grow(1.0)
+    .min_width(length(0.0));
+let row = Element::row([navigation, content])
+    .width(length(640.0))
+    .gap(12.0);
 ```
 
-`position="absolute"` removes an element from normal flow. Give it an
-`inset` value to place it against its containing box. `position="sticky"`
-keeps the element against its nearest scroll viewport. A `transform` changes
-paint and hit geometry, but reserves no extra layout space. Popovers should
-use an `id` anchor instead of JS calculations of screen coordinates.
+`minWidth`, `maxWidth`, `minHeight`, and `maxHeight` accept pixels,
+percentages, or `auto` in TSX. `aspectRatio` is preferred width divided by
+height. A percentage needs a resolvable containing size; if the parent's size
+depends on that child, give the parent a bound or use flex growth instead.
 
-## Grid and responsive rules
+## Spacing, direction, and position
+
+Put repeated spacing on the parent with `gap`, and inner spacing on a surface
+with `padding`. `margin` is outer spacing for one child. TSX insets accept a
+number or an object with `top`, `bottom`, and either physical `left`/`right` or
+logical `start`/`end`. Do not mix physical and logical horizontal sides in one
+object. `directionScope="rtl"` reverses `start` and `end` for descendants.
+
+```tsx both
+<container width={240} height={80} directionScope="rtl" background="#e2e8f0">
+  <rectangle width={120} height={28} position="absolute"
+    inset={{ start: 12, top: 8 }} background="#2563eb">
+    <text color="#ffffff">From the start edge</text>
+  </rectangle>
+</container>
+```
+
+An absent positioned inset stays `auto`; it is not zero. `position="absolute"`
+removes the child from normal flow. `position="sticky"` constrains it against
+the nearest scroll viewport. `zIndex` orders siblings within a window layer.
+`transform` changes painting and pointer geometry but reserves no additional
+layout space. See [scrolling](scroll.md) for a bounded viewport and
+[styling](styling.md) for clipping and pointer hit shapes.
+
+## Grid tracks
 
 `gridColumns` and `gridRows` take typed arrays. A number is a fixed logical
-pixel track, `auto` and percentages use their normal layout meanings, and
-`{ fr: n }` takes a fraction of free space. `minmax` bounds one track; a
-repeat group can use a fixed count or `autoFit`/`autoFill`.
+pixel track; `"auto"` and percentages are also accepted. `{ fr: 1 }` takes a
+share of free space. `minmax` bounds a track, and `repeat` accepts a fixed
+count, `autoFit`, or `autoFill`.
 
-```tsx
-<grid
-  gap={12}
-  gridColumns={[
-    { repeat: { count: 'autoFit', tracks: [{ minmax: { min: 180, max: { fr: 1 } } }] } },
-  ]}
->
-  {cards}
+```tsx both
+<grid width="100%" gap={8} gridColumns={[
+  { repeat: { count: 'autoFit', tracks: [
+    { minmax: { min: 140, max: { fr: 1 } } },
+  ] } },
+]}>
+  <rectangle height={40} background="#dbeafe" />
+  <rectangle height={40} background="#dbeafe" />
+  <rectangle height={40} background="#dbeafe" />
 </grid>
 ```
 
-An item can set `gridColumnStart` and `gridColumnSpan` (and the row
-equivalents). For deliberate presentation changes, `containerScope` names a
-measurement scope and `containerRules` applies typed layout overrides when an
-ancestor scope meets a size or orientation condition. The Rust engine bounds
-responsive convergence and reports cycles rather than showing an unstable
-frame. Prefer ordinary flex/grid adaptation when it already gives the wanted
-result.
+For explicit placement, `gridColumnStart` and `gridRowStart` are one-based
+grid lines; `gridColumnSpan` and `gridRowSpan` count occupied tracks. Prefer
+natural flex or grid adaptation before adding a [container query](styling.md#container-queries).
 
-## Scrolling and inspection
-
-`scrollView` is the public viewport primitive. Set a resolvable `height` or
-`maxHeight` for vertical scrolling, or place it in a bounded flex parent with
-`grow={1}`. `scrollX` and `scrollY` select axes. Scrolling, sticky movement,
-scrollbar interaction, and virtual list windowing stay in the native engine.
-The scrollbar appears automatically when content overflows and grows on hover;
-`scrollbarVisible={false}` hides it without disabling scroll input. There is no
-JS callback for each movement frame.
-
-In development, the inspector reports preferred and bounded sizes, flex
-growth and shrink, computed geometry, and notes for likely mistakes such as a
-percentage against an unresolved parent or a scroll viewport without a
-vertical bound. These are diagnostics, not a second layout algorithm.
-
-Rust builders use idiomatic `snake_case` method names for these same concepts;
-public schema and TSX property names use `camelCase`.
+The active gallery's [layout scenarios](../../apps/gallery/src/solid/layout-scenarios.tsx)
+show resizing, overflow, scrolling, adaptive grid tracks, and logical insets.

@@ -1,5 +1,6 @@
-#[path = "../../src/app/frame_route.rs"]
-mod implementation;
+#![cfg(test)]
+
+use super::retain_compositor_frame;
 
 use argui_animation::Time;
 use argui_host::{Host, HostId, Operation};
@@ -71,9 +72,7 @@ fn host_text_change_during_native_motion_uses_fresh_layout_scene() {
     .unwrap();
     let update = tree.update(host.root_element().unwrap());
     assert_eq!(update, TreeUpdate::Layout);
-    assert!(!implementation::retain_compositor_frame(
-        true, update, false, false
-    ));
+    assert!(!retain_compositor_frame(true, update, false, false));
     let ElementKind::Text { content, .. } = &tree.root().children[0].kind else {
         panic!("host text child must remain text");
     };
@@ -82,19 +81,19 @@ fn host_text_change_during_native_motion_uses_fresh_layout_scene() {
 
 #[test]
 fn requested_layout_or_asset_refresh_cannot_reuse_compositor_scene() {
-    assert!(!implementation::retain_compositor_frame(
+    assert!(!retain_compositor_frame(
         true,
         TreeUpdate::Composite,
         true,
         false
     ));
-    assert!(!implementation::retain_compositor_frame(
+    assert!(!retain_compositor_frame(
         true,
         TreeUpdate::Composite,
         false,
         true
     ));
-    assert!(implementation::retain_compositor_frame(
+    assert!(retain_compositor_frame(
         true,
         TreeUpdate::Composite,
         false,
@@ -112,22 +111,14 @@ fn compositor_frame_retention_requires_all_reuse_conditions() {
         TreeUpdate::Paint,
         TreeUpdate::Scroll,
     ] {
-        assert!(implementation::retain_compositor_frame(
-            true, update, false, false
-        ));
-        assert!(!implementation::retain_compositor_frame(
-            false, update, false, false
-        ));
-        assert!(!implementation::retain_compositor_frame(
-            true, update, true, false
-        ));
-        assert!(!implementation::retain_compositor_frame(
-            true, update, false, true
-        ));
+        assert!(retain_compositor_frame(true, update, false, false));
+        assert!(!retain_compositor_frame(false, update, false, false));
+        assert!(!retain_compositor_frame(true, update, true, false));
+        assert!(!retain_compositor_frame(true, update, false, true));
     }
     for pending_layout in [false, true] {
         for assets_changed in [false, true] {
-            assert!(!implementation::retain_compositor_frame(
+            assert!(!retain_compositor_frame(
                 true,
                 TreeUpdate::Layout,
                 pending_layout,

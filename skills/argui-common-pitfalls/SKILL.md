@@ -5,11 +5,36 @@ description: Read before creating an Argui component or using Argui in Rust, Sol
 
 # Argui v2 common pitfalls
 
-Read this skill before each new Argui component or Argui usage in this
-repository. Then read [the layout contract](../../docs/ui/layout.md) and the
-generated JSX declaration for each primitive used. A TypeScript pass alone
-does not prove the host accepts the final tree: build and mount the actual
-adapter too.
+Read this skill before each new Argui component or Argui usage. The contracts
+needed for the common decisions are included here; the skill does not require
+the repository documentation to be present. Check the generated Solid or React
+JSX declaration for each primitive used. A TypeScript pass alone does not prove
+the Rust host accepts the final tree: build and mount the actual adapter too.
+
+## Framework contract
+
+Argui's Rust engine retains the UI tree. Solid and React produce transactions
+through `@argui/host`; `argui-schema` defines their names and wire values. The
+host owns native element identity, layout, text, input, accessibility, paint,
+and animation. TSX state changes describe target properties, not per-frame
+pixels. A Rust application can use `argui-runtime` directly without a JS host.
+
+`row`, `column`, `container`, `rectangle`, `grid`, `text`, `scrollView`,
+`focusScope`, and `popup` are native primitives. Flex sizes have distinct
+meanings: `width`/`height` are preferred sizes, percentage sizes resolve
+against a parent bound, and `grow` receives free space. Give a scroll view a
+resolvable viewport size. `key` is framework identity; optional native `id`
+is the addressable identity used by anchors, relations, and tests. The same
+retained tree and schema run through the desktop QuickJS host and browser WASM
+host. A browser host needs WebGPU and has no native desktop window services.
+
+Reusable controls are exported separately from `@argui/widgets/solid` and
+`@argui/widgets/react`. Install one widget theme provider at the app root;
+local scopes override only selected tokens. Built-in controls own their input,
+focus, and semantic behavior. Application icons are supplied through slots or
+assets; widgets do not impose an icon library.
+
+## Common pitfalls
 
 - Public schema and TSX names are `camelCase`; Rust identifiers stay idiomatic
   `snake_case`. Change the Rust schema first, regenerate both declarations,
