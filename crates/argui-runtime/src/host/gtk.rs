@@ -7,6 +7,19 @@ use winit::{
     window::{CursorIcon, Window, WindowLevel},
 };
 
+#[path = "../../tests/host/gtk.rs"]
+mod tests;
+
+/// Returns whether a requested frame can be drawn, querying window state only as needed.
+/// `requested` records pending work; `visible` and `minimized` read native window state lazily.
+fn redraw_allowed(
+    requested: bool,
+    visible: impl FnOnce() -> bool,
+    minimized: impl FnOnce() -> bool,
+) -> bool {
+    requested && visible() && !minimized()
+}
+
 pub(crate) struct GtkHost {
     pub(crate) platform: GtkWindow,
     pub(crate) ime_enabled: Cell<bool>,
@@ -19,9 +32,11 @@ impl GtkHost {
     }
 
     pub(crate) fn redraw_pending(&self) -> bool {
-        self.redraw_requested.get()
-            && self.platform.native().is_visible()
-            && !self.platform.native().is_minimized()
+        redraw_allowed(
+            self.redraw_requested.get(),
+            || self.platform.native().is_visible(),
+            || self.platform.native().is_minimized(),
+        )
     }
 }
 
