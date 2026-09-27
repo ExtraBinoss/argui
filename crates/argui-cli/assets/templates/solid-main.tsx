@@ -6,7 +6,7 @@ function App() {
   return <column width="100%" height="100%" padding={32} gap={16}>
     <text fontSize={30}>Hello from Argui</text>
     <text>{`Count: ${count()}`}</text>
-    <rectangle width={180} height={48} background="#2563eb" onClick={() => setCount(count() + 1)}>
+    <rectangle id="increment" width={180} height={48} background="#2563eb" onClick={() => setCount(count() + 1)}>
       <text color="#ffffff">Increment</text>
     </rectangle>
   </column>

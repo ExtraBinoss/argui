@@ -362,9 +362,14 @@ fn rust_main() -> &'static str {
     include_str!("../../assets/templates/rust-main.rs")
 }
 
-/// Returns a standalone Bun package with app-local SDK adapters.
+/// Returns a standalone Bun package with the CLI SDK's release provenance.
 fn js_manifest(options: &Options) -> String {
     let framework = &options.framework;
+    let delivery = if sdk::release_available() {
+        "cli-cache-release"
+    } else {
+        "cli-cache-development"
+    };
     let runtime = if framework == "solid" {
         "\"solid-js\": \"1.9.15\""
     } else {
@@ -376,7 +381,7 @@ fn js_manifest(options: &Options) -> String {
         ", \"@types/react\": \"19.2.0\", \"@types/react-reconciler\": \"0.33.0\""
     };
     format!(
-        "{{\n  \"name\": \"{}\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"arguiSdk\": {{ \"version\": \"{}\", \"delivery\": \"cli-cache-development\" }},\n  \"dependencies\": {{ {runtime} }},\n  \"devDependencies\": {{ \"typescript\": \"5.9.3\", \"vite\": \"8.2.2\", \"oxfmt\": \"0.70.0\", \"@types/bun\": \"1.3.11\"{plugin} }}\n}}\n",
+        "{{\n  \"name\": \"{}\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"arguiSdk\": {{ \"version\": \"{}\", \"delivery\": \"{delivery}\" }},\n  \"dependencies\": {{ {runtime} }},\n  \"devDependencies\": {{ \"typescript\": \"5.9.3\", \"vite\": \"8.2.2\", \"oxfmt\": \"0.70.0\", \"@types/bun\": \"1.3.11\"{plugin} }}\n}}\n",
         options.name,
         env!("CARGO_PKG_VERSION")
     )
@@ -414,8 +419,19 @@ fn html(name: &str) -> String {
     )
 }
 
-/// Returns concise generated project instructions.
+/// Returns concise generated project instructions with the SDK's release status.
 fn readme(options: &Options) -> String {
+    let distribution = if sdk::release_available() {
+        format!(
+            "This application uses the Argui {} release SDK, verified by the CLI's embedded hash.",
+            env!("CARGO_PKG_VERSION")
+        )
+    } else {
+        format!(
+            "This is an explicit development distribution until Argui {} crates and JS SDK are published together. The application tracks the exact SDK version and hash in `argui.json`.",
+            env!("CARGO_PKG_VERSION")
+        )
+    };
     let (install, format_step, formatting) = if options.framework == "rust" {
         ("", "", "")
     } else {
@@ -426,10 +442,9 @@ fn readme(options: &Options) -> String {
         )
     };
     format!(
-        "# {}\n\nArgui {} application. Targets: {}.\n\nThe CLI supplies Argui SDK and host sources from its verified local cache outside this project. This is an explicit development distribution until Argui {} crates and JS SDK are published together. The application tracks the exact SDK version and hash in `argui.json`.\n\n```sh\n{install}argui check\n{format_step}argui build release\n```\n\n{formatting}Select one output with `argui build release --target native` or `--target web`. Web artifacts go to `dist/web/`; native artifacts go to `dist/desktop/`. `argui dev --target native` starts the native host; `argui dev --target web` starts Vite.\n",
+        "# {}\n\nArgui {} application. Targets: {}.\n\nThe CLI supplies Argui SDK and host sources from its verified local cache outside this project. {distribution}\n\n```sh\n{install}argui check\n{format_step}argui build release\n```\n\n{formatting}Select one output with `argui build release --target native` or `--target web`. Web artifacts go to `dist/web/`; native artifacts go to `dist/desktop/`. `argui dev --target native` starts the native host; `argui dev --target web` starts Vite.\n",
         options.name,
         options.framework,
-        options.targets.join(", "),
-        env!("CARGO_PKG_VERSION")
+        options.targets.join(", ")
     )
 }

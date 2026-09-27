@@ -64,6 +64,9 @@ jobs:
           toolchain: '1.98.0'
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: v0.16.0
@@ -104,10 +107,18 @@ jobs:
           cache-targets: false
           cache-directories: ${{ env.SCCACHE_DIR }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Compare publishable APIs with crates.io
+      # Five new 0.4 crates have no crates.io baseline until this release lands.
+      - name: Compare existing crate APIs with crates.io
         run: >-
-          cargo semver-checks check-release --workspace
-          --release-type major
+          cargo semver-checks check-release --workspace --release-type major
+          --package argui-core --package argui-accessibility
+          --package argui-animation --package argui-i18n
+          --package argui-inspect --package argui-paint
+          --package argui-platform --package argui-text
+          --package argui-render --package argui-theme
+          --package argui-ui --package argui-effects
+          --package argui-layout --package argui-updater
+          --package argui-webview --package argui-runtime
 
   coverage:
     name: Rust coverage
@@ -133,6 +144,9 @@ jobs:
           toolchain: '1.98.0'
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: v0.16.0
@@ -238,8 +252,10 @@ jobs:
       - name: Build the generated counter and run the same TSX test
         run: |
           bun install --frozen-lockfile
-          cargo run --locked -p argui-cli -- init counter-native
-          bun install --no-save
+          cargo run --locked -p argui-cli -- init solid --dir apps/counter-native --targets native --feature automation --yes --no-install
+          if [ "$RUNNER_OS" = Windows ]; then python_cmd=python; else python_cmd=python3; fi
+          "$python_cmd" scripts/ci-local-crates.py >> "$HOME/.cargo/config.toml"
+          (cd apps/counter-native && bun install --no-save)
           if [ "$RUNNER_OS" = Windows ]; then exe=target/debug/argui.exe; else exe=target/debug/argui; fi
           if [ "$RUNNER_OS" = Linux ]; then
             ./scripts/linux-hidden-display.sh "$exe" test apps/counter-native tests/automation/counter.test.ts --out target/automation-counter
@@ -295,6 +311,9 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: '1.4.0'
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: v0.16.0
       - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
         with:
           tool: wasm-pack@0.15.0
@@ -307,11 +326,12 @@ jobs:
       - name: Generate and verify a browser app
         run: |
           bun install --frozen-lockfile
-          cargo run --locked -p argui-cli -- init counter-web
-          bun install --no-save
+          cargo run --locked -p argui-cli -- init solid --dir apps/counter-web --targets web --yes --no-install
+          python3 scripts/ci-local-crates.py >> "$HOME/.cargo/config.toml"
           cd apps/counter-web
-          ../../../target/debug/argui check
-          ../../../target/debug/argui build release
+          bun install --no-save
+          ../../target/debug/argui check
+          ../../target/debug/argui build release
           test -s dist/web/index.html
           test -n "$(find dist/web -name '*.wasm' -print -quit)"
 

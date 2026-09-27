@@ -44,7 +44,7 @@ fn init_generates_three_standalone_frameworks() {
         assert_eq!(state["framework"], framework);
         assert_eq!(state["arguiVersion"], env!("CARGO_PKG_VERSION"));
         assert_eq!(state["sdkSha256"].as_str().unwrap().len(), 64);
-        assert_eq!(state["distribution"], "embedded-development");
+        assert_eq!(state["distribution"], "release");
         assert!(!app.join("sdk").exists());
         assert!(!app.join("hosts").exists());
         if framework == "rust" {
@@ -62,6 +62,7 @@ fn init_generates_three_standalone_frameworks() {
             assert!(!package.contains("workspace:"));
             assert!(!package.contains("/home/"));
             let package: Value = serde_json::from_str(&package).unwrap();
+            assert_eq!(package["arguiSdk"]["delivery"], "cli-cache-release");
             assert_eq!(package["devDependencies"]["oxfmt"], "0.70.0");
             let formatting = fs::read_to_string(app.join(".oxfmtrc.json")).unwrap();
             let formatting: Value = serde_json::from_str(&formatting).unwrap();
@@ -140,11 +141,15 @@ fn features_and_build_selection_are_consistent() {
 }
 
 #[test]
-/// Unpublished development sources are never installed or presented as a tagged release.
-fn add_is_atomic_while_sources_are_unpublished() {
+/// A project marked as an unpublished development snapshot cannot install tagged sources.
+fn add_is_atomic_for_unpublished_development_snapshots() {
     let root = tempfile::tempdir().unwrap();
     run(root.path(), &["init", "solid", "--dir", "app", "--yes"]).unwrap();
     let app = root.path().join("app");
+    let manifest_path = app.join("argui.json");
+    let mut state = manifest(&app);
+    state["distribution"] = "embedded-development".into();
+    fs::write(&manifest_path, serde_json::to_vec_pretty(&state).unwrap()).unwrap();
     let original = fs::read(app.join("argui.json")).unwrap();
     let error = run(&app, &["add", "button", "input", "dialog", "--solid"]).unwrap_err();
     assert!(error.contains("no matching published widget source"));
@@ -158,7 +163,7 @@ fn add_is_atomic_while_sources_are_unpublished() {
 }
 
 #[test]
-/// The production catalog exposes every v2 widget for each adapter.
+/// The release catalog exposes every v2 widget with tagged sources.
 fn list_finds_every_component_pair_outside_checkout() {
     let root = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_argui"))
@@ -186,10 +191,11 @@ fn list_finds_every_component_pair_outside_checkout() {
             .count(),
         8
     );
-    assert!(
-        rows.iter()
-            .all(|row| row["source"] == "unpublished development snapshot")
-    );
+    assert!(rows.iter().all(|row| {
+        row["source"]
+            .as_str()
+            .is_some_and(|source| source.contains("/blob/v0.4.0/"))
+    }));
     assert!(
         rows.iter()
             .all(|row| row["version"] == env!("CARGO_PKG_VERSION"))

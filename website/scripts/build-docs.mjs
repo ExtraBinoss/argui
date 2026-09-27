@@ -136,7 +136,10 @@ for (const file of await markdownFiles(docsRoot)) {
   })
 }
 const startOrder = new Map(['', 'getting-started', 'cli', 'crates', 'architecture'].map((slug, index) => [slug, index]))
+const sectionOrder = new Map(Object.values(sectionNames).map((section, index) => [section, index]))
 pages.sort((a, b) => {
+  const section = (sectionOrder.get(a.section) ?? 99) - (sectionOrder.get(b.section) ?? 99)
+  if (section) return section
   if (a.section === 'Start' && b.section === 'Start') {
     const order = (startOrder.get(a.slug) ?? 99) - (startOrder.get(b.slug) ?? 99)
     if (order) return order
