@@ -19,7 +19,7 @@ export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () 
   const root = host.createElement('Column')
   host.setProperty(root, 'width', '100%')
   host.setProperty(root, 'height', '100%')
-  const dispose = render(() => <App /> as NativeNode, root)
+  const dispose = render(() => <App /> as unknown as NativeNode, root)
   host.setRoot(root)
   return () => { dispose(); host.dispose() }
 }

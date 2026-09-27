@@ -64,6 +64,14 @@ fn init_generates_three_standalone_frameworks() {
             let package: Value = serde_json::from_str(&package).unwrap();
             assert_eq!(package["arguiSdk"]["delivery"], "cli-cache-release");
             assert_eq!(package["devDependencies"]["oxfmt"], "0.70.0");
+            let tsconfig: Value =
+                serde_json::from_slice(&fs::read(app.join("tsconfig.json")).unwrap()).unwrap();
+            assert_eq!(tsconfig["compilerOptions"]["preserveSymlinks"], true);
+            assert!(
+                fs::read_to_string(app.join("vite.config.ts"))
+                    .unwrap()
+                    .contains("preserveSymlinks: true")
+            );
             let formatting = fs::read_to_string(app.join(".oxfmtrc.json")).unwrap();
             let formatting: Value = serde_json::from_str(&formatting).unwrap();
             assert_eq!(formatting["singleQuote"], true);

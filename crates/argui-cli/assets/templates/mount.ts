@@ -26,7 +26,10 @@ export async function mountArgui(elementId: string): Promise<() => void> {
     theme: {
       create: definition => bridge.themeCreate(definition),
       update: (id, patch) => bridge.themeUpdate(id, patch),
-      subscribe: (id, callback) => bridge.themeSubscribe(id, callback),
+      subscribe: (id, callback) => {
+        const unsubscribe = bridge.themeSubscribe(id, callback)
+        return () => { unsubscribe() }
+      },
       dispose: id => bridge.themeDispose(id),
     },
   }
