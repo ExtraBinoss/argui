@@ -26,5 +26,11 @@ export function PopoverPage(): ReactElement {
         <text color={theme.textMuted}>The first control receives focus.</text>
       </Popover>
     </row>
+    <row width="100%" justifyContent="end">
+      <Popover id="gallery-outside-popover" trigger="Outside window" placement="rightStart"
+        allowOutsideWindow={true} opaque={true} contentWidth={240} closeLabel="Done">
+        <text color={theme.text}>This native popup may extend past the window edge.</text>
+      </Popover>
+    </row>
   </column>
 }

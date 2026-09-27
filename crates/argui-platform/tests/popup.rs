@@ -57,3 +57,28 @@ fn desktop_coordinates_preserve_negative_monitor_origins_and_fractional_scale() 
         assert!(!reason.to_string().is_empty());
     }
 }
+
+#[test]
+fn ui_zoom_preserves_physical_desktop_geometry() {
+    let desktop = PopupEnvironment::from_physical(
+        Point::new(100.0, 50.0),
+        1.5,
+        Rect::new(Point::default(), Size::new(1920.0, 1080.0)),
+    )
+    .unwrap();
+    let zoomed = desktop.with_ui_zoom(1.25).unwrap();
+    assert_eq!(zoomed.origin, desktop.origin);
+    assert_eq!(zoomed.scale, 1.875);
+    assert_eq!(zoomed.work_area.size, Size::new(1024.0, 576.0));
+    let bounds = Rect::new(Point::new(120.0, 80.0), Size::new(240.0, 80.0));
+    assert_eq!(
+        zoomed.position(bounds),
+        winit::dpi::PhysicalPosition::new(325, 200)
+    );
+    assert_eq!(zoomed.size(bounds), winit::dpi::PhysicalSize::new(450, 150));
+    assert_eq!(zoomed.snap(zoomed.snap(bounds)), zoomed.snap(bounds));
+    assert_eq!(desktop.with_ui_zoom(1.0), Some(desktop));
+    for factor in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+        assert!(desktop.with_ui_zoom(factor).is_none());
+    }
+}

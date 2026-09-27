@@ -83,7 +83,12 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             json!({"kind": "scroll", "offsetX": offset.x, "offsetY": offset.y})
         }
         UiEventKind::Gesture(gesture) => match gesture.kind {
-            GestureKind::Pan { delta, total, velocity, .. } => json!({
+            GestureKind::Pan {
+                delta,
+                total,
+                velocity,
+                ..
+            } => json!({
                 "kind": "pan", "deltaX": delta.x, "deltaY": delta.y,
                 "totalX": total.x, "totalY": total.y,
                 "velocityX": velocity.x, "velocityY": velocity.y,

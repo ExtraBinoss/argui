@@ -5,6 +5,7 @@ use crate::{
 };
 use argui_animation::{Motion, MotionTrack, Time, Transition};
 use argui_core::{Color, Point, Transform2D};
+use argui_paint::Fill;
 use std::collections::{HashMap, HashSet};
 
 mod style;
@@ -50,6 +51,7 @@ enum AnimatedValue {
     Transform(Motion<Transform2D>),
     F32(Motion<f32>),
     Color(Motion<Color>),
+    SolidBackground(Motion<Color>),
     Point(Motion<Point>),
     Vec2(Motion<[f32; 2]>),
     Vec3(Motion<[f32; 3]>),
@@ -161,6 +163,22 @@ impl TransitionRegistry {
     /// Returns whether at least one transition needs a continuous frame.
     pub(super) fn wants_frame(&self) -> bool {
         !self.active_targets.is_empty()
+    }
+
+    /// Returns whether `node` is still transitioning a composited property.
+    ///
+    /// * `node` — retained element whose transform or opacity may be in flight.
+    pub(super) fn has_active_compositor_property(&self, node: NodeId) -> bool {
+        self.entries
+            .get(&TransitionTarget::Element(node))
+            .is_some_and(|entry| {
+                entry.values.iter().any(|property| {
+                    matches!(
+                        property.key,
+                        PropertyKey::Transform | PropertyKey::LayerOpacity
+                    ) && property.value.is_active()
+                })
+            })
     }
 
     pub(super) fn set_scroll(&mut self, node: NodeId, offset: Point) {
@@ -385,6 +403,9 @@ impl AnimatedValue {
     fn new(value: StateValue) -> Self {
         match value {
             StateValue::Transform(value) => Self::Transform(Motion::new(value)),
+            StateValue::Background(Some(Fill::Solid(color))) => {
+                Self::SolidBackground(Motion::new(color))
+            }
             StateValue::Background(_) | StateValue::Border(_) => Self::Discrete {
                 from: value.clone(),
                 target: value,
@@ -415,6 +436,9 @@ impl AnimatedValue {
             Self::Transform(value) => StateValue::Transform(value.value()),
             Self::F32(value) => StateValue::F32(value.value()),
             Self::Color(value) => StateValue::Color(value.value()),
+            Self::SolidBackground(value) => {
+                StateValue::Background(Some(Fill::Solid(value.value())))
+            }
             Self::Point(value) => StateValue::Point(value.value()),
             Self::Vec2(value) => StateValue::Vec2(value.value()),
             Self::Vec3(value) => StateValue::Vec3(value.value()),
@@ -457,6 +481,9 @@ impl AnimatedValue {
                 | StateValue::BorderColor(value)
                 | StateValue::Color(value),
             ) => transition.retarget(motion, value),
+            (Self::SolidBackground(motion), StateValue::Background(Some(Fill::Solid(value)))) => {
+                transition.retarget(motion, value)
+            }
             (Self::Point(motion), StateValue::Point(value)) => transition.retarget(motion, value),
             (Self::Vec2(motion), StateValue::Vec2(value)) => transition.retarget(motion, value),
             (Self::Vec3(motion), StateValue::Vec3(value)) => transition.retarget(motion, value),
@@ -486,6 +513,7 @@ impl AnimatedValue {
             Self::Transform(value) => value,
             Self::F32(value) => value,
             Self::Color(value) => value,
+            Self::SolidBackground(value) => value,
             Self::Point(value) => value,
             Self::Vec2(value) => value,
             Self::Vec3(value) => value,

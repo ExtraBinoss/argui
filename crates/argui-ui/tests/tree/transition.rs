@@ -27,6 +27,40 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
     }
 }
 
+/// Direct solid backgrounds interpolate in both directions instead of switching halfway.
+#[test]
+fn solid_background_transition_interpolates_on_enter_and_exit() {
+    let surface = |color| {
+        Element::container([])
+            .background(color)
+            .transition(transition())
+    };
+    let mut tree = UiTree::new(surface(Color::BLACK));
+    let node = tree.node_id_at(0).unwrap();
+    let presented_color = |tree: &UiTree| {
+        let Some(Fill::Solid(color)) = tree.resolved_quad(node, tree.root()).background else {
+            panic!("expected a solid background");
+        };
+        color
+    };
+
+    assert_eq!(tree.update(surface(Color::WHITE)), TreeUpdate::Paint);
+    tree.advance_animations(Time::from_nanos(1));
+    tree.advance_animations(Time::from_nanos(50_000_001));
+    let entering = presented_color(&tree);
+    assert_ne!(entering, Color::BLACK);
+    assert_ne!(entering, Color::WHITE);
+
+    tree.advance_animations(Time::from_nanos(100_000_001));
+    assert_eq!(presented_color(&tree), Color::WHITE);
+    assert_eq!(tree.update(surface(Color::BLACK)), TreeUpdate::Paint);
+    tree.advance_animations(Time::from_nanos(101_000_001));
+    tree.advance_animations(Time::from_nanos(151_000_001));
+    let exiting = presented_color(&tree);
+    assert_ne!(exiting, Color::BLACK);
+    assert_ne!(exiting, Color::WHITE);
+}
+
 #[test]
 /// A focused descendant activates an ancestor's native visual style.
 fn focus_within_styles_ancestors_and_clears_on_blur() {

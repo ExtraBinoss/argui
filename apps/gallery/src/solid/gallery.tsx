@@ -1,7 +1,7 @@
 import { For, createSignal, onCleanup } from 'solid-js'
-import type { ThemeRuntime } from '@argui/host'
+import type { ApplicationServices, ThemeRuntime } from '@argui/host'
 import { ThemeScope, useTheme, useThemeSnapshot } from '@argui/solid'
-import { Button, ButtonGroup, ButtonGroupSeparator, InputField, Popover, ScrollShadow, type WidgetTheme } from '@argui/widgets/solid'
+import { Button, ButtonGroup, ButtonGroupSeparator, InputField, Popover, ScrollShadow, VirtualList, type WidgetTheme } from '@argui/widgets/solid'
 import { ButtonPage } from './button-page'
 import { ButtonGroupPage } from './button-group-page'
 import { CheckboxPage } from './checkbox-page'
@@ -12,38 +12,44 @@ import { TabsPage } from './tabs-page'
 import { SliderPage } from './slider-page'
 import { ProgressPage } from './progress-page'
 import { PopoverPage } from './popover-page'
+import { TooltipPage } from './tooltip-page'
 import { VirtualListPage } from './virtual-list-page'
 import { ScrollbarPage } from './scrollbar-page'
 import { LayoutScenarios } from './layout-scenarios'
 import { AnimationPage } from './animation-page'
 import { ExpressivePage } from './expressive-page'
+import { ScreenSpotlightPage } from './screen-spotlight-page'
 import { mediaAssets } from '../../assets.generated'
+import { searchFromBackgroundKey } from '../search-key'
 import { applyGalleryTheme, colorFamilies, familySwatch, watchSystemFamily, type ColorFamily } from '../theme-colors'
 
 const pages = [
   { id: 'button', label: 'Button', category: 'Widgets' },
   { id: 'button-group', label: 'ButtonGroup', category: 'Widgets' },
   { id: 'checkbox', label: 'Checkbox', category: 'Widgets' },
-  { id: 'switch', label: 'Switch', category: 'Widgets' },
   { id: 'input-field', label: 'InputField', category: 'Widgets' },
-  { id: 'select', label: 'Select', category: 'Widgets' },
-  { id: 'tabs', label: 'Tabs', category: 'Widgets' },
-  { id: 'slider', label: 'Slider', category: 'Widgets' },
-  { id: 'progress', label: 'Progress', category: 'Widgets' },
   { id: 'popover', label: 'Popover', category: 'Widgets' },
+  { id: 'progress', label: 'Progress', category: 'Widgets' },
+  { id: 'select', label: 'Select', category: 'Widgets' },
+  { id: 'slider', label: 'Slider', category: 'Widgets' },
+  { id: 'switch', label: 'Switch', category: 'Widgets' },
+  { id: 'tabs', label: 'Tabs', category: 'Widgets' },
+  { id: 'tooltip', label: 'Tooltip', category: 'Widgets' },
   { id: 'virtual-list', label: 'VirtualList', category: 'Widgets' },
   { id: 'layouting', label: 'Layouting', category: 'Examples' },
   { id: 'scrollbars', label: 'Scrollbars', category: 'Examples' },
   { id: 'animation', label: 'Animation', category: 'Examples' },
   { id: 'expressive', label: 'Expressive UI', category: 'Examples' },
+  { id: 'screen-spotlight', label: 'Screen spotlight', category: 'Examples' },
 ] as const
 
 type PageId = typeof pages[number]['id']
 
 /** Renders a searchable sidebar, one widget page, and a compact settings popover. */
-export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }) {
+export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme>; services: ApplicationServices }) {
   const [page, setPage] = createSignal<PageId>('button')
   const [search, setSearch] = createSignal('')
+  const [backgroundFocused, setBackgroundFocused] = createSignal(false)
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [family, setFamily] = createSignal<ColorFamily>('Neutral')
   const theme = useTheme<WidgetTheme>()
@@ -65,13 +71,19 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }) {
     : page() === 'slider' ? <SliderPage />
     : page() === 'progress' ? <ProgressPage />
     : page() === 'popover' ? <PopoverPage />
+    : page() === 'tooltip' ? <TooltipPage />
     : page() === 'virtual-list' ? <VirtualListPage />
     : page() === 'layouting' ? <column width="100%" gap={16}><text color={theme().text} fontSize={24}>Layouting</text><LayoutScenarios /></column>
     : page() === 'scrollbars' ? <ScrollbarPage />
     : page() === 'expressive' ? <ExpressivePage />
+    : page() === 'screen-spotlight' ? <ScreenSpotlightPage services={props.services} />
     : <AnimationPage />
 
-  return <row width="100%" height="100%" background={theme().surface}>
+  return <focusScope id="gallery-keyboard" width="100%" height="100%"
+    focusOnClick={true} focusOnTabNavigation={false} initialFocus="gallery-search"
+    onFocus={() => setBackgroundFocused(true)} onBlur={() => setBackgroundFocused(false)}
+    onKey={(event) => { if (backgroundFocused()) setSearch((current) => searchFromBackgroundKey(current, event)) }}>
+    <row width="100%" height="100%" background={theme().surface}>
     <column id="gallery-sidebar" width={256} height="100%" shrink={0} padding={{ top: 16 }} gap={16} background={theme().sidebar}>
       <container padding={{ start: 24, end: 16 }}><text color={theme().text} fontSize={20}>Argui</text></container>
       <container padding={{ start: 16, end: 16 }}><InputField id="gallery-search" accessibleName="Search gallery" type="search"
@@ -131,19 +143,20 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }) {
             </Button>
           </ButtonGroup>
           <text color={theme().text} fontSize={14}>Color family</text>
-          <scrollView id="gallery-color-list" width="100%" height={228} scrollY={true} scrollbarWidth={3}
-            scrollbarThumbColor={theme().border} scrollbarHoverColor={theme().textMuted}>
-            <column width="100%" gap={4}>
-              <For each={colorFamilies}>{(entry) => <Button id={`color-${entry.toLowerCase()}`}
+          <VirtualList id="gallery-color-list" count={colorFamilies.length} width="100%" height={228}
+            estimate={36} variable={false} overscan={2} scrollbarWidth={3} scrollbarColor={theme().border}
+            itemKey={(index) => colorFamilies[index]!}
+            renderItem={(index) => {
+              const entry = colorFamilies[index]!
+              return <container width="100%" height={36}><Button id={`color-${entry.toLowerCase()}`}
                 width="100%" variant="ghost" pressed={family() === entry} contentAlign="start"
                 onClick={() => chooseFamily(entry)}>
                 <row gap={6} alignItems="center">
                   <rectangle width={12} height={12} radii={6} background={familySwatch(entry, snapshot().resolvedVariant === 'dark')} />
                   <text color={theme().text} fontSize={12}>{entry}</text>
                 </row>
-              </Button>}</For>
-            </column>
-          </scrollView>
+              </Button></container>
+            }} />
         </Popover>
       </row>
       <scrollView id="gallery-content" width="100%" height="100%" grow={1} scrollY={true}
@@ -151,5 +164,6 @@ export function Gallery(props: { runtime: ThemeRuntime<WidgetTheme> }) {
         <column width="100%" padding={24} gap={16}>{content()}</column>
       </scrollView>
     </column>
-  </row>
+    </row>
+  </focusScope>
 }

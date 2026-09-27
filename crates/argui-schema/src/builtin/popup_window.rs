@@ -2,14 +2,14 @@
 
 use argui_ui::{
     DismissPolicy, Element, EventType, FloatingPlacement, FocusContainment, FocusScope,
-    FocusTarget, InitialFocus, Interaction, Placement, ViewportAlign, ViewportPlacement,
-    WindowLayer,
+    FocusTarget, InitialFocus, Interaction, OverlaySurface, Placement, ViewportAlign,
+    ViewportPlacement, WindowLayer,
 };
 
 use super::{
-    ANCHOR, CHILDREN, CommonProperty, DISMISS, DISMISS_POLICY, FOCUS_CONTAINMENT, INITIAL_FOCUS,
-    PLACEMENT, PLACEMENT_OFFSET, POPUP_WINDOW, RESTORE_FOCUS, VISIBLE, WINDOW_LAYER, apply_common,
-    common_event, common_property, optional_bool,
+    ALLOW_OUTSIDE_WINDOW, ANCHOR, CHILDREN, CommonProperty, DISMISS, DISMISS_POLICY,
+    FOCUS_CONTAINMENT, INITIAL_FOCUS, PLACEMENT, PLACEMENT_OFFSET, POPUP_WINDOW, RESTORE_FOCUS,
+    VISIBLE, WINDOW_LAYER, apply_common, common_event, common_property, optional_bool,
 };
 use crate::{
     NativeElementInput, NativeSchema, PropertySchema, SchemaError, SchemaRegistry, SchemaValue,
@@ -37,6 +37,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .property(common_property(CommonProperty::DesktopBackdropTint))
         .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
+    .property(
+        PropertySchema::new(
+            ALLOW_OUTSIDE_WINDOW,
+            "allowOutsideWindow",
+            ValueType::Bool,
+            "Prefer a native popup surface that can extend beyond the owning window; fall back to an in-window portal when unavailable.",
+        )
+        .default_value(SchemaValue::Bool(false)),
+    )
     .property(PropertySchema::new(
         ANCHOR,
         "anchor",
@@ -139,6 +148,13 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             initial,
             restore: optional_bool(input, RESTORE_FOCUS).unwrap_or(true),
         });
+        element = element.portal_surface(
+            if optional_bool(input, ALLOW_OUTSIDE_WINDOW).unwrap_or(false) {
+                OverlaySurface::PreferNative
+            } else {
+                OverlaySurface::InWindow
+            },
+        );
         if layer == WindowLayer::Modal || dismiss == DismissPolicy::OutsideHoverOrEscape {
             element = element.interaction(Interaction::blocker());
         }

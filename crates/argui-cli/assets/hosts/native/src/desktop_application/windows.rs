@@ -6,8 +6,11 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use argui_core::BackdropMaterial;
-use argui_platform::{CloseBehavior, WindowConfig, WindowKey, WindowSpec};
+use argui_core::{BackdropMaterial, Point, Rect, Size};
+use argui_platform::{
+    CloseBehavior, WindowBackend, WindowConfig, WindowInputRegion, WindowKey, WindowLevel,
+    WindowSpec,
+};
 use argui_runtime::{NativeHostApplicationRequest, NativeWindowInfo};
 use serde_json::{Value, json};
 
@@ -84,6 +87,86 @@ pub(super) fn register_window_services(
             Ok(Err(error)) => ServiceOutcome::Error(error),
             Err(_) => ServiceOutcome::Error("window information request timed out".into()),
         }
+    });
+    let monitor_sender = sender.clone();
+    registry.register("windows", "getMonitors", move |payload| {
+        let key = match window_key(&payload) {
+            Ok(key) => key,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        let (reply, result) = mpsc::channel();
+        if monitor_sender
+            .send(NativeHostApplicationRequest::GetMonitors(key, reply))
+            .is_err()
+        {
+            return ServiceOutcome::Error("native application runtime has stopped".into());
+        }
+        match result.recv_timeout(Duration::from_secs(30)) {
+            Ok(Ok(monitors)) => ServiceOutcome::Ok(json!(
+                monitors
+                    .iter()
+                    .map(|monitor| json!({
+                        "name": monitor.name, "x": monitor.x, "y": monitor.y,
+                        "width": monitor.width, "height": monitor.height,
+                        "scaleFactor": monitor.scale_factor, "primary": monitor.primary,
+                    }))
+                    .collect::<Vec<_>>()
+            )),
+            Ok(Err(error)) => ServiceOutcome::Error(error),
+            Err(_) => ServiceOutcome::Error("monitor information request timed out".into()),
+        }
+    });
+    let input_sender = sender.clone();
+    registry.register("windows", "setInputRegion", move |payload| {
+        let key = match window_key(&payload) {
+            Ok(key) => key,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        let region = match parse_input_region(&payload) {
+            Ok(region) => region,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        dispatch(&input_sender, |reply| {
+            NativeHostApplicationRequest::SetWindowInputRegion(key, region, reply)
+        })
+    });
+    let level_sender = sender.clone();
+    registry.register("windows", "setLevel", move |payload| {
+        let key = match window_key(&payload) {
+            Ok(key) => key,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        let level = match payload.get("level").and_then(Value::as_str) {
+            Some("bottom") => WindowLevel::AlwaysOnBottom,
+            Some("normal") => WindowLevel::Normal,
+            Some("top") => WindowLevel::AlwaysOnTop,
+            _ => {
+                return ServiceOutcome::Error("window level must be bottom, normal, or top".into());
+            }
+        };
+        dispatch(&level_sender, |reply| {
+            NativeHostApplicationRequest::SetWindowLevel(key, level, reply)
+        })
+    });
+    let show_sender = sender.clone();
+    registry.register("windows", "show", move |payload| {
+        let key = match window_key(&payload) {
+            Ok(key) => key,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        dispatch(&show_sender, |reply| {
+            NativeHostApplicationRequest::ShowWindow(key, reply)
+        })
+    });
+    let close_sender = sender.clone();
+    registry.register("windows", "close", move |payload| {
+        let key = match window_key(&payload) {
+            Ok(key) => key,
+            Err(error) => return ServiceOutcome::Error(error),
+        };
+        dispatch(&close_sender, |reply| {
+            NativeHostApplicationRequest::CloseWindow(key, reply)
+        })
     });
     let title_sender = sender.clone();
     registry.register("windows", "setTitle", move |payload| {
@@ -248,6 +331,16 @@ fn window_key(payload: &Value) -> Result<WindowKey, String> {
 /// Converts native logical window information to the JavaScript service response.
 /// `info` contains the latest title, dimensions, visibility, and appearance state.
 fn window_info_json(info: NativeWindowInfo) -> Value {
+    let backend = match info.capabilities.backend {
+        WindowBackend::Windows => "windows",
+        WindowBackend::MacOs => "macos",
+        WindowBackend::X11 => "x11",
+        WindowBackend::Wayland => "wayland",
+        WindowBackend::Android => "android",
+        WindowBackend::Ios => "ios",
+        WindowBackend::Web => "web",
+        WindowBackend::Other => "other",
+    };
     json!({
         "window": info.window.as_str(), "title": info.title,
         "width": info.width, "height": info.height, "visible": info.visible,
@@ -255,5 +348,54 @@ fn window_info_json(info: NativeWindowInfo) -> Value {
         "decorations": info.decorations, "transparent": info.transparent,
         "backdrop": info.backdrop.is_some(),
         "backdropAvailable": info.backdrop_available,
+        "scaleFactor": info.scale_factor, "uiZoomFactor": info.ui_zoom_factor,
+        "capabilities": {
+            "backend": backend,
+            "absolutePosition": info.capabilities.absolute_position,
+            "windowLevel": info.capabilities.window_level,
+            "mousePassthrough": info.capabilities.mouse_passthrough,
+            "inputRegions": info.capabilities.input_regions,
+            "transparentCompositing": info.capabilities.transparent_compositing,
+            "nativeShadow": info.capabilities.native_shadow,
+        },
     })
+}
+
+/// Parses one TSX input policy with a rectangular hole in UI coordinates.
+/// `payload` contains `mode` and, for exclusion, a finite nonnegative `rect`.
+///
+/// # Errors
+/// Returns a validation message for missing or invalid fields.
+fn parse_input_region(payload: &Value) -> Result<WindowInputRegion, String> {
+    match payload.get("mode").and_then(Value::as_str) {
+        Some("full") => Ok(WindowInputRegion::Full),
+        Some("passThrough") => Ok(WindowInputRegion::PassThrough),
+        Some("exclude") => {
+            let rect = payload
+                .get("rect")
+                .ok_or("exclude input region requires rect")?;
+            let field = |name| -> Result<f32, String> {
+                let value = rect
+                    .get(name)
+                    .and_then(Value::as_f64)
+                    .ok_or_else(|| format!("input region {name} must be numeric"))?;
+                if !value.is_finite() || value.abs() > 100_000.0 {
+                    return Err(format!(
+                        "input region {name} is outside the supported range"
+                    ));
+                }
+                Ok(value as f32)
+            };
+            let (x, y, width, height) =
+                (field("x")?, field("y")?, field("width")?, field("height")?);
+            if width < 0.0 || height < 0.0 {
+                return Err("input region width and height must be nonnegative".into());
+            }
+            Ok(WindowInputRegion::Exclude(Rect::new(
+                Point::new(x, y),
+                Size::new(width, height),
+            )))
+        }
+        _ => Err("input region mode must be full, passThrough, or exclude".into()),
+    }
 }

@@ -15,7 +15,7 @@ export function VirtualList(props: VirtualListProps): ReactElement {
   const [window, setWindow] = useState<NativeWindowRange>({
     start: initial, end: Math.min(props.count, initial + 12), offset: initial * (props.estimate ?? 48), viewportExtent: 0,
   })
-  const current = props.count <= 32
+  const current = props.count <= 12
     ? { ...boundedWindow(window, props.count), start: 0, end: props.count }
     : boundedWindow(window, props.count)
   const axis = props.axis ?? 'vertical'

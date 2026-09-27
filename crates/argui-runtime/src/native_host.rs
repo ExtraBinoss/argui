@@ -117,6 +117,8 @@ pub enum NativeHostApplicationRequest {
     SendWindowMessage(WindowKey, String, Sender<Result<(), String>>),
     /// Reads the current title, logical client size, and visibility of one window.
     GetWindowInfo(WindowKey, Sender<Result<NativeWindowInfo, String>>),
+    /// Reads current native monitor geometry in physical desktop pixels.
+    GetMonitors(WindowKey, Sender<Result<Vec<NativeMonitorInfo>, String>>),
     /// Changes one window's native title.
     SetWindowTitle(WindowKey, String, Sender<Result<(), String>>),
     /// Requests a new logical client size for one window.
@@ -125,6 +127,22 @@ pub enum NativeHostApplicationRequest {
     SetWindowPosition(WindowKey, f64, f64, Sender<Result<(), String>>),
     /// Enables or removes a window's native decorations.
     SetWindowDecorations(WindowKey, bool, Sender<Result<(), String>>),
+    /// Changes stacking level when supported by the native backend.
+    SetWindowLevel(
+        WindowKey,
+        argui_platform::WindowLevel,
+        Sender<Result<(), String>>,
+    ),
+    /// Shows an existing window without forcing keyboard focus.
+    ShowWindow(WindowKey, Sender<Result<(), String>>),
+    /// Closes an existing window.
+    CloseWindow(WindowKey, Sender<Result<(), String>>),
+    /// Sets the native input region in the same UI units used for rendering.
+    SetWindowInputRegion(
+        WindowKey,
+        argui_platform::WindowInputRegion,
+        Sender<Result<(), String>>,
+    ),
 }
 
 /// Current information about one native application window.
@@ -152,6 +170,31 @@ pub struct NativeWindowInfo {
     pub backdrop: Option<argui_core::BackdropMaterial>,
     /// Whether the compositor currently provides desktop backdrop blur.
     pub backdrop_available: bool,
+    /// Native display scale applied before UI zoom.
+    pub scale_factor: f64,
+    /// Current application UI zoom factor.
+    pub ui_zoom_factor: f32,
+    /// Supported native window operations on this backend.
+    pub capabilities: argui_platform::WindowCapabilities,
+}
+
+/// A monitor reported by the native window backend.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeMonitorInfo {
+    /// OS-provided display name, when available.
+    pub name: Option<String>,
+    /// Physical top-left X coordinate in the desktop space.
+    pub x: i32,
+    /// Physical top-left Y coordinate in the desktop space.
+    pub y: i32,
+    /// Physical display width.
+    pub width: u32,
+    /// Physical display height.
+    pub height: u32,
+    /// Native DPI scale for this display.
+    pub scale_factor: f64,
+    /// Whether this is the backend's primary display.
+    pub primary: bool,
 }
 
 /// A renderer control sent by a native JavaScript presentation host.

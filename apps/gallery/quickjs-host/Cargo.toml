@@ -41,7 +41,7 @@ argui-runtime = { path = "../../../crates/argui-runtime", version = "0.4.0", fea
 argui-text = { path = "../../../crates/argui-text", version = "0.4.0" }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
-argui-runtime = { path = "../../../crates/argui-runtime", version = "0.4.0", features = ["tray", "global-shortcuts", "desktop-backdrop"] }
+argui-runtime = { path = "../../../crates/argui-runtime", version = "0.4.0", features = ["tray", "global-shortcuts", "desktop-backdrop", "native-popups", "window-input-regions"] }
 
 [workspace]
 resolver = "3"

@@ -123,3 +123,28 @@ test('window details and live title, size, position, and decoration requests ret
   await Promise.all(changed)
   services.dispose()
 })
+
+test('desktop window contract keeps monitor geometry, input policy, and backend errors typed', async () => {
+  const mock = bridge()
+  const services = new ApplicationServices(mock.native)
+  const monitors = services.getMonitors()
+  const hole = services.setWindowInputRegion('spotlight', {
+    mode: 'exclude', rect: { x: 120, y: 80, width: 400, height: 220 },
+  })
+  const all = services.setWindowMousePassthrough('spotlight', true)
+  const level = services.setWindowLevel('spotlight', 'top')
+  expect(mock.requests).toMatchObject([
+    { method: 'getMonitors', payload: { window: 'main' } },
+    { method: 'setInputRegion', payload: { window: 'spotlight', mode: 'exclude', rect: { x: 120, y: 80, width: 400, height: 220 } } },
+    { method: 'setInputRegion', payload: { window: 'spotlight', mode: 'passThrough' } },
+    { method: 'setLevel', payload: { window: 'spotlight', level: 'top' } },
+  ])
+  mock.deliver({ requestId: 1, window: 'main', status: 'ok', value: [{ x: 0, y: 0, width: 1920, height: 1080, scaleFactor: 1, primary: true, name: null }] })
+  mock.deliver({ requestId: 2, window: 'main', status: 'unsupported', message: 'X11 required' })
+  mock.deliver({ requestId: 3, window: 'main', status: 'ok', value: null })
+  mock.deliver({ requestId: 4, window: 'main', status: 'ok', value: null })
+  expect((await monitors)[0]?.width).toBe(1920)
+  expect(hole).rejects.toMatchObject({ code: 'unsupported', message: 'X11 required' })
+  await Promise.all([all, level])
+  services.dispose()
+})

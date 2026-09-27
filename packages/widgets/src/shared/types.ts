@@ -100,6 +100,8 @@ export type PopoverOptions = WidgetLayoutProps & {
     | 'leftStart' | 'left' | 'leftEnd' | 'rightStart' | 'right' | 'rightEnd'
   /** Preferred popup width, independent of the trigger and outer layout. */
   contentWidth?: DimensionValue
+  /** Prefer a native popup surface that may extend beyond the application window. */
+  allowOutsideWindow?: boolean
   blur?: boolean
   opaque?: boolean
   closeLabel?: string | false
@@ -117,6 +119,19 @@ export interface SelectOption {
   disabled?: boolean
 }
 
+/** Shared options for a hover-triggered, informational tooltip. */
+export type TooltipOptions = WidgetLayoutProps & {
+  /** Text shown in the tooltip and announced to assistive technology. */
+  content: string
+  placement?: 'topStart' | 'top' | 'topEnd' | 'bottomStart' | 'bottom' | 'bottomEnd'
+    | 'leftStart' | 'left' | 'leftEnd' | 'rightStart' | 'right' | 'rightEnd'
+  contentWidth?: DimensionValue
+  /** Prefer a native tooltip surface that may extend beyond the application window. */
+  allowOutsideWindow?: boolean
+  blur?: boolean
+  opaque?: boolean
+}
+
 /** Visual presentations supported by both Select adapters. */
 export type SelectVariant = 'default' | 'shadcn'
 
@@ -125,6 +140,8 @@ export type SelectOptions = WidgetLayoutProps & {
   /** Standard field or compact trigger with its group title inside the open menu. */
   variant?: SelectVariant
   options: readonly SelectOption[]
+  /** Prefer a native option surface that may extend beyond the application window. */
+  allowOutsideWindow?: boolean
   label: string
   placeholder?: string
   disabled?: boolean

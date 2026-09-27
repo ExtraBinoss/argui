@@ -17,7 +17,7 @@ export function VirtualList(props: VirtualListProps): JSX.Element {
   })
   const axis = () => props.axis ?? 'vertical'
   const shadow = () => props.shadow
-  const current = () => props.count <= 32
+  const current = () => props.count <= 12
     ? { ...boundedWindow(window(), props.count), start: 0, end: props.count }
     : boundedWindow(window(), props.count)
   const entries = new Map<string | number, { index: Accessor<number>; setIndex: (index: number) => void }>()

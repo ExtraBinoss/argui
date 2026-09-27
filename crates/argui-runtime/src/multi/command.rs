@@ -114,16 +114,19 @@ impl MultiApplication {
                 window,
                 passthrough,
             } => {
-                self.with_window_capability(
-                    &window,
-                    "mouse passthrough",
-                    |capabilities| capabilities.mouse_passthrough,
-                    |window| {
-                        window
-                            .set_cursor_hittest(!passthrough)
-                            .map_err(|error| error.to_string())
-                    },
-                );
+                let region = if passthrough {
+                    argui_platform::WindowInputRegion::PassThrough
+                } else {
+                    argui_platform::WindowInputRegion::Full
+                };
+                if let Err(error) = self.set_window_input_region(&window, region) {
+                    self.emit(RuntimeEvent::CommandFailed(error));
+                }
+            }
+            AppCommand::SetWindowInputRegion { window, region } => {
+                if let Err(error) = self.set_window_input_region(&window, region) {
+                    self.emit(RuntimeEvent::CommandFailed(error));
+                }
             }
             AppCommand::SetDamageTracking { window, tracking } => {
                 if let Some(entry) = self.windows.get_mut(&window) {

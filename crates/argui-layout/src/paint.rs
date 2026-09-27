@@ -196,7 +196,7 @@ pub(super) fn paint_node(
     let transform = parent.transform
         * ui.resolved_transform(node.node, element)
             .affine(node.bounds, element.transform_origin);
-    let composited = element.needs_compositor_layer();
+    let composited = ui.needs_compositor_layer(node.node, element);
     let compositor_id = CompositorId::new(node.node.get());
     let compositor_owner = if composited {
         Some(compositor_id)

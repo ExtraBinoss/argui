@@ -30,7 +30,8 @@ export function SelectPage(): ReactElement {
     <Select id="language-select" label="Language" options={languages} value={language} onValueChange={setLanguage}
       trailing={<svg source={mediaAssets['tabler/chevron-down.svg']} width={16} height={16} color={theme.textMuted} />} />
     <text color={theme.text} text={`Selected value: ${language}`} />
-    <Select label="Local selection" options={languages} defaultValue="typescript" />
+    <Select label="Local selection" options={languages} defaultValue="typescript"
+      trailing={<svg source={mediaAssets['tabler/chevron-down.svg']} width={16} height={16} color={theme.textMuted} />} />
     <text color={theme.text} fontSize={18}>Shadcn variant</text>
     <text color={theme.textMuted}>The group title appears in the menu. Choose a fruit to update the trigger.</text>
     <Select id="fruit-select" variant="shadcn" label="Fruits" placeholder="Select a fruit"

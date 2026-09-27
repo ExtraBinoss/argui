@@ -105,6 +105,31 @@ impl PopupEnvironment {
         })
     }
 
+    /// Converts this desktop environment to coordinates at the application's UI zoom.
+    /// `factor` is the positive UI zoom relative to the native DPI scale; the
+    /// physical origin and work area remain fixed. Returns `None` for an invalid factor.
+    #[must_use]
+    pub fn with_ui_zoom(self, factor: f32) -> Option<Self> {
+        let scale = self.scale * factor;
+        if !factor.is_finite() || factor <= 0.0 || !scale.is_finite() || scale <= 0.0 {
+            return None;
+        }
+        Some(Self {
+            origin: self.origin,
+            scale,
+            work_area: Rect::new(
+                Point::new(
+                    self.work_area.origin.x / factor,
+                    self.work_area.origin.y / factor,
+                ),
+                Size::new(
+                    self.work_area.size.width / factor,
+                    self.work_area.size.height / factor,
+                ),
+            ),
+        })
+    }
+
     /// Accept physical pixel rounding before layout to avoid alternating sizes at fractional DPI.
     /// `bounds` is the popup rectangle in logical coordinates.
     #[must_use]
@@ -197,6 +222,7 @@ impl NativePopup {
             .with_title("Argui popup")
             .with_decorations(false)
             .with_resizable(false)
+            .with_transparent(true)
             .with_visible(false)
             .with_active(false)
             .with_inner_size(environment.size(bounds))

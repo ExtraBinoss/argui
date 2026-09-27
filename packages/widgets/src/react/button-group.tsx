@@ -63,7 +63,7 @@ export function ButtonGroupSeparator(props: ButtonGroupSeparatorProps): ReactEle
   const group = useButtonGroup()
   const orientation = props.orientation ?? (group === 'vertical' ? 'horizontal' : 'vertical')
   return orientation === 'vertical'
-    ? <rectangle width={1} height={24} shrink={0} background={theme.input} />
+    ? <rectangle width={1} alignSelf="stretch" shrink={0} background={theme.input} />
     : <rectangle width="100%" height={1} shrink={0} background={theme.input} />
 }
 

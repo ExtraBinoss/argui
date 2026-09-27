@@ -1,5 +1,5 @@
 {
-  "abiHash": "13915789742453721320",
+  "abiHash": "213758376829446881",
   "natives": [
     {
       "id": 1,
@@ -9870,6 +9870,15 @@
           "readOnly": false,
           "required": false,
           "default": "Bool(true)",
+          "allowedValues": []
+        },
+        {
+          "id": 265,
+          "name": "allowOutsideWindow",
+          "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": "Bool(false)",
           "allowedValues": []
         },
         {

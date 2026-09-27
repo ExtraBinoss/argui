@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use argui_core::Rect;
 use argui_platform::popup::{NativePopup, PopupEnvironment, PopupKind, PopupUnavailable};
-use argui_render::{GpuCanvasDiagnosticKind, RenderStatus, SurfaceRenderer};
+use argui_render::{GpuCanvasDiagnosticKind, RenderStatus, SurfaceAlphaMode, SurfaceRenderer};
 use argui_ui::{InteractionUpdate, NodeId, OverlaySurface, Role, UiEventKind};
 use winit::window::WindowId;
 
@@ -154,10 +154,17 @@ impl Application {
             }
             return changed;
         };
+        let ui_zoom = self.ui_zoom_factor;
         let environment = self
             .popups
             .environment
-            .get_or_insert_with(|| NativePopup::environment(parent))
+            .get_or_insert_with(|| {
+                NativePopup::environment(parent).and_then(|environment| {
+                    environment
+                        .with_ui_zoom(ui_zoom)
+                        .ok_or(PopupUnavailable::UnknownGeometry)
+                })
+            })
             .clone();
         for node in requested {
             if self.popups.rejected.contains_key(&node) {
@@ -218,14 +225,10 @@ impl Application {
             let result: Result<Popup, PopupUnavailable> = (|| {
                 let native = event_loop.popup(native_parent, kind, environment, bounds)?;
                 let size = native.window().inner_size();
-                let mut config = self.renderer_config.clone();
-                config.surface_alpha = argui_render::SurfaceAlphaMode::Opaque;
-                if let Some(argui_paint::Fill::Solid(color)) = ui
-                    .element_for(node)
-                    .and_then(|element| element.paint.quad.background.as_ref())
-                {
-                    config.clear_color = color.with_alpha(1.0);
-                }
+                let config = self
+                    .renderer_config
+                    .clone()
+                    .surface_alpha(SurfaceAlphaMode::Transparent);
                 let mut renderer = pollster::block_on(SurfaceRenderer::new_with_device(
                     native.window().clone(),
                     size.width,

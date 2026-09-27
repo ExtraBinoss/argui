@@ -1017,6 +1017,7 @@ export namespace JSX {
       desktopBackdropTint?: string
       desktopBackdropFallback?: string
       visible?: boolean
+      allowOutsideWindow?: boolean
       anchor?: string
       placement?: "fill" | "center" | "topStart" | "top" | "topEnd" | "bottomStart" | "bottom" | "bottomEnd" | "leftStart" | "left" | "leftEnd" | "rightStart" | "right" | "rightEnd"
       placementOffset?: number

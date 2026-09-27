@@ -45,6 +45,7 @@ export function Popover(props: PopoverProps): JSX.Element {
       anchor={id}
       placement={props.placement ?? 'bottomStart'}
       width={props.contentWidth ?? theme().overlayWidth}
+      allowOutsideWindow={props.allowOutsideWindow}
       windowLayer="popover"
       dismissPolicy="outsidePointerOrEscape"
       containment="none"
@@ -60,7 +61,7 @@ export function Popover(props: PopoverProps): JSX.Element {
         backdropFilter={!props.opaque && props.blur !== false ? `blur(${theme().overlayBlur}px)` : undefined}
         border={{ width: theme().overlayBorderWidth, color: theme().border }}
         radii={theme().overlayRadius}
-        shadow={{ offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
+        shadow={props.allowOutsideWindow ? undefined : { offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
       >
         <column width="100%" gap={theme().spacing}>
           <ButtonGroupBoundary>

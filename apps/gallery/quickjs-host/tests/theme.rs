@@ -49,6 +49,8 @@ export function mountGallery(bridge) {
     assert_eq!(result["changed"]["change"]["impact"], "Layout");
     assert!(result["invalid"].as_str().unwrap().contains("missing"));
     gallery.dispose().unwrap();
-    assert!(result["changed"]["revision"].as_u64().unwrap()
-        > result["created"]["snapshot"]["revision"].as_u64().unwrap());
+    assert!(
+        result["changed"]["revision"].as_u64().unwrap()
+            > result["created"]["snapshot"]["revision"].as_u64().unwrap()
+    );
 }

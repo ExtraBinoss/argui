@@ -1,9 +1,9 @@
 //! Application controls received from a native JavaScript presentation.
 
-use argui_platform::{GlobalShortcut, WindowKey};
+use argui_platform::{GlobalShortcut, WindowKey, WindowLevel};
 
 use super::MultiApplication;
-use crate::{AppCommand, NativeHostApplicationRequest, NativeWindowInfo};
+use crate::{AppCommand, NativeHostApplicationRequest, NativeMonitorInfo, NativeWindowInfo};
 
 impl MultiApplication {
     /// Applies one application request on the UI thread and replies to its caller.
@@ -50,7 +50,20 @@ impl MultiApplication {
             }
             NativeHostApplicationRequest::OpenWindow(spec, reply) => {
                 let key = spec.key.clone();
-                let result = if self.windows.contains_key(&key) {
+                let main_capabilities = self
+                    .windows
+                    .get(&WindowKey::main())
+                    .and_then(|entry| entry.runtime.window())
+                    .map(|window| window.capabilities());
+                let result = if spec.window.physical_position.is_some()
+                    && !main_capabilities.is_some_and(|capabilities| capabilities.absolute_position)
+                {
+                    Err("absolute screen positioning is unavailable on this window backend".into())
+                } else if spec.window.level != WindowLevel::Normal
+                    && !main_capabilities.is_some_and(|capabilities| capabilities.window_level)
+                {
+                    Err("window stacking levels are unavailable on this window backend".into())
+                } else if self.windows.contains_key(&key) {
                     self.apply_command(event_loop, AppCommand::FocusWindow(key));
                     Ok(())
                 } else {
@@ -96,9 +109,45 @@ impl MultiApplication {
                             transparent: entry.spec.window.transparent,
                             backdrop: entry.spec.window.desktop_backdrop,
                             backdrop_available: entry.runtime.desktop_backdrop_available(),
+                            scale_factor: window.native_scale_factor(),
+                            ui_zoom_factor: self.ui_zoom_factor,
+                            capabilities: window.capabilities(),
                         }
                     })
                     .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()));
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::GetMonitors(key, reply) => {
+                let result = self
+                    .windows
+                    .get(&key)
+                    .and_then(|entry| entry.runtime.window())
+                    .and_then(crate::host::WindowHost::winit)
+                    .map(|window| {
+                        let primary = window.primary_monitor();
+                        window
+                            .available_monitors()
+                            .map(|monitor| {
+                                let position = monitor.position();
+                                let size = monitor.size();
+                                NativeMonitorInfo {
+                                    name: monitor.name(),
+                                    x: position.x,
+                                    y: position.y,
+                                    width: size.width,
+                                    height: size.height,
+                                    scale_factor: monitor.scale_factor(),
+                                    primary: primary.as_ref() == Some(&monitor),
+                                }
+                            })
+                            .collect()
+                    })
+                    .ok_or_else(|| {
+                        format!(
+                            "native monitors are unavailable for window '{}'",
+                            key.as_str()
+                        )
+                    });
                 let _ = reply.send(result);
             }
             NativeHostApplicationRequest::SetWindowTitle(key, title, reply) => {
@@ -153,7 +202,15 @@ impl MultiApplication {
                         .get(&key)
                         .and_then(|entry| entry.runtime.window())
                         .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
-                        .and_then(|window| window.set_outer_position(x, y))
+                        .and_then(|window| {
+                            if !window.capabilities().absolute_position {
+                                return Err(
+                                    "absolute screen positioning is unavailable on this window backend"
+                                        .into(),
+                                );
+                            }
+                            window.set_outer_position(x, y)
+                        })
                 };
                 let _ = reply.send(result);
             }
@@ -171,6 +228,46 @@ impl MultiApplication {
                             Ok(())
                         });
                 let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::SetWindowLevel(key, level, reply) => {
+                let result =
+                    self.windows
+                        .get_mut(&key)
+                        .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                        .and_then(|entry| {
+                            let window = entry.runtime.window().ok_or_else(|| {
+                                format!("window '{}' is unavailable", key.as_str())
+                            })?;
+                            if level != WindowLevel::Normal && !window.capabilities().window_level {
+                                return Err(
+                                    "window stacking levels are unavailable on this window backend"
+                                        .into(),
+                                );
+                            }
+                            window.set_window_level(level.into());
+                            entry.spec.window.level = level;
+                            Ok(())
+                        });
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::ShowWindow(key, reply) => {
+                let result = self
+                    .windows
+                    .contains_key(&key)
+                    .then(|| self.set_visible(&key, true))
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()));
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::CloseWindow(key, reply) => {
+                let result = self
+                    .windows
+                    .contains_key(&key)
+                    .then(|| self.close_window(&key))
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()));
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::SetWindowInputRegion(key, region, reply) => {
+                let _ = reply.send(self.set_window_input_region(&key, region));
             }
         }
     }

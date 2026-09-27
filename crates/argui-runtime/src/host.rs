@@ -9,7 +9,7 @@ use argui_core::Insets;
 use argui_core::{Point, Rect, Size};
 #[cfg(not(target_arch = "wasm32"))]
 use argui_platform::WindowBackend;
-use argui_platform::WindowCapabilities;
+use argui_platform::{WindowCapabilities, WindowInputRegion};
 use winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
     window::{CursorIcon, Window},
@@ -62,7 +62,18 @@ pub(crate) trait WindowHost {
     fn set_minimized(&self, minimized: bool);
     fn is_minimized(&self) -> Option<bool>;
     fn set_window_level(&self, level: winit::window::WindowLevel);
-    fn set_cursor_hittest(&self, enabled: bool) -> Result<(), String>;
+    /// Native display scale, before application UI zoom.
+    fn native_scale_factor(&self) -> f64;
+    /// Applies `region` after converting UI units through `ui_scale`.
+    /// Returns an error if the backend cannot install the region.
+    fn set_input_region(&self, region: &WindowInputRegion, ui_scale: f64) -> Result<(), String> {
+        self.winit()
+            .ok_or_else(|| "native input regions are unavailable on this window host".to_string())
+            .and_then(|window| {
+                argui_platform::apply_window_input_region(window, region, ui_scale)
+                    .map_err(|error| error.to_string())
+            })
+    }
     fn request_redraw(&self);
     /// Physical drawable extent. iOS uses Winit's outer bounds because its
     /// inner bounds describe the safe area rather than the full surface.
@@ -166,10 +177,8 @@ impl WindowHost for Arc<Window> {
     fn set_window_level(&self, level: winit::window::WindowLevel) {
         self.as_ref().set_window_level(level);
     }
-    fn set_cursor_hittest(&self, enabled: bool) -> Result<(), String> {
-        self.as_ref()
-            .set_cursor_hittest(enabled)
-            .map_err(|error| error.to_string())
+    fn native_scale_factor(&self) -> f64 {
+        self.as_ref().scale_factor()
     }
     fn request_redraw(&self) {
         self.as_ref().request_redraw();
@@ -295,8 +304,8 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     fn set_window_level(&self, level: winit::window::WindowLevel) {
         self.as_ref().set_window_level(level);
     }
-    fn set_cursor_hittest(&self, enabled: bool) -> Result<(), String> {
-        self.as_ref().set_cursor_hittest(enabled)
+    fn native_scale_factor(&self) -> f64 {
+        self.as_ref().native_scale_factor()
     }
     fn request_redraw(&self) {
         self.as_ref().request_redraw();

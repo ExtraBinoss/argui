@@ -76,6 +76,11 @@ pub enum AppCommand {
         window: WindowKey,
         passthrough: bool,
     },
+    /// Changes native pointer input without changing rendered transparency.
+    SetWindowInputRegion {
+        window: WindowKey,
+        region: argui_platform::WindowInputRegion,
+    },
     /// Changes adaptive damage rendering for one window at runtime.
     ///
     /// Use [`DamageTracking::enabled`] for the adaptive policy,

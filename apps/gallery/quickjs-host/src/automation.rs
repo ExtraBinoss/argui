@@ -21,8 +21,8 @@ use serde_json::{Value, json};
 
 use crate::{QuickJsGallery, decode_wire_operations, delivery::event_json};
 
-mod clock;
 mod capture;
+mod clock;
 use capture::CaptureState;
 use clock::TestClock;
 
@@ -133,13 +133,7 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
                 });
                 let action = metrics.span("automation.action");
                 let trace_id = action.id();
-                let outcome = execute(
-                    &request,
-                    &driver,
-                    &gallery,
-                    &mut capture,
-                    &mut clock,
-                );
+                let outcome = execute(&request, &driver, &gallery, &mut capture, &mut clock);
                 drop(action);
                 let error = outcome.as_ref().err().cloned();
                 steps.push(Step {
@@ -198,7 +192,13 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
             }
         }
     })();
-    let report = report(&driver.borrow(), &steps, capture.adapter, &result, started_unix_ms);
+    let report = report(
+        &driver.borrow(),
+        &steps,
+        capture.adapter,
+        &result,
+        started_unix_ms,
+    );
     fs::write(out.join("report.json"), serde_json::to_vec_pretty(&report)?)?;
     result.map_err(Into::into)
 }
@@ -303,14 +303,18 @@ fn execute(
             let viewport = Viewport {
                 width: dimension(&args, "width")?,
                 height: dimension(&args, "height")?,
-                scale: args["scale"].as_f64().map_or(current.scale, |scale| scale as f32),
+                scale: args["scale"]
+                    .as_f64()
+                    .map_or(current.scale, |scale| scale as f32),
             };
             driver.borrow_mut().set_viewport(viewport)?;
             capture.render_scene(&mut driver.borrow_mut(), &trace)?;
         }
         "window.move" => {
             window_main(&request.target)?;
-            return Err("window movement needs a native desktop window; argui test is windowless".into());
+            return Err(
+                "window movement needs a native desktop window; argui test is windowless".into(),
+            );
         }
         "screenshot" => {
             capture.screenshot(&mut driver.borrow_mut(), string("name")?, &trace)?;
@@ -343,7 +347,9 @@ fn window_main(key: &str) -> Result<(), String> {
     if key == "main" {
         Ok(())
     } else {
-        Err(format!("window {key:?} is unavailable; this test mounts only main"))
+        Err(format!(
+            "window {key:?} is unavailable; this test mounts only main"
+        ))
     }
 }
 

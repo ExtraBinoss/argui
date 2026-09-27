@@ -5,7 +5,11 @@ import type { WidgetTheme } from '../shared/theme'
 import { keyName, nextEnabledOption, type SelectOptions } from '../shared/types'
 
 /** Props for the native Solid Select. */
-export type SelectProps = SelectOptions & { leading?: JSX.Element; trailing?: JSX.Element }
+export type SelectProps = SelectOptions & {
+  leading?: JSX.Element
+  /** App-supplied chevron, rotated while the option list is open. */
+  trailing?: JSX.Element
+}
 
 /** Renders a keyboard-accessible native option list with controlled or local value. */
 export function Select(props: SelectProps): JSX.Element {
@@ -116,11 +120,14 @@ export function Select(props: SelectProps): JSX.Element {
               {selected()?.label ?? props.placeholder ?? 'Choose an option'}
             </text>
           </container>
-          {props.trailing}
+          {props.trailing ? <container id={`${id}-chevron`} shrink={0}
+            rotation={expanded() ? 180 : 0} transitionMs={180}
+            transitionTimingFunction="cubic-bezier(0.2, 0, 0, 1)">{props.trailing}</container> : null}
         </row>
       </rectangle>
     </focusScope>
     {expanded() ? <popupWindow
+      allowOutsideWindow={props.allowOutsideWindow}
       id={popupId}
       role="listBox"
       accessibleName={props.label}
@@ -141,7 +148,7 @@ export function Select(props: SelectProps): JSX.Element {
         clip={true}
         border={{ width: theme().overlayBorderWidth, color: theme().border }}
         radii={theme().overlayRadius}
-        shadow={{ offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
+        shadow={props.allowOutsideWindow ? undefined : { offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
       >
         <scrollView width="100%" height={optionHeight()} scrollY={true}>
           <column width="100%" gap={2} padding={4}>

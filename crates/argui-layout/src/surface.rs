@@ -65,6 +65,10 @@ impl NativeSurfacePaint {
                     DisplayCommand::BeginLayer(layer) => {
                         layer.bounds.origin.x += delta.x;
                         layer.bounds.origin.y += delta.y;
+                        if let Some(clip) = &mut layer.clip {
+                            clip.origin.x += delta.x;
+                            clip.origin.y += delta.y;
+                        }
                     }
                     DisplayCommand::BeginCompositor(layer) => {
                         layer.bounds.origin.x += delta.x;
@@ -83,13 +87,13 @@ impl NativeSurfacePaint {
 }
 
 impl crate::LayoutOutput {
-    /// Resolve an anchored portal against an OS work area, keeping the tree's logical coordinates.
+    /// Resolve a portal for a native surface, keeping the tree's logical coordinates.
     ///
     /// * `ui` — retained UI tree containing the portal and anchor.
     /// * `node` — portal node to place.
     /// * `work_area` — available logical bounds of the native surface.
     ///
-    /// Returns `None` when portal metadata, target, anchor geometry, or positive-size placement
+    /// Returns `None` when portal metadata, anchor geometry, or positive-size placement
     /// is unavailable.
     #[must_use]
     pub fn native_portal_placement(
@@ -100,7 +104,7 @@ impl crate::LayoutOutput {
     ) -> Option<Rect> {
         let metadata = self.portals.iter().find(|portal| portal.node == node)?;
         let element = ui.element_for(node)?;
-        let (anchor, placement) = match &element.portal.as_ref()?.target {
+        let placed = match &element.portal.as_ref()?.target {
             argui_ui::PortalTarget::Anchor(anchor) => {
                 let anchor_node = ui
                     .node_ids()
@@ -112,19 +116,31 @@ impl crate::LayoutOutput {
                     .iter()
                     .find(|node| node.node == anchor_node)?
                     .bounds;
-                (bounds, anchor.placement)
+                anchor
+                    .placement
+                    .place(
+                        work_area,
+                        bounds,
+                        metadata.desired_size,
+                        ui.resolved_layout_style(node, element).writing_direction,
+                    )
+                    .bounds
             }
-            argui_ui::PortalTarget::Rect { bounds, placement } => (*bounds, *placement),
+            argui_ui::PortalTarget::Rect { bounds, placement } => {
+                placement
+                    .place(
+                        work_area,
+                        *bounds,
+                        metadata.desired_size,
+                        ui.resolved_layout_style(node, element).writing_direction,
+                    )
+                    .bounds
+            }
+            argui_ui::PortalTarget::Viewport(placement) => {
+                placement.place(self.viewport, metadata.desired_size)
+            }
             _ => return None,
         };
-        let placed = placement
-            .place(
-                work_area,
-                anchor,
-                metadata.desired_size,
-                ui.resolved_layout_style(node, element).writing_direction,
-            )
-            .bounds;
         (placed.size.width > 0.0 && placed.size.height > 0.0).then_some(placed)
     }
 }

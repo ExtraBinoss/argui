@@ -93,16 +93,23 @@ pub(super) fn run_js_loop(
                             },
                         },
                     ) {
-                        eprintln!("argui-hot-reload: {}: {error}; keeping previous scene", watcher.path.display());
+                        eprintln!(
+                            "argui-hot-reload: {}: {error}; keeping previous scene",
+                            watcher.path.display()
+                        );
                     } else {
-                        eprintln!("argui-hot-reload: bundle applied from {}", watcher.path.display());
+                        eprintln!(
+                            "argui-hot-reload: bundle applied from {}",
+                            watcher.path.display()
+                        );
                     }
                 }
                 Ok(None) => {}
                 Err(error) => eprintln!("argui-hot-reload: {error}"),
             }
         }
-        deliver_services(gallery, &inbox.services, dispatch.borrow().generation)?;
+        let generation = dispatch.borrow().generation;
+        deliver_services(gallery, &inbox.services, generation)?;
         #[cfg(any(debug_assertions, feature = "dev-metrics"))]
         let entered = Instant::now();
         let maximum_delay = if profile_enabled.load(Ordering::Relaxed)
@@ -154,7 +161,8 @@ pub(super) fn run_js_loop(
                 ));
             }
         }
-        deliver_services(gallery, &inbox.services, dispatch.borrow().generation)?;
+        let generation = dispatch.borrow().generation;
+        deliver_services(gallery, &inbox.services, generation)?;
         #[cfg(any(debug_assertions, feature = "dev-metrics"))]
         let mut latest_profile = None;
         #[cfg(any(debug_assertions, feature = "dev-metrics"))]

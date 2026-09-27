@@ -30,11 +30,12 @@ export function Switch(props: SwitchProps): ReactElement {
       <rectangle width={small ? 24 : 32} height={small ? 14 : 18} radii={9} shrink={0}
         padding={1} background={checked ? theme.primary : theme.input}
         hoverBackground={checked ? theme.primaryHover : theme.controlHover}
+        transitionMs={150} transitionTimingFunction="cubic-bezier(0.2, 0, 0, 1)"
         focusBorderColor={theme.focusRing} opacity={enabled ? 1 : 0.5}>
         <container width="100%" height="100%" position="relative">
           <container width={small ? 12 : 16} height={small ? 12 : 16} position="absolute"
             inset={{ start: 0, top: 0 }} transform={{ translateX: checked ? (small ? 10 : 14) : 0 }}
-            transitionMs={150} transitionTimingFunction="cubic-bezier(0.4, 0, 0.2, 1)">
+            transitionMs={150} transitionTimingFunction="cubic-bezier(0.2, 0, 0, 1)">
             <rectangle width="100%" height="100%" radii={8}
               background={checked ? theme.primaryForeground : theme.background} />
           </container>

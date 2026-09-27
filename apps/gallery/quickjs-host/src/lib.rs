@@ -182,32 +182,37 @@ impl QuickJsGallery {
             globals
                 .set(
                     "__arguiSend",
-                    Function::new(ctx.clone(), commit).map_err(|error| js_context_error(&ctx, error))?,
+                    Function::new(ctx.clone(), commit)
+                        .map_err(|error| js_context_error(&ctx, error))?,
                 )
                 .map_err(|error| js_context_error(&ctx, error))?;
             globals
                 .set(
                     "__arguiControl",
-                    Function::new(ctx.clone(), control).map_err(|error| js_context_error(&ctx, error))?,
+                    Function::new(ctx.clone(), control)
+                        .map_err(|error| js_context_error(&ctx, error))?,
                 )
                 .map_err(|error| js_context_error(&ctx, error))?;
             globals
                 .set(
                     "__arguiService",
-                    Function::new(ctx.clone(), request).map_err(|error| js_context_error(&ctx, error))?,
+                    Function::new(ctx.clone(), request)
+                        .map_err(|error| js_context_error(&ctx, error))?,
                 )
                 .map_err(|error| js_context_error(&ctx, error))?;
             globals
                 .set(
                     "__arguiCancelService",
-                    Function::new(ctx.clone(), cancel).map_err(|error| js_context_error(&ctx, error))?,
+                    Function::new(ctx.clone(), cancel)
+                        .map_err(|error| js_context_error(&ctx, error))?,
                 )
                 .map_err(|error| js_context_error(&ctx, error))?;
             #[cfg(feature = "automation")]
             globals
                 .set(
                     "__arguiRequest",
-                    Function::new(ctx.clone(), automation).map_err(|error| js_context_error(&ctx, error))?,
+                    Function::new(ctx.clone(), automation)
+                        .map_err(|error| js_context_error(&ctx, error))?,
                 )
                 .map_err(|error| js_context_error(&ctx, error))?;
             let loader = Rc::clone(&i18n);
@@ -269,29 +274,42 @@ impl QuickJsGallery {
                     .map_err(|error| js_context_error(&ctx, error))?,
                 )
                 .map_err(|error| js_context_error(&ctx, error))?;
-            let _: () = ctx.eval(include_str!("bootstrap.js")).map_err(|error| js_context_error(&ctx, error))?;
-            let module =
-                Module::declare(ctx.clone(), "gallery-core.mjs", source).map_err(|error| js_context_error(&ctx, error))?;
+            let _: () = ctx
+                .eval(include_str!("bootstrap.js"))
+                .map_err(|error| js_context_error(&ctx, error))?;
+            let module = Module::declare(ctx.clone(), "gallery-core.mjs", source)
+                .map_err(|error| js_context_error(&ctx, error))?;
             let (module, evaluated) = CaughtError::catch(&ctx, module.eval())
                 .map_err(|error| format!("QuickJS: {}", caught_error(error)))?;
             CaughtError::catch(&ctx, evaluated.finish::<()>())
                 .map_err(|error| format!("QuickJS module: {}", caught_error(error)))?;
             #[cfg(feature = "automation")]
             let mount: Function = if entry == "__arguiTest" {
-                let test: Object = globals.get("__arguiTest").map_err(|error| js_context_error(&ctx, error))?;
-                test.get("app").map_err(|error| js_context_error(&ctx, error))?
+                let test: Object = globals
+                    .get("__arguiTest")
+                    .map_err(|error| js_context_error(&ctx, error))?;
+                test.get("app")
+                    .map_err(|error| js_context_error(&ctx, error))?
             } else {
-                module.get(entry).map_err(|error| js_context_error(&ctx, error))?
+                module
+                    .get(entry)
+                    .map_err(|error| js_context_error(&ctx, error))?
             };
             #[cfg(not(feature = "automation"))]
-            let mount: Function = module.get(entry).map_err(|error| js_context_error(&ctx, error))?;
-            let bridge: Object = globals.get("__arguiBridge").map_err(|error| js_context_error(&ctx, error))?;
+            let mount: Function = module
+                .get(entry)
+                .map_err(|error| js_context_error(&ctx, error))?;
+            let bridge: Object = globals
+                .get("__arguiBridge")
+                .map_err(|error| js_context_error(&ctx, error))?;
             let hash: String = ctx
                 .eval("JSON.parse(__arguiContractJson).abiHash")
                 .map_err(|error| js_context_error(&ctx, error))?;
             let dispose: Function = CaughtError::catch(&ctx, mount.call((bridge, hash)))
                 .map_err(|error| format!("QuickJS: {}", caught_error(error)))?;
-            globals.set("__arguiDispose", dispose).map_err(|error| js_context_error(&ctx, error))
+            globals
+                .set("__arguiDispose", dispose)
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         let gallery = Self { runtime, context };
         gallery.drain_jobs()?;
@@ -341,8 +359,13 @@ impl QuickJsGallery {
     #[cfg(feature = "automation")]
     pub fn resolve_automation(&self, id: i32, error: &str, result: &str) -> Result<(), String> {
         self.context.with(|ctx| {
-            let resolve: Function = ctx.globals().get("__arguiResolve").map_err(|error| js_context_error(&ctx, error))?;
-            resolve.call::<_, ()>((id, error, result)).map_err(|error| js_context_error(&ctx, error))
+            let resolve: Function = ctx
+                .globals()
+                .get("__arguiResolve")
+                .map_err(|error| js_context_error(&ctx, error))?;
+            resolve
+                .call::<_, ()>((id, error, result))
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         self.drain_jobs()
     }
@@ -353,8 +376,13 @@ impl QuickJsGallery {
     /// Returns an error if the callback or its scheduled microtasks fail.
     pub fn deliver(&self, delivery_json: &str) -> Result<(), String> {
         self.context.with(|ctx| {
-            let deliver: Function = ctx.globals().get("__arguiDeliver").map_err(|error| js_context_error(&ctx, error))?;
-            deliver.call::<_, ()>((delivery_json,)).map_err(|error| js_context_error(&ctx, error))
+            let deliver: Function = ctx
+                .globals()
+                .get("__arguiDeliver")
+                .map_err(|error| js_context_error(&ctx, error))?;
+            deliver
+                .call::<_, ()>((delivery_json,))
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         self.drain_jobs()
     }
@@ -373,7 +401,9 @@ impl QuickJsGallery {
                 .globals()
                 .get("__arguiDeliverProfile")
                 .map_err(|error| js_context_error(&ctx, error))?;
-            deliver.call::<_, ()>((profile_json,)).map_err(|error| js_context_error(&ctx, error))
+            deliver
+                .call::<_, ()>((profile_json,))
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         self.drain_jobs()
     }
@@ -389,7 +419,9 @@ impl QuickJsGallery {
                 .globals()
                 .get("__arguiDeliverService")
                 .map_err(|error| js_context_error(&ctx, error))?;
-            deliver.call::<_, ()>((response_json,)).map_err(|error| js_context_error(&ctx, error))
+            deliver
+                .call::<_, ()>((response_json,))
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         self.drain_jobs()
     }
@@ -413,8 +445,12 @@ impl QuickJsGallery {
     /// Returns an error if a timer or its scheduled microtasks fail.
     pub fn tick(&self, elapsed_ms: f64) -> Result<(), String> {
         self.context.with(|ctx| {
-            let tick: Function = ctx.globals().get("__arguiTick").map_err(|error| js_context_error(&ctx, error))?;
-            tick.call::<_, ()>((elapsed_ms,)).map_err(|error| js_context_error(&ctx, error))
+            let tick: Function = ctx
+                .globals()
+                .get("__arguiTick")
+                .map_err(|error| js_context_error(&ctx, error))?;
+            tick.call::<_, ()>((elapsed_ms,))
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         self.drain_jobs()
     }
@@ -425,8 +461,12 @@ impl QuickJsGallery {
     /// Returns an error if the timer scheduler cannot be queried.
     pub fn next_wake(&self, elapsed_ms: f64) -> Result<Duration, String> {
         let remaining: Option<f64> = self.context.with(|ctx| {
-            let next: Function = ctx.globals().get("__arguiNextTimer").map_err(|error| js_context_error(&ctx, error))?;
-            next.call((elapsed_ms,)).map_err(|error| js_context_error(&ctx, error))
+            let next: Function = ctx
+                .globals()
+                .get("__arguiNextTimer")
+                .map_err(|error| js_context_error(&ctx, error))?;
+            next.call((elapsed_ms,))
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         let milliseconds = remaining.unwrap_or(1000.0).clamp(0.0, 1000.0);
         Ok(Duration::from_secs_f64(milliseconds / 1000.0))
@@ -438,8 +478,13 @@ impl QuickJsGallery {
     /// Returns an error if the disposer or its scheduled microtasks fail.
     pub fn dispose(&self) -> Result<(), String> {
         self.context.with(|ctx| {
-            let dispose: Function = ctx.globals().get("__arguiDispose").map_err(|error| js_context_error(&ctx, error))?;
-            dispose.call::<_, ()>(()).map_err(|error| js_context_error(&ctx, error))
+            let dispose: Function = ctx
+                .globals()
+                .get("__arguiDispose")
+                .map_err(|error| js_context_error(&ctx, error))?;
+            dispose
+                .call::<_, ()>(())
+                .map_err(|error| js_context_error(&ctx, error))
         })?;
         self.drain_jobs()
     }
@@ -448,7 +493,10 @@ impl QuickJsGallery {
     fn drain_jobs(&self) -> Result<(), String> {
         while self.runtime.execute_pending_job().map_err(|error| {
             error.0.with(|ctx| {
-                format!("QuickJS job: {}", caught_error(CaughtError::from_error(&ctx, Error::Exception)))
+                format!(
+                    "QuickJS job: {}",
+                    caught_error(CaughtError::from_error(&ctx, Error::Exception))
+                )
             })
         })? {}
         let microtask_error: Option<String> = self.context.with(|ctx| {
@@ -472,7 +520,10 @@ fn js_error(error: impl std::fmt::Debug) -> String {
 ///
 /// `ctx` is the context where `error` occurred. Returns a readable diagnostic.
 fn js_context_error(ctx: &Ctx<'_>, error: Error) -> String {
-    format!("QuickJS: {}", caught_error(CaughtError::from_error(ctx, error)))
+    format!(
+        "QuickJS: {}",
+        caught_error(CaughtError::from_error(ctx, error))
+    )
 }
 
 /// Formats a caught JavaScript error with its message and source stack.
@@ -481,7 +532,9 @@ fn js_context_error(ctx: &Ctx<'_>, error: Error) -> String {
 fn caught_error(error: CaughtError<'_>) -> String {
     match error {
         CaughtError::Exception(exception) => {
-            let message = exception.message().unwrap_or_else(|| "JavaScript exception".into());
+            let message = exception
+                .message()
+                .unwrap_or_else(|| "JavaScript exception".into());
             match exception.stack() {
                 Some(stack) if !stack.is_empty() => format!("{message}\n{stack}"),
                 _ => message,

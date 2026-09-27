@@ -162,8 +162,15 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
             return;
         };
         let close = matches!(event, WindowEvent::CloseRequested);
+        let geometry_changed = matches!(
+            event,
+            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
+        );
         if let Some(entry) = self.windows.get_mut(&key) {
             entry.runtime.window_event(event_loop, window_id, event);
+        }
+        if geometry_changed {
+            self.refresh_window_input_region(&key);
         }
         self.synchronize_ui_zoom(&key);
         self.process_pending(event_loop);

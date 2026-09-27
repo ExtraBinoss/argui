@@ -53,7 +53,38 @@ export interface NativeWindowInfo {
   transparent: boolean
   backdrop: boolean
   backdropAvailable: boolean
+  /** Native DPI multiplier, before application UI zoom. */
+  scaleFactor: number
+  uiZoomFactor: number
+  capabilities: NativeWindowCapabilities
 }
+
+/** Desktop operations supported by the current native window backend. */
+export interface NativeWindowCapabilities {
+  backend: 'windows' | 'macos' | 'x11' | 'wayland' | 'android' | 'ios' | 'web' | 'other'
+  absolutePosition: boolean
+  windowLevel: boolean
+  mousePassthrough: boolean
+  inputRegions: boolean
+  transparentCompositing: boolean
+  nativeShadow: boolean
+}
+
+/** Physical desktop geometry and DPI for one monitor. */
+export interface NativeMonitorInfo {
+  name: string | null
+  x: number
+  y: number
+  width: number
+  height: number
+  scaleFactor: number
+  primary: boolean
+}
+
+/** Window input policy; exclusion coordinates use Argui UI logical units. */
+export type WindowInputRegion =
+  | { mode: 'full' | 'passThrough' }
+  | { mode: 'exclude'; rect: { x: number; y: number; width: number; height: number } }
 
 type Pending = {
   resolve(value: unknown): void
@@ -156,6 +187,36 @@ export class ApplicationServices {
   /** Reads a native window's current logical size and requested appearance. */
   getWindowInfo(window: string = 'main', signal?: AbortSignal): Promise<NativeWindowInfo> {
     return this.call('windows', 'getInfo', { window }, signal)
+  }
+
+  /** Reads physical screen geometry for all native monitors. */
+  getMonitors(window: string = 'main', signal?: AbortSignal): Promise<NativeMonitorInfo[]> {
+    return this.call('windows', 'getMonitors', { window }, signal)
+  }
+
+  /** Sets whole-window or rectangular-hole native pointer routing. */
+  setWindowInputRegion(window: string, region: WindowInputRegion, signal?: AbortSignal): Promise<void> {
+    return this.call('windows', 'setInputRegion', { window, ...region }, signal)
+  }
+
+  /** Lets all mouse input reach windows behind `window`, or restores normal input. */
+  setWindowMousePassthrough(window: string, enabled: boolean, signal?: AbortSignal): Promise<void> {
+    return this.setWindowInputRegion(window, { mode: enabled ? 'passThrough' : 'full' }, signal)
+  }
+
+  /** Requests a native stacking level; the OS may decline to keep it. */
+  setWindowLevel(window: string, level: 'bottom' | 'normal' | 'top', signal?: AbortSignal): Promise<void> {
+    return this.call('windows', 'setLevel', { window, level }, signal)
+  }
+
+  /** Shows an existing native window without activating it. */
+  showWindow(window: string, signal?: AbortSignal): Promise<void> {
+    return this.call('windows', 'show', { window }, signal)
+  }
+
+  /** Closes an existing native window. */
+  closeWindow(window: string, signal?: AbortSignal): Promise<void> {
+    return this.call('windows', 'close', { window }, signal)
   }
 
   /** Changes the native title of an existing window. */

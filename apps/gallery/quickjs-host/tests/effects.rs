@@ -2,8 +2,12 @@ use argui_gallery_quickjs::registry_from_json;
 use serde_json::json;
 
 #[test]
-fn imported_gallery_wgsl_validates_and_invalid_source_is_atomic() {
-    let source = include_str!("../../src/prism.wgsl");
+fn imported_wgsl_validates_and_invalid_source_is_atomic() {
+    let source = r#"
+        fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> {
+            return mix(source, backdrop, uv.x);
+        }
+    "#;
     let valid = json!([{
         "id": "gallery.examples.prism",
         "source": source,

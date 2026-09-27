@@ -22,7 +22,12 @@ pub(super) struct CaptureState<'a> {
 impl<'a> CaptureState<'a> {
     /// Creates capture state for `out` with `assets` registered on first render.
     pub(super) fn new(out: &'a Path, assets: &'a NativeHostAssets) -> Self {
-        Self { out, assets, renderer: None, adapter: None }
+        Self {
+            out,
+            assets,
+            renderer: None,
+            adapter: None,
+        }
     }
 
     /// Renders the current `driver` scene at its latest viewport size.
@@ -104,7 +109,12 @@ impl<'a> CaptureState<'a> {
             .read_offscreen_rgba()
             .map_err(|error| format!("screenshot readback: {error}"))?;
         drop(_readback);
-        if !pixels.as_chunks::<4>().0.iter().any(|pixel| pixel != &pixels[..4]) {
+        if !pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| pixel != &pixels[..4])
+        {
             return Err("screenshot was blank; check the mounted app and GPU renderer".into());
         }
         let _write = trace.span("artifact.png_write");

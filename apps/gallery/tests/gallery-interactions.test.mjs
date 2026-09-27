@@ -126,6 +126,49 @@ function descendant(node, typeName) {
 }
 
 for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
+  test(`${adapter} widget navigation is alphabetical and background typing searches`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      const widgets = view.all('FocusScope')
+        .filter((node) => node.properties.id?.startsWith('page-'))
+        .slice(0, 12)
+        .map((node) => view.text(node))
+      assert.deepEqual(widgets, [
+        'Button', 'ButtonGroup', 'Checkbox', 'InputField', 'Popover', 'Progress',
+        'Select', 'Slider', 'Switch', 'Tabs', 'Tooltip', 'VirtualList',
+      ])
+      const background = view.find('FocusScope', (node) => node.properties.id === 'gallery-keyboard')
+      const field = () => view.find('TextInput', (node) => node.properties.id === 'gallery-search')
+      assert.equal(background?.properties.focusOnClick, true)
+      assert.equal(background?.properties.initialFocus, 'gallery-search')
+      view.dispatch(background, 'focus', { kind: 'focus' })
+      for (const letter of ['t', 'o', 'o']) {
+        view.dispatch(background, 'key', {
+          kind: 'key', key: letter, text: letter, state: 'pressed',
+          control: false, alt: false, super: false,
+        })
+      }
+      await turn()
+      assert.equal(field()?.properties.value, 'too')
+      assert(findButton(view, 'Tooltip'))
+      assert(!findButton(view, 'Button'))
+      view.dispatch(background, 'key', {
+        kind: 'key', key: 'Backspace', text: null, state: 'pressed',
+        control: false, alt: false, super: false,
+      })
+      await turn()
+      assert.equal(field()?.properties.value, 'to')
+      view.dispatch(background, 'blur', { kind: 'blur' })
+      view.dispatch(background, 'key', {
+        kind: 'key', key: 'x', text: 'x', state: 'pressed',
+        control: false, alt: false, super: false,
+      })
+      await turn()
+      assert.equal(field()?.properties.value, 'to', 'typing into another control leaves search unchanged')
+    } finally { dispose() }
+  })
+
   test(`${adapter} gallery exposes matching layout geometry and settles after theme updates`, async (context) => {
     const view = galleryBridge()
     const dispose = mount(view.bridge, contract.abiHash)
@@ -221,12 +264,13 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
     try {
       view.dispatch(findButton(view, 'Settings'), 'click')
       await turn()
-      const colors = view.find('ScrollView', (node) => node.properties.id === 'gallery-color-list')
-      assert.equal(colors?.properties.scrollY, true)
+      const colors = view.find('VirtualWindow', (node) => node.properties.id === 'gallery-color-list')
       assert.equal(colors?.properties.height, 228)
-      assert.equal(colors?.children[0]?.type.name, 'Column', 'color choices form a vertical overflow list')
-      assert(view.all('FocusScope').filter((node) => node.properties.id?.startsWith('color-')).length > 15,
-        'the bounded viewport contains more choices than one screen can show')
+      assert.equal(colors?.properties.itemCount, 26)
+      assert.equal(view.all('FocusScope').filter((node) => node.properties.id?.startsWith('color-')).length, 12,
+        'only the initial color window is mounted')
+      view.dispatch(colors, 'window', { kind: 'window', start: 16, end: 26, offset: 16 * 36, viewportExtent: 228 })
+      await turn()
       view.dispatch(findButton(view, 'Blue'), 'click')
       await turn()
       assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
@@ -244,6 +288,9 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
         'oklch(0.707 0.165 254.624)', 'system changes refresh the chosen family')
+      view.dispatch(view.find('VirtualWindow', (node) => node.properties.id === 'gallery-color-list'),
+        'window', { kind: 'window', start: 0, end: 12, offset: 0, viewportExtent: 228 })
+      await turn()
       view.dispatch(findButton(view, 'Neutral'), 'click')
       await turn()
       assert.equal(descendant(findButton(view, 'Default'), 'Rectangle')?.properties.background,
@@ -421,8 +468,12 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       let select = view.find('FocusScope', (node) => node.properties.role === 'comboBox')
       assert(select, 'combobox is mounted')
+      const chevron = () => view.find('Container', (node) => node.properties.id === 'language-select-chevron')
+      assert.equal(chevron()?.properties.rotation, 0, 'closed chevron points down')
+      assert.equal(chevron()?.properties.transitionMs, 180, 'chevron rotates with a native transition')
       view.dispatch(select, 'click')
       await turn()
+      assert.equal(chevron()?.properties.rotation, 180, 'open chevron points up')
       const languagePopup = view.find('PopupWindow', (node) => node.properties.id === 'language-select-popup')
       assert(languagePopup, 'standard select popup is mounted')
       assert.equal(descendant(languagePopup, 'Rectangle')?.properties.clip, true,
@@ -440,6 +491,7 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       select = view.find('FocusScope', (node) => node.properties.role === 'comboBox')
       assert.equal(select?.properties.accessibleValue, 'TypeScript')
+      assert.equal(chevron()?.properties.rotation, 0, 'closing the list reverses the chevron')
 
       let fruitSelect = view.find('FocusScope', (node) => node.properties.id === 'fruit-select')
       assert(fruitSelect, 'shadcn combobox is mounted')
@@ -521,6 +573,50 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       assert.equal(searchPopup.properties.containment, 'none')
       assert.equal(searchPopup.properties.accessibleName, 'Blurred')
       assert.equal(searchTrigger.properties.width, undefined)
+      const outsideTrigger = view.find('FocusScope', (node) => node.properties.controls === 'gallery-outside-popover-popup')
+      assert(outsideTrigger, 'outside-window popover trigger is mounted')
+      view.dispatch(outsideTrigger, 'click')
+      await turn()
+      const outsidePopup = view.find('PopupWindow', (node) => node.properties.id === 'gallery-outside-popover-popup')
+      assert.equal(outsidePopup?.properties.allowOutsideWindow, true)
+      assert.equal(outsidePopup.properties.placement, 'rightStart')
+    } finally { dispose() }
+  })
+
+  test(`${adapter} Tooltip variants use hover dismissal and native overflow on request`, async () => {
+    const view = galleryBridge()
+    const dispose = mount(view.bridge, contract.abiHash)
+    try {
+      view.dispatch(findButton(view, 'Tooltip'), 'click')
+      await turn()
+      for (const [id, expectedBlur] of [
+        ['gallery-tooltip-opaque', false], ['gallery-tooltip-blur', true],
+        ['gallery-tooltip-transparent', false], ['gallery-tooltip-outside', false],
+      ]) {
+        const trigger = view.find('TouchArea', (node) => node.properties.id === id)
+        assert(trigger, `${id} trigger is mounted`)
+        view.dispatch(trigger, 'pointerEnter')
+        await turn()
+        const popup = view.find('PopupWindow', (node) => node.properties.id === `${id}-popup`)
+        assert(popup, `${id} opens on hover`)
+        assert.equal(popup.properties.role, 'tooltip')
+        assert.equal(popup.properties.width, 220)
+        assert.equal(popup.properties.dismissPolicy, 'outsideHoverOrEscape')
+        assert.equal(popup.properties.allowOutsideWindow, id === 'gallery-tooltip-outside' ? true : undefined)
+        const surface = descendant(popup, 'Rectangle')
+        assert.equal(!!surface?.properties.backdropFilter, expectedBlur)
+        view.dispatch(popup, 'dismiss')
+        await turn()
+        assert.equal(view.find('PopupWindow', (node) => node.properties.id === `${id}-popup`), undefined)
+      }
+      const keyboardTrigger = view.find('FocusScope', (node) => node.properties.describedBy === 'gallery-tooltip-opaque-popup')
+      assert(keyboardTrigger, 'tooltip trigger is focusable for keyboard users')
+      view.dispatch(keyboardTrigger, 'focus')
+      await turn()
+      assert(view.find('PopupWindow', (node) => node.properties.id === 'gallery-tooltip-opaque-popup'))
+      view.dispatch(keyboardTrigger, 'blur')
+      await turn()
+      assert.equal(view.find('PopupWindow', (node) => node.properties.id === 'gallery-tooltip-opaque-popup'), undefined)
     } finally { dispose() }
   })
 

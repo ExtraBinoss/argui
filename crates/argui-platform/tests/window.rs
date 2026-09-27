@@ -66,6 +66,12 @@ fn capabilities_expose_real_backend_limits() {
     assert!(!wayland.native_shadow);
     assert!(wayland.mouse_passthrough);
     assert!(!wayland.window_level);
+    assert!(!wayland.absolute_position);
+    assert!(!wayland.input_regions);
+    assert_eq!(
+        WindowBackend::X11.capabilities().input_regions,
+        cfg!(feature = "window-input-regions")
+    );
 
     for backend in [
         WindowBackend::Windows,
@@ -77,6 +83,7 @@ fn capabilities_expose_real_backend_limits() {
         assert!(capabilities.minimize);
         assert!(capabilities.maximize);
         assert!(capabilities.window_level);
+        assert!(capabilities.absolute_position);
         assert!(capabilities.mouse_passthrough);
     }
     assert!(WindowBackend::Windows.capabilities().native_shadow);
@@ -90,6 +97,8 @@ fn capabilities_expose_real_backend_limits() {
         assert!(!capabilities.minimize);
         assert!(!capabilities.maximize);
         assert!(!capabilities.window_level);
+        assert!(!capabilities.absolute_position);
+        assert!(!capabilities.input_regions);
         assert!(!capabilities.mouse_passthrough);
     }
 
@@ -102,7 +111,10 @@ fn capabilities_expose_real_backend_limits() {
             minimize: false,
             maximize: false,
             window_level: false,
+            absolute_position: false,
             mouse_passthrough: false,
+            input_regions: false,
+            transparent_compositing: false,
         }
     );
 }

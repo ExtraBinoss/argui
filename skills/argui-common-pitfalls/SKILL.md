@@ -30,6 +30,11 @@ adapter too.
   side, width and hover style; keep scroll, dragging and transitions native.
   Check that content actually overflows and the thumb is reachable. Do not
   place a decorative bar over a separate invisible scrollbar.
+- A bounded `scrollView` still mounts every child. For a popup with many
+  expensive rows, use `VirtualList` with stable item keys and a measured row
+  estimate; lists of 12 items or fewer intentionally mount all rows. Check
+  opening time and that the last item remains reachable after scrolling. Base
+  the choice on mounted native nodes and measured latency, not item count alone.
 - For an edge shadow, use `ScrollShadow` and let native scroll metrics reveal
   each edge only while content remains hidden there. Give the viewport the
   full width of the surface and put content padding inside it; otherwise the
@@ -76,6 +81,14 @@ adapter too.
   trigger. The default popover leaves focus on the trigger and is nonmodal;
   opt into `initialFocus="first"` when the first control should receive focus.
   Modal dialogs need a separate modal containment contract.
+  `allowOutsideWindow` requests a native popup, so verify the runtime feature
+  and platform backend; unsupported hosts fall back inside the window. On the
+  current Linux backend, native popups use X11. Check the alpha, shadow, and
+  zoom details in [native popup surfaces](references/argui-native-popup-surfaces.md).
+  For screen overlays and native pointer holes, read
+  [desktop overlay pitfalls](references/argui-desktop-overlays.md).
+  Keep new built-in property IDs distinct from all existing IDs, including IDs
+  declared later in `builtin.rs`.
 - Icons belong to the application. A widget may accept app-provided JSX or
   media slots, but must not require Tabler or another icon set. An icon-only
   action still needs an accessible name. The gallery can choose its own icons
@@ -100,6 +113,8 @@ adapter too.
   in a column; use `width` or `alignSelf="stretch"` only when the group should
   fill the page. A chosen option in an action
   group should expose `pressed` as well as its selected visual paint.
+  See [ButtonGroup and Select layout and motion](references/argui-button-group-select.md)
+  for dividers that follow mixed control heights.
 - A Neutral ghost button hovers with `muted`; place it on `background` or
   `sidebar` so the state does not disappear into an identical muted parent.
   For a sidebar, scope `ghostHover` to `sidebarAccent` and color the active
@@ -117,6 +132,8 @@ adapter too.
 - In `Select variant="shadcn"`, the placeholder is an option too. It must
   respond to pointer hover even after another value is selected; use native
   `hoverBackground` on its row, as on every other option.
+  The [Select motion notes](references/argui-button-group-select.md) cover the
+  retained chevron transition.
 - Put layout demonstrations in an `Examples / Layouting` view. Explain the
   property beside an observable scene: resize for `%` versus `grow`, constrain
   a flex item with long text for overflow, and scroll real excess content.

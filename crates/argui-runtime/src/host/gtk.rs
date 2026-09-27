@@ -1,5 +1,5 @@
 use super::{HostId, WindowHost};
-use argui_platform::{WindowCapabilities, gtk_host::GtkWindow};
+use argui_platform::{WindowCapabilities, WindowInputRegion, gtk_host::GtkWindow};
 use gtk::prelude::*;
 use std::cell::Cell;
 use winit::{
@@ -94,11 +94,20 @@ impl WindowHost for GtkHost {
             .native()
             .set_always_on_bottom(level == WindowLevel::AlwaysOnBottom);
     }
-    fn set_cursor_hittest(&self, enabled: bool) -> Result<(), String> {
-        self.platform
-            .native()
-            .set_ignore_cursor_events(!enabled)
-            .map_err(|error| error.to_string())
+    fn native_scale_factor(&self) -> f64 {
+        f64::from(self.platform.client_size().2)
+    }
+    fn set_input_region(&self, region: &WindowInputRegion, _ui_scale: f64) -> Result<(), String> {
+        match region {
+            WindowInputRegion::Full | WindowInputRegion::PassThrough => self
+                .platform
+                .native()
+                .set_ignore_cursor_events(matches!(region, WindowInputRegion::PassThrough))
+                .map_err(|error| error.to_string()),
+            WindowInputRegion::Exclude(_) => {
+                Err("partial input regions are unavailable on the GTK host".into())
+            }
+        }
     }
     fn request_redraw(&self) {
         self.redraw_requested.set(true);

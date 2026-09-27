@@ -2,24 +2,26 @@
   "version": 2,
   "arguiVersion": "0.4.0",
   "files": {
-    "react/button-group.tsx": "f2a8e578f9b083e190a43998001435f370028330f6056f5308d8147d21b297ba",
+    "react/button-group.tsx": "ed7b30bcdf94e17301e7295e513c77878c228118d99823fd263503caaa081d31",
     "react/button.tsx": "fe45a0d836c75cc2580aa6cff4b995d39df191915fbb06ff5a4869ab4c9116ab",
     "react/input-field.tsx": "ffd08ecfecef30127fcdcd39911c31177e973f7b75daa7653aefbe82f730a530",
-    "react/popover.tsx": "9afdbf46be008da76ed621d4081f0ebcaf1654d589891409b021dc50c5dff86f",
+    "react/popover.tsx": "d00659c8bd59987eb44fc16a89b421237e1094893e28ae147e8761da0229b0dc",
     "react/scroll-shadow.tsx": "1182c0d9b6cf6b8b26f0916ea8969b8940cf418377caec054672cc36bc1c2908",
-    "react/select.tsx": "43ce130f5366cd1bda968ccfacec1a68b6cabe634abce42c000b285afbb9c6da",
+    "react/select.tsx": "1d647c9c5134232c89c76498fae48767f894a4c5f662ee98bbfa09414dc940f5",
+    "react/tooltip.tsx": "83940fe1fa96e5bce35ef8fbce8d49e8d602bf78d0a359d24ea62b3b4950151b",
     "react/virtual-list.tsx": "ea1967150227a7b0193263aa31806e3fdcb87a2127e730ed6dee4ef3f4e3ab9c",
     "shared/button-paint.ts": "68bb9e4471ff01dd125297fd5da22b112716f1c8c797b88c799815bd21067a23",
     "shared/input-edit.ts": "9cb10aef7e6aba6e4fd7e7c4e696be2894a4ed38f2ee6b02e55f8253d78c06d9",
     "shared/input-offset-index.ts": "78035279d593f4512c34a038c6d204ee99cf11cbaea92d30620a2be565556138",
     "shared/theme.ts": "60618ecd6cedd903512bc8d41cadac4982d35a9c6ba5a5b163cee0e222643e59",
-    "shared/types.ts": "60c38f51df08ce6c9700b508dbd66e78f77e3a6f222bb9168bb884bcf4716316",
-    "solid/button-group.tsx": "2119fe35f01281224f82a9713f89dcb2979c48bcf3e262fecaeb5e4501225b76",
+    "shared/types.ts": "1d46c81cc273e3d038c6ab8625a3384d106f566f5a2d5ec9939b2690d565bd4b",
+    "solid/button-group.tsx": "36b6f771c8444c3a549a173b0c184b4a25f7102b0618bfe1a76588f52f917757",
     "solid/button.tsx": "42298bf1ee21695e88046f1a359a79b059f0f1c2faba0f8f4743c2e2da613bb0",
     "solid/input-field.tsx": "e987963ea02bc889db3651070e0f173f31d1e8727dc32dd30628b2f4908699ae",
-    "solid/popover.tsx": "00ea1d317c41314982b6cf5eac0ea96d2619ab89c377174291dcf2f64e3f6591",
+    "solid/popover.tsx": "dca7e419585f5bac8fe073e8ea85cc6bef6e9980f04955972cea54308bfe45f2",
     "solid/scroll-shadow.tsx": "bb711490da926b58ab9592e539f6e80d2f607659dfa8b1f3d7f2cf30e6b6b0c3",
-    "solid/select.tsx": "ec6c1eefe3ad22d5772e7a9ae5d5cd6855394197ac9b4d254514e8c86b770050",
+    "solid/select.tsx": "536d07e5efb37dd20c784edc21abc6528faae6de0ffbc6754e02b03f576132da",
+    "solid/tooltip.tsx": "e4e33aac385716b4c3da64e25a4a4cec3931c7c328265dee35496d3f9d237a29",
     "solid/virtual-list.tsx": "d1de471ed90b4d7f5e009a017051bb7b8a0cc2e3f7650ebd3bb83ed5a8403861"
   },
   "components": {
@@ -139,6 +141,23 @@
       ],
       "react": [
         "react/select.tsx",
+        "shared/theme.ts",
+        "shared/types.ts"
+      ]
+    },
+    "tooltip": {
+      "version": "0.4.0",
+      "source": {
+        "solid": "https://github.com/ExtraBinoss/argui/blob/v0.4.0/packages/widgets/src/solid/tooltip.tsx",
+        "react": "https://github.com/ExtraBinoss/argui/blob/v0.4.0/packages/widgets/src/react/tooltip.tsx"
+      },
+      "solid": [
+        "shared/theme.ts",
+        "shared/types.ts",
+        "solid/tooltip.tsx"
+      ],
+      "react": [
+        "react/tooltip.tsx",
         "shared/theme.ts",
         "shared/types.ts"
       ]

@@ -94,7 +94,7 @@ pub fn run_desktop_with_services(
         config.windows[0].window.title = title;
     }
     let (application_sender, application_requests) = mpsc::channel();
-    let appearance =
+    let (appearance, spotlight) =
         register_application_services(&services, application_sender, config.tray.clone());
     #[cfg(any(debug_assertions, feature = "dev-metrics"))]
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
@@ -129,7 +129,7 @@ pub fn run_desktop_with_services(
                     events: deliveries,
                     requests: application_requests,
                 },
-                GalleryApp::with_appearance(service_sender.clone(), appearance),
+                GalleryApp::with_appearance(service_sender.clone(), appearance, spotlight),
                 move |event| {
                     #[cfg(any(debug_assertions, feature = "dev-metrics"))]
                     {

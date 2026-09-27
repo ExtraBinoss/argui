@@ -181,6 +181,7 @@ pub const SCROLL_MOMENTUM: PropertyId = PropertyId::from_raw(258);
 pub const SCROLLBAR_TRACK_COLOR: PropertyId = PropertyId::from_raw(259);
 pub const SCROLLBAR_PRESSED_COLOR: PropertyId = PropertyId::from_raw(260);
 pub const SCROLLBAR_VISIBLE: PropertyId = PropertyId::from_raw(261);
+pub const ALLOW_OUTSIDE_WINDOW: PropertyId = PropertyId::from_raw(265);
 pub const TEXT_LINE_HEIGHT: PropertyId = PropertyId::from_raw(105);
 pub const TEXT_FONT_STYLE: PropertyId = PropertyId::from_raw(106);
 pub const TEXT_LETTER_SPACING: PropertyId = PropertyId::from_raw(107);

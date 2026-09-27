@@ -83,6 +83,17 @@ impl UiTree {
         transform
     }
 
+    /// Returns whether a node needs a compositor boundary for authored or active motion.
+    ///
+    /// * `node` — retained node whose transition state is inspected.
+    /// * `element` — current authored element description.
+    #[must_use]
+    pub fn needs_compositor_layer(&self, node: NodeId, element: &Element) -> bool {
+        element.needs_compositor_layer()
+            || (element.style_transition.is_some()
+                && self.transitions.has_active_compositor_property(node))
+    }
+
     /// Resolves an element layout style using transitions, bindings, direction, and borders.
     ///
     /// * `node` — retained node identifier.

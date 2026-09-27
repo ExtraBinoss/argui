@@ -5,8 +5,8 @@ use argui_schema::{
 };
 use argui_ui::{
     DismissPolicy, Element, EventHandler, EventHandlerId, EventOwnerId, EventType,
-    FocusContainment, InitialFocus, Interaction, Placement, PortalTarget, ViewportPlacement,
-    VisualState, WindowLayer, WritingDirection, length, percent,
+    FocusContainment, InitialFocus, Interaction, OverlaySurface, Placement, PortalTarget,
+    ViewportPlacement, VisualState, WindowLayer, WritingDirection, length, percent,
 };
 
 #[test]
@@ -144,6 +144,39 @@ fn viewport_popup_is_centered_and_hidden_popup_has_no_portal() {
     assert!(hidden.portal.is_none());
     assert!(hidden.focus_scope.is_none());
     assert!(hidden.event_listeners.is_empty());
+}
+
+#[test]
+fn outside_window_preference_is_opt_in_and_hidden_popups_stay_hidden() {
+    let registry = builtin::registry().unwrap();
+    let default = registry
+        .construct(builtin::POPUP_WINDOW, &NativeElementInput::new())
+        .unwrap();
+    assert_eq!(
+        default.portal.as_ref().unwrap().surface,
+        Some(OverlaySurface::InWindow)
+    );
+    let preferred = registry
+        .construct(
+            builtin::POPUP_WINDOW,
+            &NativeElementInput::new()
+                .property(builtin::ALLOW_OUTSIDE_WINDOW, SchemaValue::Bool(true))
+                .property(builtin::ANCHOR, SchemaValue::String("trigger".into())),
+        )
+        .unwrap();
+    assert_eq!(
+        preferred.portal.as_ref().unwrap().surface,
+        Some(OverlaySurface::PreferNative)
+    );
+    let hidden = registry
+        .construct(
+            builtin::POPUP_WINDOW,
+            &NativeElementInput::new()
+                .property(builtin::ALLOW_OUTSIDE_WINDOW, SchemaValue::Bool(true))
+                .property(builtin::VISIBLE, SchemaValue::Bool(false)),
+        )
+        .unwrap();
+    assert!(hidden.portal.is_none());
 }
 
 #[test]

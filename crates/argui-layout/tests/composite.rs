@@ -249,6 +249,9 @@ fn button_surface_icon_and_text_share_one_animated_layer() {
     assert_eq!(output.text, retained_text);
 }
 
+#[path = "composite/exit.rs"]
+mod exit;
+
 #[test]
 fn singular_compositor_transforms_request_the_safe_paint_fallback() {
     let mut ui = UiTree::new(scene(Transform2D::IDENTITY, 0.8));

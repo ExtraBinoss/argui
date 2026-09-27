@@ -1,5 +1,6 @@
 //! Desktop application services for the QuickJS gallery.
 
+pub(crate) mod spotlight;
 mod windows;
 
 use std::{
@@ -30,6 +31,7 @@ pub struct GalleryApp {
     message: String,
     events: Sender<ServiceResponse>,
     appearance: Arc<Mutex<CompanionAppearance>>,
+    spotlight: Arc<Mutex<spotlight::SpotlightState>>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -44,7 +46,11 @@ impl GalleryApp {
     /// Creates the gallery model with the channel used for companion-window events.
     /// `events` delivers messages to the active QuickJS actor.
     pub fn new(events: Sender<ServiceResponse>) -> Self {
-        Self::with_appearance(events, Arc::new(Mutex::new(CompanionAppearance::default())))
+        Self::with_appearance(
+            events,
+            Arc::new(Mutex::new(CompanionAppearance::default())),
+            Arc::new(Mutex::new(spotlight::SpotlightState::default())),
+        )
     }
 
     /// Shares creation-time companion appearance with native service handlers.
@@ -52,17 +58,27 @@ impl GalleryApp {
     pub(crate) fn with_appearance(
         events: Sender<ServiceResponse>,
         appearance: Arc<Mutex<CompanionAppearance>>,
+        spotlight: Arc<Mutex<spotlight::SpotlightState>>,
     ) -> Self {
         Self {
             message: "Waiting for the main window".into(),
             events,
             appearance,
+            spotlight,
         }
     }
 }
 
 impl AppModel for GalleryApp {
     fn view(&self, window: &WindowKey, _environment: WindowEnvironment) -> Option<Element> {
+        if window.as_str() == "spotlight" {
+            return Some(
+                self.spotlight
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner())
+                    .view(),
+            );
+        }
         (window.as_str() == "companion").then(|| {
             let appearance = *self
                 .appearance
@@ -108,6 +124,23 @@ impl AppModel for GalleryApp {
 
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
         match event {
+            AppEvent::Window {
+                window,
+                event: PlatformEvent::Pointer(pointer),
+            } if window.as_str() == "spotlight" => self
+                .spotlight
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .pointer(*pointer),
+            AppEvent::Window {
+                window,
+                event: PlatformEvent::Keyboard(input),
+            } if window.as_str() == "spotlight"
+                && input.key == argui_core::Key::Escape
+                && input.state == argui_core::KeyState::Pressed =>
+            {
+                AppUpdate::none().command(AppCommand::CloseWindow(window.clone()))
+            }
             AppEvent::Tray(TrayEvent::Click {
                 button: TrayPointerButton::Primary,
                 ..
@@ -143,6 +176,16 @@ impl AppModel for GalleryApp {
                 event: PlatformEvent::Closed,
             } if window.as_str() == "companion" => {
                 self.appearance
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner())
+                    .open = false;
+                AppUpdate::none()
+            }
+            AppEvent::Window {
+                window,
+                event: PlatformEvent::Closed,
+            } if window.as_str() == "spotlight" => {
+                self.spotlight
                     .lock()
                     .unwrap_or_else(|poison| poison.into_inner())
                     .open = false;
@@ -193,7 +236,7 @@ pub(crate) fn gallery_config() -> Result<ApplicationConfig, Box<dyn std::error::
         WindowConfig {
             title: "Argui Gallery / QuickJS".into(),
             close_behavior: CloseBehavior::Hide,
-            transparent: cfg!(target_os = "linux"),
+            transparent: false,
             ..WindowConfig::default()
         },
     )
@@ -263,8 +306,12 @@ pub(crate) fn register_application_services(
     registry: &ServiceRegistry,
     sender: Sender<NativeHostApplicationRequest>,
     tray: Option<TrayConfig>,
-) -> Arc<Mutex<CompanionAppearance>> {
+) -> (
+    Arc<Mutex<CompanionAppearance>>,
+    Arc<Mutex<spotlight::SpotlightState>>,
+) {
     let appearance = Arc::new(Mutex::new(CompanionAppearance::default()));
+    let spotlight = Arc::new(Mutex::new(spotlight::SpotlightState::default()));
     let state = Arc::new(Mutex::new(TrayState {
         config: tray.expect("desktop gallery config has a tray"),
         enabled: true,
@@ -388,8 +435,9 @@ pub(crate) fn register_application_services(
             NativeHostApplicationRequest::SetGlobalShortcuts(shortcuts, reply)
         })
     });
-    windows::register_window_services(registry, sender, &appearance);
-    appearance
+    windows::register_window_services(registry, sender.clone(), &appearance);
+    spotlight::register_spotlight_service(registry, sender, &spotlight);
+    (appearance, spotlight)
 }
 
 /// Parses a bounded list of translated menu labels and associated actions.

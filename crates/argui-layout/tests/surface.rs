@@ -4,7 +4,7 @@ use argui_paint::{DisplayCommand, Fill, GpuCanvasId, LayerStyle};
 use argui_text::TextEngine;
 use argui_ui::{
     Axes, Element, FloatingPlacement, GpuCanvasSpec, Interaction, NodeId, Overflow, OverlaySurface,
-    Placement, ScrollConfig, UiTree, WindowLayer, length,
+    Placement, ScrollConfig, UiTree, ViewportPlacement, WindowLayer, length,
 };
 
 fn node(ui: &UiTree, key: &str) -> NodeId {
@@ -79,6 +79,7 @@ fn native_acceptance_restores_natural_size_splits_paint_and_keeps_global_hits() 
     assert_eq!(surface.bounds, bounds);
     assert!(!native.display_list.commands().iter().any(|command| matches!(command, DisplayCommand::Quad(quad) if quad.background == Some(Fill::Solid(Color::WHITE)))));
     assert!(surface.display_list.commands().iter().any(|command| matches!(command, DisplayCommand::Quad(quad) if quad.background == Some(Fill::Solid(Color::WHITE)))));
+    assert!(surface.display_list.commands().iter().any(|command| matches!(command, DisplayCommand::BeginLayer(layer) if layer.clip == Some(Rect::new(Point::default(), bounds.size)))));
     assert!(surface.display_list.commands().iter().any(|command| matches!(command, DisplayCommand::Text { transform, .. } if transform.translation == Point::new(-bounds.origin.x, -bounds.origin.y))));
     let outside = Point::new(
         (bounds.origin.x + bounds.size.width) - 10.0,
@@ -101,6 +102,25 @@ fn native_acceptance_restores_natural_size_splits_paint_and_keeps_global_hits() 
     let fallback = engine.compute(&mut ui, &mut text, viewport).unwrap();
     assert!(fallback.native_surfaces.is_empty());
     assert_eq!(fallback.portals[0].bounds, internal.portals[0].bounds);
+}
+
+#[test]
+fn viewport_popup_can_receive_a_native_surface_at_its_window_placement() {
+    let mut ui = UiTree::new(Element::column([Element::container([])
+        .keyed("dialog")
+        .width(length(120.0))
+        .height(length(80.0))
+        .viewport_portal(WindowLayer::Popover, ViewportPlacement::centered())
+        .portal_surface(OverlaySurface::PreferNative)]));
+    let dialog = node(&ui, "dialog");
+    let mut engine = LayoutEngine::new();
+    let output = engine
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(400.0, 300.0))
+        .unwrap();
+    let bounds = output
+        .native_portal_placement(&ui, dialog, rect(-100.0, -100.0, 1000.0, 800.0))
+        .unwrap();
+    assert_eq!(bounds, rect(140.0, 110.0, 120.0, 80.0));
 }
 
 #[test]

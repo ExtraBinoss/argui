@@ -166,6 +166,8 @@ export class NativeHost {
     }
     if (!property) throw new Error(`${node.type.name} has no property ${name}`)
     if (property.readOnly) throw new Error(`${node.type.name}.${name} is read-only`)
+    // Only a replacement ID can have an earlier operation to coalesce.
+    const idWasSet = name === 'id' && node.values.has(property.id)
     const wire = value == null ? null : encodeValue(property, value)
     if (name === 'id') {
       if (wire?.type !== 'String' || !wire.value) throw new TypeError('Native id must be a non-empty string')
@@ -205,7 +207,7 @@ export class NativeHost {
     else node.values.delete(property.id)
     if (!this.removed.has(node)) {
       let pending: Operation | undefined
-      if (name === 'id') {
+      if (idWasSet) {
         for (let index = this.pending.length - 1; index >= 0; index--) {
           const operation = this.pending[index]!
           if (operation.kind === 'setProperty' && operation.id === node.id && operation.property === property.id) {

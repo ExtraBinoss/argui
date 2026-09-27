@@ -23,6 +23,7 @@ mod model_updates;
 #[cfg(not(target_arch = "wasm32"))]
 mod native_host_application;
 mod tray;
+mod window_input;
 
 type SharedModel = Rc<RefCell<Box<dyn AppModel>>>;
 type SharedUpdates = Rc<RefCell<Vec<AppUpdate>>>;
@@ -37,6 +38,7 @@ impl Drop for MultiApplication {
 struct WindowEntry {
     spec: WindowSpec,
     runtime: Application,
+    input_region: argui_platform::WindowInputRegion,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -297,7 +299,14 @@ impl MultiApplication {
             self.emit(RuntimeEvent::CommandFailed(error));
         }
         self.by_native.insert(window_id, key.clone());
-        self.windows.insert(key, WindowEntry { spec, runtime });
+        self.windows.insert(
+            key,
+            WindowEntry {
+                spec,
+                runtime,
+                input_region: argui_platform::WindowInputRegion::Full,
+            },
+        );
     }
 
     /// Propagates a locally requested accessibility zoom to every open window.
@@ -317,6 +326,10 @@ impl MultiApplication {
             if key != source {
                 entry.runtime.install_ui_zoom(factor, false);
             }
+        }
+        let keys: Vec<_> = self.windows.keys().cloned().collect();
+        for key in keys {
+            self.refresh_window_input_region(&key);
         }
     }
 

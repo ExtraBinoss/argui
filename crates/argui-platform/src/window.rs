@@ -1,5 +1,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use winit::dpi::LogicalSize;
+#[cfg(not(target_arch = "wasm32"))]
+use winit::dpi::PhysicalPosition;
 use winit::window::Window;
 use winit::window::WindowAttributes;
 
@@ -105,8 +107,14 @@ pub struct WindowCapabilities {
     pub maximize: bool,
     /// Whether the platform supports non-normal window levels.
     pub window_level: bool,
+    /// Whether an application can place a top-level window at screen coordinates.
+    pub absolute_position: bool,
     /// Whether the platform supports pointer passthrough.
     pub mouse_passthrough: bool,
+    /// Whether the backend can exclude a subregion from native pointer input.
+    pub input_regions: bool,
+    /// Whether translucent window pixels can composite with windows below.
+    pub transparent_compositing: bool,
 }
 
 impl WindowBackend {
@@ -124,7 +132,10 @@ impl WindowBackend {
             minimize: desktop,
             maximize: desktop,
             window_level: matches!(self, Self::Windows | Self::MacOs | Self::X11),
+            absolute_position: matches!(self, Self::Windows | Self::MacOs | Self::X11),
             mouse_passthrough: desktop,
+            input_regions: matches!(self, Self::X11) && cfg!(feature = "window-input-regions"),
+            transparent_compositing: matches!(self, Self::Windows | Self::MacOs | Self::Wayland),
         }
     }
 }
@@ -166,6 +177,8 @@ pub struct WindowConfig {
     ///
     /// A Web canvas takes its size from CSS instead.
     pub height: f64,
+    /// Initial top-left position in physical desktop pixels, when supported.
+    pub physical_position: Option<(i32, i32)>,
     /// Whether the operating system draws its standard title bar and borders.
     pub decorations: bool,
     /// Whether the user can resize a native window.
@@ -212,6 +225,7 @@ impl Default for WindowConfig {
             title: "Argui".into(),
             width: 960.0,
             height: 640.0,
+            physical_position: None,
             decorations: true,
             resizable: true,
             transparent: false,
@@ -288,7 +302,13 @@ impl WindowConfig {
         }
 
         #[cfg(not(target_arch = "wasm32"))]
-        attributes.with_inner_size(LogicalSize::new(self.width, self.height))
+        {
+            let attributes = attributes.with_inner_size(LogicalSize::new(self.width, self.height));
+            match self.physical_position {
+                Some((x, y)) => attributes.with_position(PhysicalPosition::new(x, y)),
+                None => attributes,
+            }
+        }
     }
 
     /// Converts this configuration and applies the shared application identity.
@@ -330,12 +350,43 @@ impl WindowConfig {
 
 /// Detects the native operations supported by `window`'s backend.
 ///
-/// The result describes platform support, not current window state.
+/// The result describes current backend support, including an X11 compositor
+/// that can start or stop while the application runs.
 /// `window` is the native window whose backend is inspected.
 #[must_use]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn window_capabilities(window: &Window) -> WindowCapabilities {
-    window_backend(window).capabilities()
+    let capabilities = window_backend(window).capabilities();
+    #[cfg(all(target_os = "linux", feature = "window-input-regions"))]
+    let capabilities = if capabilities.backend == WindowBackend::X11 {
+        WindowCapabilities {
+            transparent_compositing: x11_compositor_available(),
+            ..capabilities
+        }
+    } else {
+        capabilities
+    };
+    capabilities
+}
+
+/// Reports whether the active X11 screen has a compositing manager selection.
+#[cfg(all(target_os = "linux", feature = "window-input-regions"))]
+fn x11_compositor_available() -> bool {
+    use x11rb::protocol::xproto::ConnectionExt as _;
+    let Ok((connection, screen)) = x11rb::connect(None) else {
+        return false;
+    };
+    let name = format!("_NET_WM_CM_S{screen}");
+    let Ok(atom) = connection.intern_atom(false, name.as_bytes()) else {
+        return false;
+    };
+    let Ok(atom) = atom.reply() else {
+        return false;
+    };
+    let Ok(owner) = connection.get_selection_owner(atom.atom) else {
+        return false;
+    };
+    owner.reply().is_ok_and(|reply| reply.owner != 0)
 }
 
 #[cfg(target_arch = "wasm32")]

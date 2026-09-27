@@ -32,6 +32,7 @@ mod wayland_global_shortcuts;
 #[cfg(target_arch = "wasm32")]
 mod web_identity;
 mod window;
+mod window_input;
 
 pub use application::{ApplicationConfig, ApplicationConfigError, UiZoomConfig};
 pub use argui_core::{
@@ -74,3 +75,4 @@ pub use window::{
     CloseBehavior, WindowBackend, WindowCapabilities, WindowConfig, WindowKey, WindowLevel,
     WindowSpec, window_capabilities,
 };
+pub use window_input::{WindowInputRegion, WindowInputRegionError, apply_window_input_region};

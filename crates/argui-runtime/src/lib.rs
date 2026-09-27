@@ -67,8 +67,9 @@ pub use model::{
 };
 pub use native_host::{
     NativeHostApplicationRequest, NativeHostAssets, NativeHostBatch, NativeHostCommit,
-    NativeHostControl, NativeHostDelivery, NativePointerPosition, NativeWindowInfo, WireHostId,
-    WireOperation, WireValue, validate_native_host_assets, validate_native_host_canvases,
+    NativeHostControl, NativeHostDelivery, NativeMonitorInfo, NativePointerPosition,
+    NativeWindowInfo, WireHostId, WireOperation, WireValue, validate_native_host_assets,
+    validate_native_host_canvases,
 };
 pub use theme_bridge::ThemeBridge;
 
