@@ -5,7 +5,7 @@ import type { WidgetTheme } from '../shared/theme'
 import { keyName, nextEnabledOption, type SelectOptions } from '../shared/types'
 import type { AssetRef } from '@argui/host'
 import { ScrollShadow } from './scroll-shadow'
-import { selectMarqueePeriod } from '../shared/select-layout'
+import { selectMarqueePeriod, selectMenuOffset } from '../shared/select-layout'
 
 /** Props for the native Solid Select. */
 export type SelectProps = SelectOptions & {
@@ -50,6 +50,7 @@ export function Select(props: SelectProps): JSX.Element {
   const [localOpen, setLocalOpen] = createSignal(props.defaultOpen ?? false)
   const [activeIndex, setActiveIndex] = createSignal(-1)
   const [triggerWidth, setTriggerWidth] = createSignal<number>()
+  const [triggerHeight, setTriggerHeight] = createSignal<number>()
   const value = () => props.value ?? localValue()
   const expanded = () => props.open ?? localOpen()
   const controlledReadOnly = () => props.value !== undefined && !props.onValueChange
@@ -77,8 +78,9 @@ export function Select(props: SelectProps): JSX.Element {
     setOpen(false)
   }
   const measureTrigger = (payload: unknown) => {
-    const width = (payload as { width?: number } | null)?.width
+    const { width, height } = (payload as { width?: number; height?: number } | null) ?? {}
     if (typeof width === 'number' && Number.isFinite(width) && width > 0) setTriggerWidth(width)
+    if (typeof height === 'number' && Number.isFinite(height) && height > 0) setTriggerHeight(height)
   }
   const onKey = (payload: unknown) => {
     measureTrigger(payload)
@@ -116,6 +118,10 @@ export function Select(props: SelectProps): JSX.Element {
   const contentHeight = () => 8 + rowCount() * rowHeight() + (rowCount() - 1) * 2
     + (shadcn() ? 26 : 0)
   const optionHeight = () => Math.min(theme().selectMaxPopupHeight, contentHeight())
+  const placementOffset = () => shadcn()
+    ? selectMenuOffset(triggerHeight() ?? theme().selectCompactHeight, rowHeight(),
+      selectedIndex() + Number(clearable()), optionHeight(), shadowInset(), theme().overlayBorderWidth)
+    : 4 - shadowInset()
   const initialFocus = () => selected()
     ? `${id}-option-${encodeURIComponent(selected()!.value)}` : clearable() ? `${id}-placeholder` : 'first'
 
@@ -172,7 +178,7 @@ export function Select(props: SelectProps): JSX.Element {
       placement="bottomStart"
       anchorWidth={props.contentWidth === undefined ? "matchAnchor" : "content"}
       anchorWidthOffset={2 * shadowInset()}
-      placementOffset={4 - shadowInset()}
+      placementOffset={placementOffset()}
       placementCrossOffset={-shadowInset()}
       width={(typeof popupWidth() === 'number' ? popupWidth() as number : theme().selectWidth) + 2 * shadowInset()}
       windowLayer="popover"

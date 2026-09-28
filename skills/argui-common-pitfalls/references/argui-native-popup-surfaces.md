@@ -15,14 +15,16 @@ their shadows. Keep `contentWidth` independent of trigger width, and account for
 the padding when measuring long labels. Use native scroll shadows and native
 hover motion rather than expanding the menu to the longest option.
 
-For shadcn Select, open below the trigger with `bottomStart`. Native focus
-reveals the selected row without aligning that row over the trigger. Use
-`anchorWidth="matchAnchor"` and `anchorWidthOffset={2*S}` for a panel that
-matches the resolved trigger width, including percentages and flex growth;
-reserve shadow padding `S` and compensate both placement axes. Explicit
-`contentWidth` opts into an independent panel width. Use `allowClear={false}`
-for required settings and allow it for optional devices whose placeholder
-means Off. Supply one chevron through `trailing`; Select owns its rotation.
+The gallery's `fruit-select` is the compact `shadcn` variant. Keep its selected
+row aligned with the trigger, as with Radix's item-aligned Select. Its placement
+is computed from the trigger height, header, option index, shadow frame and
+native focus scroll; it must not use the mouse coordinates. A regular Select
+opens below the trigger. Use `anchorWidth="matchAnchor"` and
+`anchorWidthOffset={2*S}` to retain the trigger width with transparent shadow
+padding. Initial focus reveals a selected lower row; account for that revealed
+scroll before aligning it. Use `allowClear={false}` for required settings;
+optional devices expose Off as their empty option. Supply one chevron through
+`trailing`; Select owns its rotation.
 
 Opaque surface borders need opaque color tokens. An alpha border can expose
 another window underneath even if the panel fill is opaque. Preserve pixel

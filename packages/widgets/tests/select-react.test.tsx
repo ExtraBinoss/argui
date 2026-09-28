@@ -70,8 +70,8 @@ function emit(view: ReturnType<typeof fixture>, node: NativeNode, name: string, 
   act(() => view.deliver({ node: node.id, callback, payload }))
 }
 
-/** Checks visible panel alignment after accounting for the native window's shadow frame. */
-function expectBelowTrigger(root: NativeNode, initialFocus: string, visibleWidth = 240): void {
+/** Checks the selected row center relative to the trigger, including focus scroll and shadow. */
+function expectItemAligned(root: NativeNode, initialFocus: string, visibleWidth = 240): void {
   const popup = mountedRole(root, 'listBox')!
   expect(popup).toBeDefined()
   expect(propertyValue(popup, 'initialFocus')).toBe(initialFocus)
@@ -87,7 +87,23 @@ function expectBelowTrigger(root: NativeNode, initialFocus: string, visibleWidth
   expect(propertyValue(frame, 'width')).toBe('100%')
   expect(propertyValue(frame.children[0]!, 'width')).toBe('100%')
   expect(crossOffset + inset).toBe(0)
-  expect(offset + inset).toBe(4)
+  const panel = frame.children[0]!
+  const border = propertyValue(panel, 'border') as { width: number }
+  const viewport = panel.children[0]!
+  const menu = viewport.children[0]!
+  const rows = menu.children.filter(child => propertyValue(child, 'role') === 'option')
+  const index = initialFocus === 'first' ? 0
+    : rows.findIndex(row => propertyValue(row, 'id') === initialFocus)
+  expect(index).toBeGreaterThanOrEqual(0)
+  const rowHeight = propertyValue(optionSurface(rows[index]!)!, 'height') as number
+  const viewportHeight = propertyValue(viewport, 'height') as number
+  const rowCenter = 4 + 24 + 2 + index * (rowHeight + 2) + rowHeight / 2
+  const revealedScroll = Math.max(0, rowCenter + rowHeight / 2 - viewportHeight)
+  const trigger = mountedRole(root, 'comboBox')!.children[0]!
+  const triggerHeight = propertyValue(trigger, 'height') as number
+  // bottomStart adds the trigger's height: these centers must coincide.
+  expect(triggerHeight + offset + inset + border.width + rowCenter - revealedScroll)
+    .toBe(triggerHeight / 2)
 }
 
 /** Returns the sole native measurement target for a real option's label. */
@@ -148,7 +164,7 @@ for (const allowClear of [true, false]) {
       const selected = option(root, 'Device 10')!
       expect(propertyValue(selected, 'id')).toBe('language-option-device%2F9')
       expect(propertyValue(selected, 'selected')).toBe(true)
-      expectBelowTrigger(root, 'language-option-device%2F9')
+      expectItemAligned(root, 'language-option-device%2F9')
     } finally {
       view.dispose()
     }
@@ -161,7 +177,7 @@ test('empty clearable compact menus focus their Off placeholder', () => {
     const root = view.root.nativeRoot()
     const placeholder = option(root, 'Choose an option')!
     expect(propertyValue(placeholder, 'selected')).toBe(true)
-    expectBelowTrigger(root, 'language-placeholder')
+    expectItemAligned(root, 'language-placeholder')
   } finally {
     view.dispose()
   }
@@ -173,7 +189,7 @@ test('empty required compact menus focus an option without exposing a placeholde
     const root = view.root.nativeRoot()
     expect(option(root, 'Choose an option')).toBeUndefined()
     expect(propertyValue(option(root, 'Rust')!, 'enabled')).toBe(true)
-    expectBelowTrigger(root, 'first')
+    expectItemAligned(root, 'first')
   } finally {
     view.dispose()
   }
@@ -302,16 +318,36 @@ test('select labels without measurable overflow do not start a marquee', () => {
   }
 })
 
-test('visible select panels honor content width or trigger width with the same lower gap', () => {
+test('fruit-style select panels preserve width while aligning the selected row', () => {
   for (const contentWidth of [undefined, 310]) {
     for (const defaultValue of ['device/0', 'device/9']) {
       const view = fixture({ allowClear: false, options: devices, defaultValue, width: 180, contentWidth })
       try {
-        expectBelowTrigger(view.root.nativeRoot(), `language-option-${encodeURIComponent(defaultValue)}`,
+        expectItemAligned(view.root.nativeRoot(), `language-option-${encodeURIComponent(defaultValue)}`,
           contentWidth ?? 180)
       } finally {
         view.dispose()
       }
     }
   }
+})
+
+
+test('fruit-select placement follows its trigger geometry and ignores mouse coordinates', () => {
+  const view = fixture({ allowClear: false, defaultValue: 'go', width: 192 })
+  try {
+    const combo = mountedRole(view.root.nativeRoot(), 'comboBox')!
+    const offset = () => propertyValue(mountedRole(view.root.nativeRoot(), 'listBox')!, 'placementOffset') as number
+    const initial = offset()
+    for (const [x, y] of [[1, 2], [800, 500], [-100, -50]]) {
+      emit(view, combo, 'click', { kind: 'click', width: 192, height: 32, x, y })
+      expect(mountedRole(view.root.nativeRoot(), 'listBox')).toBeUndefined()
+      emit(view, combo, 'click', { kind: 'click', width: 192, height: 32, x, y })
+      expect(offset()).toBe(initial)
+      expectItemAligned(view.root.nativeRoot(), 'language-option-go', 192)
+    }
+    emit(view, combo, 'click', { kind: 'click', width: 192, height: 32 })
+    emit(view, combo, 'key', { kind: 'key', key: 'Enter', state: 'pressed', width: 192, height: 40 })
+    expect(offset()).toBe(initial - 4)
+  } finally { view.dispose() }
 })

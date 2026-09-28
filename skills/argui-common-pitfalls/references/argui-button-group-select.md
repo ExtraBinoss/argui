@@ -83,18 +83,15 @@ accepts up to 86,400,000 ms. Do not cap long names at a short duration and make
 them race across the viewport. Keep motion native and use `ScrollShadow`
 for clipped edges; never estimate overflow by counting characters.
 
-The Select panel opens below its trigger. Without `contentWidth`, use native
-`anchorWidth="matchAnchor"` with `anchorWidthOffset={2*S}` so percentages and
-flex widths follow actual trigger bounds on resize. Trigger click/key geometry
-provides the current label viewport for native marquee measurements. If its shadow needs an inset `S`,
-the native client width is `contentWidth + 2*S`, `placementOffset` is `4-S`,
-and physical `placementCrossOffset` is `-S` for LTR `bottomStart`. Padding `S`
-then makes the visible panel start at the trigger edge, with its requested
-width and a 4px lower gap. Initial focus reveals a selected lower row without
-moving that row over the trigger. Include the border width in visible gap
-checks. For RTL, use the corresponding physical cross offset. Keep bounds,
-clipping and pointer geometry together; a paint transform cannot fix popup
-window placement.
+The gallery's fruit selector uses `variant="shadcn"`: align the selected row
+with the trigger, including the native focus reveal scroll for long menus.
+Only the default variant opens below. Without `contentWidth`, use native
+`anchorWidth="matchAnchor"` with `anchorWidthOffset={2*S}` to follow actual
+trigger bounds on resize. `placementCrossOffset={-S}` compensates the shadow
+frame; the vertical offset must also include `S` and the panel border. Read
+trigger width/height from click/key geometry, and never anchor a Select to the
+pointer position. Keep the selected-row alignment while the pointer hovers
+other options; keyboard activity changes should not move the popup.
 
 ## Returning to an identity transform can lose the compositor layer
 
