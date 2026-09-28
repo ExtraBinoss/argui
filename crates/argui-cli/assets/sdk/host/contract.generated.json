@@ -1,5 +1,5 @@
 {
-  "abiHash": "213758376829446881",
+  "abiHash": "3825911427570161454",
   "natives": [
     {
       "id": 1,
@@ -9917,6 +9917,37 @@
         {
           "id": 251,
           "name": "placementOffset",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 266,
+          "name": "placementCrossOffset",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 267,
+          "name": "anchorWidth",
+          "valueType": "String",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": [
+            "content",
+            "atLeastAnchor",
+            "matchAnchor"
+          ]
+        },
+        {
+          "id": 268,
+          "name": "anchorWidthOffset",
           "valueType": "Float",
           "readOnly": false,
           "required": false,

@@ -4,7 +4,9 @@
 
 Use a full-width `row` with `height="100%"`, `alignItems="center"` and
 `justifyContent="center"` for an icon-only button. Give the SVG explicit equal
-dimensions. A control's padding should reserve horizontal space independently
+dimensions. On a pixel-rounded native layout, prefer even icon sizes (for
+example 16px in a 24px button); an odd size can move the center by half a
+pixel after rounding. A control's padding should reserve horizontal space independently
 of its height: use `padding={{ start: 10, end: 10 }}` rather than `padding={10}`
 on a 28 px text button. Border and padding both reduce the available content
 box, just as with `box-sizing: border-box` on the web.
@@ -65,9 +67,34 @@ the headless host's `rotation` and `transitionMs` properties.
 Use native `hoverBackground` for pointer highlighting. Keep the authored active
 index for keyboard navigation and reset it when the pointer enters or leaves
 an option, so a departed pointer cannot leave a second row highlighted. A
-selected option keeps its own selection paint. Pointer enter/leave events
-belong on a `touchArea` covering the whole row; `focusScope` does not expose
-these events. The label's smaller marquee target cannot track the entire row.
+selected option keeps its own selection paint. `focusScope` does not expose pointer enter/leave events. `touchArea` uses
+`BoxOnly` and prevents its descendants from being pointer targets: wrapping
+an entire option in it blocks a nested marquee label. Keep the native row
+hover paint on the focus scope's rectangle and one reachable label target
+for measurement/enter/leave. Reset keyboard activity from that label's events;
+reset native motion when it leaves. Validate real hit regions, not only
+callbacks delivered directly by a JavaScript test.
+
+For a held native marquee, the outward leg occupies 35% of `loopMs`.
+For approximately 14 logical pixels/second, use
+`max(4000, ceil(overflow / 14 / 0.35 * 1000))`, with overflow measured from the
+native intrinsic text width minus its bounded viewport. The native loop
+accepts up to 86,400,000 ms. Do not cap long names at a short duration and make
+them race across the viewport. Keep motion native and use `ScrollShadow`
+for clipped edges; never estimate overflow by counting characters.
+
+The Select panel opens below its trigger. Without `contentWidth`, use native
+`anchorWidth="matchAnchor"` with `anchorWidthOffset={2*S}` so percentages and
+flex widths follow actual trigger bounds on resize. Trigger click/key geometry
+provides the current label viewport for native marquee measurements. If its shadow needs an inset `S`,
+the native client width is `contentWidth + 2*S`, `placementOffset` is `4-S`,
+and physical `placementCrossOffset` is `-S` for LTR `bottomStart`. Padding `S`
+then makes the visible panel start at the trigger edge, with its requested
+width and a 4px lower gap. Initial focus reveals a selected lower row without
+moving that row over the trigger. Include the border width in visible gap
+checks. For RTL, use the corresponding physical cross offset. Keep bounds,
+clipping and pointer geometry together; a paint transform cannot fix popup
+window placement.
 
 ## Returning to an identity transform can lose the compositor layer
 

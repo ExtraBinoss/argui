@@ -64,6 +64,7 @@ pub(super) fn allowed_values(id: PropertyId) -> &'static [&'static str] {
             "modal",
             "debug",
         ],
+        ANCHOR_WIDTH => &["content", "atLeastAnchor", "matchAnchor"],
         PLACEMENT => &[
             "fill",
             "center",

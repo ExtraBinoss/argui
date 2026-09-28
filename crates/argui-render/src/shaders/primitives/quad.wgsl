@@ -55,10 +55,23 @@ fn rounded_distance(point: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 
     return length(max(offset, vec2(0.0))) + min(max(offset.x, offset.y), 0.0) - radius;
 }
 
+// Integrate the local SDF plane over a square framebuffer pixel. Aligned
+// straight edges stay fully opaque; diagonal/curved edges retain area coverage.
+fn pixel_coverage(distance: f32, gradient: vec2<f32>) -> f32 {
+    let derivatives = abs(gradient);
+    let major = max(max(derivatives.x, derivatives.y), 0.00001);
+    let minor = min(derivatives.x, derivatives.y);
+    let extent = major + minor;
+    let position = clamp(extent * 0.5 - distance, 0.0, extent);
+    if minor < 0.00001 { return clamp(position / major, 0.0, 1.0); }
+    if position < minor { return position * position / (2.0 * major * minor); }
+    if position <= major { return (position - minor * 0.5) / major; }
+    let tail = extent - position;
+    return 1.0 - tail * tail / (2.0 * major * minor);
+}
+
 fn edge_coverage(distance: f32) -> f32 {
-    let gradient = length(vec2(dpdx(distance), dpdy(distance)));
-    let pixel_width = max(gradient, 0.75) * 1.5;
-    return clamp(0.5 - distance / pixel_width, 0.0, 1.0);
+    return pixel_coverage(distance, vec2(dpdx(distance), dpdy(distance)));
 }
 
 fn srgb_to_linear(value: vec3<f32>) -> vec3<f32> {
@@ -162,8 +175,7 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         let clip = clips[quad.clip_meta.x + offset];
         let local = transformed(clip.inverse_a, clip.inverse_b, pixel);
         let distance = rounded_distance(local - clip.bounds.xy, clip.bounds.zw, clip.radii);
-        let pixel_width = max(length(clip_gradient(clip, local, distance)), 0.75) * 1.5;
-        clip_coverage *= clamp(0.5 - distance / pixel_width, 0.0, 1.0);
+        clip_coverage *= pixel_coverage(distance, clip_gradient(clip, local, distance));
     }
     let outer_distance = rounded_distance(input.local, quad.rect.zw, quad.radii);
     let outer_coverage = edge_coverage(outer_distance);

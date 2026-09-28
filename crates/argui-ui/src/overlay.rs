@@ -170,6 +170,8 @@ pub struct FloatingPlacement {
     pub cross_offset: f32,
     pub viewport_padding: f32,
     pub anchor_width: AnchorWidth,
+    /// Extra logical width around the matched anchor, for transparent shadow margins.
+    pub anchor_width_offset: f32,
     pub collision: CollisionPolicy,
 }
 
@@ -185,6 +187,7 @@ impl FloatingPlacement {
             cross_offset: 0.0,
             viewport_padding: 8.0,
             anchor_width: AnchorWidth::Content,
+            anchor_width_offset: 0.0,
             collision: CollisionPolicy::FIT_VIEWPORT,
         }
     }
@@ -215,6 +218,14 @@ impl FloatingPlacement {
     #[must_use]
     pub const fn anchor_width(mut self, width: AnchorWidth) -> Self {
         self.anchor_width = width;
+        self
+    }
+
+    /// Reserves `offset` extra logical pixels when matching or bounding anchor width.
+    /// Content-sized overlays ignore this value; non-finite values resolve to zero.
+    #[must_use]
+    pub const fn anchor_width_offset(mut self, offset: f32) -> Self {
+        self.anchor_width_offset = offset;
         self
     }
 
@@ -272,12 +283,11 @@ impl FloatingPlacement {
     }
 
     fn apply_anchor_width(self, desired: Size, anchor: Size) -> Size {
+        let width = (anchor.width + finite(self.anchor_width_offset)).max(0.0);
         match self.anchor_width {
             AnchorWidth::Content => desired,
-            AnchorWidth::AtLeastAnchor => {
-                Size::new(desired.width.max(anchor.width), desired.height)
-            }
-            AnchorWidth::MatchAnchor => Size::new(anchor.width, desired.height),
+            AnchorWidth::AtLeastAnchor => Size::new(desired.width.max(width), desired.height),
+            AnchorWidth::MatchAnchor => Size::new(width, desired.height),
         }
     }
 

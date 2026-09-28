@@ -1,15 +1,16 @@
 //! Unpainted portal and focus boundary for declarative popup content.
 
 use argui_ui::{
-    DismissPolicy, Element, EventType, FloatingPlacement, FocusContainment, FocusScope,
-    FocusTarget, InitialFocus, Interaction, OverlaySurface, Placement, ViewportAlign,
+    AnchorWidth, DismissPolicy, Element, EventType, FloatingPlacement, FocusContainment,
+    FocusScope, FocusTarget, InitialFocus, Interaction, OverlaySurface, Placement, ViewportAlign,
     ViewportPlacement, WindowLayer,
 };
 
 use super::{
-    ALLOW_OUTSIDE_WINDOW, ANCHOR, CHILDREN, CommonProperty, DISMISS, DISMISS_POLICY,
-    FOCUS_CONTAINMENT, INITIAL_FOCUS, PLACEMENT, PLACEMENT_OFFSET, POPUP_WINDOW, RESTORE_FOCUS,
-    VISIBLE, WINDOW_LAYER, apply_common, common_event, common_property, optional_bool,
+    ALLOW_OUTSIDE_WINDOW, ANCHOR, ANCHOR_WIDTH, ANCHOR_WIDTH_OFFSET, CHILDREN, CommonProperty,
+    DISMISS, DISMISS_POLICY, FOCUS_CONTAINMENT, INITIAL_FOCUS, PLACEMENT, PLACEMENT_CROSS_OFFSET,
+    PLACEMENT_OFFSET, POPUP_WINDOW, RESTORE_FOCUS, VISIBLE, WINDOW_LAYER, apply_common,
+    common_event, common_property, optional_bool,
 };
 use crate::{
     NativeElementInput, NativeSchema, PropertySchema, SchemaError, SchemaRegistry, SchemaValue,
@@ -63,6 +64,20 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "placementOffset",
         ValueType::Float,
         "Signed distance in logical pixels from an anchored edge; defaults to 6.",
+    ))
+    .property(PropertySchema::new(
+        PLACEMENT_CROSS_OFFSET,
+        "placementCrossOffset",
+        ValueType::Float,
+        "Signed translation along the anchor edge in logical pixels; defaults to 0.",
+    ))
+    .property(PropertySchema::new(
+        ANCHOR_WIDTH, "anchorWidth", ValueType::String,
+        "Popup width policy: content, atLeastAnchor, or matchAnchor; defaults to content.",
+    ))
+    .property(PropertySchema::new(
+        ANCHOR_WIDTH_OFFSET, "anchorWidthOffset", ValueType::Float,
+        "Extra logical width for matched anchor margins, such as transparent shadows; defaults to 0.",
     ))
     .property(
         PropertySchema::new(
@@ -135,6 +150,24 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 )?);
                 if let Some(SchemaValue::Float(offset)) = input.get(PLACEMENT_OFFSET) {
                     floating = floating.offset(*offset);
+                }
+                if let Some(SchemaValue::Float(offset)) = input.get(PLACEMENT_CROSS_OFFSET) {
+                    floating = floating.cross_offset(*offset);
+                }
+                if let Some(SchemaValue::String(width)) = input.get(ANCHOR_WIDTH) {
+                    floating = floating.anchor_width(match width.as_str() {
+                        "content" => AnchorWidth::Content,
+                        "atLeastAnchor" => AnchorWidth::AtLeastAnchor,
+                        "matchAnchor" => AnchorWidth::MatchAnchor,
+                        _ => {
+                            return Err(SchemaError::Adapter(format!(
+                                "unsupported anchorWidth `{width}`"
+                            )));
+                        }
+                    });
+                }
+                if let Some(SchemaValue::Float(offset)) = input.get(ANCHOR_WIDTH_OFFSET) {
+                    floating = floating.anchor_width_offset(*offset);
                 }
                 element.anchored_portal(layer, key, floating)
             }

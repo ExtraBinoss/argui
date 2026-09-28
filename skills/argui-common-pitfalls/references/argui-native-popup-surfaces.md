@@ -15,14 +15,20 @@ their shadows. Keep `contentWidth` independent of trigger width, and account for
 the padding when measuring long labels. Use native scroll shadows and native
 hover motion rather than expanding the menu to the longest option.
 
-For shadcn Select, align the selected row with the trigger even when the list
-scrolls. Target that row by stable option ID in `initialFocus`; native focus
-reveals it with `Nearest`, so subtract its revealed scroll from the row's
-placement offset. Dropping the offset for long lists moves the panel below the
-trigger by both the popup gap and shadow padding. Keep screen-edge collision
-handling. Use `allowClear={false}` for required settings values and allow it
-for optional devices whose placeholder means Off. Supply one chevron through
-`trailing`; Select owns its retained rotation.
+For shadcn Select, open below the trigger with `bottomStart`. Native focus
+reveals the selected row without aligning that row over the trigger. Use
+`anchorWidth="matchAnchor"` and `anchorWidthOffset={2*S}` for a panel that
+matches the resolved trigger width, including percentages and flex growth;
+reserve shadow padding `S` and compensate both placement axes. Explicit
+`contentWidth` opts into an independent panel width. Use `allowClear={false}`
+for required settings and allow it for optional devices whose placeholder
+means Off. Supply one chevron through `trailing`; Select owns its rotation.
+
+Opaque surface borders need opaque color tokens. An alpha border can expose
+another window underneath even if the panel fill is opaque. Preserve pixel
+coverage at curved outer edges, but keep aligned straight one-pixel edges
+fully covered. The quad shader integrates its local SDF plane over the pixel
+square; widening that filter arbitrarily also makes straight edges translucent.
 
 Solid's native renderer ignores React-style `key` props. Refreshable options must
 retain nodes by primitive option value: `<For each={options.map(o => o.value)}>`

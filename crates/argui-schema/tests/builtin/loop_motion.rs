@@ -66,3 +66,32 @@ fn gap_loop_requires_an_authored_gap() {
         .unwrap_err();
     assert!(error.to_string().contains("loop_gap requires gap"));
 }
+
+#[test]
+fn slow_marquee_durations_remain_native_and_reject_nonfinite_or_unbounded_values() {
+    let registry = builtin::registry().unwrap();
+    for duration in [1.0, 60_001.0, 120_000.0, 86_400_000.0] {
+        let element = registry
+            .construct(
+                builtin::RECTANGLE,
+                &NativeElementInput::new()
+                    .property(builtin::LOOP_MS, SchemaValue::Float(duration))
+                    .property(builtin::LOOP_TRANSLATE_X, SchemaValue::Float(-700.0))
+                    .property(builtin::LOOP_HOLD, SchemaValue::Bool(true)),
+            )
+            .unwrap();
+        assert!(UiTree::new(element).wants_animation_frame());
+    }
+    for duration in [0.0, -1.0, 86_400_008.0, f32::NAN, f32::INFINITY] {
+        assert!(
+            registry
+                .construct(
+                    builtin::RECTANGLE,
+                    &NativeElementInput::new()
+                        .property(builtin::LOOP_MS, SchemaValue::Float(duration))
+                        .property(builtin::LOOP_TRANSLATE_X, SchemaValue::Float(-700.0))
+                )
+                .is_err()
+        );
+    }
+}

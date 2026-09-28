@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
-use argui_core::{Point, Rect, Size, Transform2D};
+use argui_core::{Point, PointerEvent, PointerPhase, Rect, Size, Transform2D};
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{Border, Color, DisplayCommand, Fill, VectorAsset, VectorId};
-use argui_text::{TextEngine, TextStyle};
+use argui_text::{TextEngine, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Element, JustifyContent, LengthPercentageAuto, Sides, UiTree, length, percent,
+    AlignItems, Axes, Element, EventHandler, EventHandlerId, EventOwnerId, EventType, HitTestStyle,
+    Interaction, JustifyContent, LengthPercentageAuto, Overflow, PointerEvents, ScrollAxes,
+    ScrollConfig, Sides, UiTree, length, percent,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
@@ -258,4 +260,143 @@ fn select_twenty_pixel_line_boxes_center_text_and_icons_in_twenty_eight_pixel_ro
         1.875,
         0.0001,
     );
+}
+
+/// Mirrors a Select option with its naturally measured label inside a clipped viewport.
+fn select_option_with_label_target(blocking_wrapper: bool) -> Element {
+    let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(1), 1));
+    let area = Element::container([Element::container([Element::text(
+        "A very long native audio input device name extending beyond the option viewport",
+    )
+    .keyed("label-text")
+    .text_style(TextStyle {
+        font_size: 13.0,
+        line_height: 20.0,
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    })])
+    .height(length(20.0))])
+    .keyed("label-area")
+    .interaction(Interaction::default())
+    .hit_test(HitTestStyle::default().pointer_events(PointerEvents::BoxOnly))
+    .on(handler.direct_listener(EventType::PointerEnter))
+    .on(handler.direct_listener(EventType::PointerLeave));
+    let viewport = Element::container([
+        Element::row([Element::container([area]).shrink(0.0)]).height(length(20.0))
+    ])
+    .keyed("label-viewport")
+    .width(length(160.0))
+    .height(length(20.0))
+    .overflow(Axes {
+        x: Overflow::Auto,
+        y: Overflow::Hidden,
+    })
+    .scroll_config(ScrollConfig::default().axes(ScrollAxes::Horizontal));
+    let surface = Element::row([
+        viewport,
+        Element::container([]).width(length(16.0)).shrink(0.0),
+    ])
+    .keyed("option-surface")
+    .width(percent(1.0))
+    .height(length(28.0))
+    .padding(Sides {
+        left: length(6.0),
+        right: length(6.0),
+        top: length(0.0),
+        bottom: length(0.0),
+    })
+    .align_items(AlignItems::CENTER)
+    .interaction(Interaction::default());
+    let content = if blocking_wrapper {
+        Element::container([surface])
+            .keyed("blocking-option-area")
+            .width(percent(1.0))
+            .height(length(28.0))
+            .interaction(Interaction::default())
+            .hit_test(HitTestStyle::default().pointer_events(PointerEvents::BoxOnly))
+    } else {
+        surface
+    };
+    Element::container([content])
+        .width(length(200.0))
+        .height(length(28.0))
+}
+
+#[test]
+fn select_label_hit_targets_receive_enter_and_leave_without_a_box_only_ancestor() {
+    for blocking_wrapper in [false, true] {
+        let (mut tree, output) = compute(
+            select_option_with_label_target(blocking_wrapper),
+            Size::new(220.0, 40.0),
+            &[],
+        );
+        let viewport = bounds(&tree, &output, "label-viewport");
+        let area = bounds(&tree, &output, "label-area");
+        let text = bounds(&tree, &output, "label-text");
+        assert!(area.size.width > viewport.size.width);
+        assert_eq!(area.size.width, text.size.width);
+        assert_eq!(area.size.height, 20.0);
+        let inside = Point::new(viewport.origin.x + 5.0, center(viewport).y);
+        let outside = Point::new(
+            viewport.origin.x + viewport.size.width + 1.0,
+            center(viewport).y,
+        );
+        let label_region = output
+            .hit_regions
+            .iter()
+            .find(|region| tree.key(region.node) == Some("label-area"));
+        if blocking_wrapper {
+            assert!(
+                label_region.is_none(),
+                "BoxOnly must suppress descendant hits"
+            );
+            let hit = output
+                .hit_regions
+                .iter()
+                .rev()
+                .find(|region| region.contains(inside))
+                .unwrap();
+            assert_eq!(tree.key(hit.node), Some("blocking-option-area"));
+            continue;
+        }
+        let region = label_region.expect("the unwrapped label must own a native hit region");
+        assert_eq!(region.bounds, area);
+        assert!(region.contains(inside));
+        assert!(
+            area.contains(outside),
+            "the intrinsic text extends beyond the viewport"
+        );
+        assert!(
+            !region.contains(outside),
+            "the viewport must clip the label hit region"
+        );
+        let label = region.node;
+        let entered = tree.pointer_event(
+            PointerEvent::mouse(PointerPhase::Moved, inside),
+            &output.hit_regions,
+        );
+        assert_eq!(
+            entered
+                .events
+                .iter()
+                .filter(|event| {
+                    event.target == label && event.kind.event_type() == EventType::PointerEnter
+                })
+                .count(),
+            1
+        );
+        let left = tree.pointer_event(
+            PointerEvent::mouse(PointerPhase::Moved, outside),
+            &output.hit_regions,
+        );
+        assert_eq!(
+            left.events
+                .iter()
+                .filter(|event| {
+                    event.target == label && event.kind.event_type() == EventType::PointerLeave
+                })
+                .count(),
+            1
+        );
+    }
 }

@@ -118,6 +118,8 @@ assets; widgets do not impose an icon library.
   For independent QuickJS scenes, retained auxiliary windows, embedded fonts,
   and Linux portal dependencies, read
   [native presentation pitfalls](references/argui-native-presentations.md).
+  For native translations, reactive TR helpers, JSON imports, shared locale
+  preferences and font coverage, read [i18n integration](references/argui-i18n.md).
   For native release checks, verified downloads and installation boundaries,
   read [native updater integration](references/argui-native-updater.md).
   Keep new built-in property IDs distinct from all existing IDs, including IDs

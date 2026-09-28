@@ -1021,6 +1021,9 @@ export namespace JSX {
       anchor?: string
       placement?: "fill" | "center" | "topStart" | "top" | "topEnd" | "bottomStart" | "bottom" | "bottomEnd" | "leftStart" | "left" | "leftEnd" | "rightStart" | "right" | "rightEnd"
       placementOffset?: number
+      placementCrossOffset?: number
+      anchorWidth?: "content" | "atLeastAnchor" | "matchAnchor"
+      anchorWidthOffset?: number
       dismissPolicy?: "manual" | "outsidePointer" | "escape" | "outsidePointerOrEscape" | "outsideHoverOrEscape"
       windowLayer?: "background" | "content" | "floating" | "popover" | "modal" | "debug"
       containment?: "none" | "trap" | "modal"

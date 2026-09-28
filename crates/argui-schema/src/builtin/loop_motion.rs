@@ -332,7 +332,7 @@ pub(super) fn apply(
 ///
 /// # Errors
 ///
-/// Returns a schema error for a duration outside 1–60,000 ms or a nonfinite value.
+/// Returns a schema error for a duration outside 1–86,400,000 ms or a nonfinite value.
 fn duration(
     input: &NativeElementInput,
     id: PropertyId,
@@ -341,9 +341,9 @@ fn duration(
     let Some(SchemaValue::Float(value)) = input.get(id) else {
         return Ok(None);
     };
-    if !value.is_finite() || !(1.0..=60_000.0).contains(value) {
+    if !value.is_finite() || !(1.0..=86_400_000.0).contains(value) {
         return Err(SchemaError::Adapter(format!(
-            "{name} must be between 1 and 60000"
+            "{name} must be between 1 and 86400000"
         )));
     }
     Ok(Some(value.round() as u64))

@@ -3,8 +3,9 @@ use argui_layout::LayoutEngine;
 use argui_paint::{DisplayCommand, Fill, GpuCanvasId, LayerStyle};
 use argui_text::TextEngine;
 use argui_ui::{
-    Axes, Element, FloatingPlacement, GpuCanvasSpec, Interaction, NodeId, Overflow, OverlaySurface,
-    Placement, ScrollConfig, UiTree, ViewportPlacement, WindowLayer, length,
+    AnchorWidth, Axes, Element, FloatingPlacement, GpuCanvasSpec, Interaction, NodeId, Overflow,
+    OverlaySurface, Placement, ScrollConfig, Sides, UiTree, ViewportPlacement, WindowLayer, length,
+    percent,
 };
 
 fn node(ui: &UiTree, key: &str) -> NodeId {
@@ -284,4 +285,130 @@ fn native_image_vector_and_effect_clips_share_the_same_local_coordinates() {
     }
     assert_eq!(kinds, ["image", "vector", "gpu-canvas"]);
     assert!(output.native_surfaces[0].display_list.validate().is_ok());
+}
+
+/// Mirrors a responsive Select anchor and its transparent popup client with shadow gutters.
+fn select_with_matching_native_panel(grow: bool, shadow_inset: f32) -> Element {
+    let anchor = Element::container([])
+        .keyed("select-anchor")
+        .height(length(28.0));
+    let anchor = if grow {
+        anchor.width(length(0.0)).grow(1.0).min_width(length(0.0))
+    } else {
+        anchor.width(percent(1.0))
+    };
+    let popup = Element::container([Element::container([])
+        .keyed("visible-panel")
+        .width(percent(1.0))
+        .height(percent(1.0))
+        .background(Color::WHITE)
+        .interaction(Interaction::blocker())])
+    .keyed("select-popup")
+    // The native anchor policy must override this unrelated intrinsic width.
+    .width(length(320.0))
+    .height(length(100.0))
+    .padding(Sides::length(shadow_inset))
+    .anchored_portal(
+        WindowLayer::Popover,
+        "select-anchor",
+        FloatingPlacement::new(Placement::BottomStart)
+            .anchor_width(AnchorWidth::MatchAnchor)
+            .anchor_width_offset(2.0 * shadow_inset)
+            .offset(4.0 - shadow_inset)
+            .cross_offset(-shadow_inset),
+    )
+    .portal_surface(OverlaySurface::PreferNative);
+    Element::column([
+        Element::row([anchor])
+            .width(percent(1.0))
+            .height(length(28.0))
+            .shrink(0.0),
+        popup,
+    ])
+    .width(percent(1.0))
+    .height(percent(1.0))
+    .padding(Sides::length(40.0))
+}
+
+#[test]
+fn native_select_panels_match_resolved_anchor_width_after_window_resize_without_remount() {
+    let shadow_inset = 18.0;
+    let work_area = rect(-200.0, -100.0, 1200.0, 800.0);
+    for grow in [false, true] {
+        let mut ui = UiTree::new(select_with_matching_native_panel(grow, shadow_inset));
+        let anchor = node(&ui, "select-anchor");
+        let popup = node(&ui, "select-popup");
+        let panel = node(&ui, "visible-panel");
+        let mut engine = LayoutEngine::new();
+        let mut text = TextEngine::new();
+        // The same retained tree changes width through percentage/flex layout alone.
+        for anchor_width in [184.0, 232.0, 140.0] {
+            let viewport = Size::new(anchor_width + 80.0, 300.0);
+            let output = engine.compute(&mut ui, &mut text, viewport).unwrap();
+            let anchor_bounds = output
+                .nodes
+                .iter()
+                .find(|item| item.node == anchor)
+                .unwrap()
+                .bounds;
+            assert_eq!(anchor_bounds, rect(40.0, 40.0, anchor_width, 28.0));
+            let accepted = output
+                .native_portal_placement(&ui, popup, work_area)
+                .unwrap();
+            assert_eq!(
+                accepted,
+                rect(22.0, 54.0, anchor_width + 2.0 * shadow_inset, 100.0)
+            );
+            assert!(ui.set_native_portal(popup, Some(accepted)));
+            let native = engine.compute(&mut ui, &mut text, viewport).unwrap();
+            assert_eq!(node(&ui, "select-anchor"), anchor);
+            assert_eq!(node(&ui, "select-popup"), popup);
+            assert_eq!(node(&ui, "visible-panel"), panel);
+            let visible = native
+                .nodes
+                .iter()
+                .find(|item| item.node == panel)
+                .unwrap()
+                .bounds;
+            assert_eq!(
+                visible,
+                rect(anchor_bounds.origin.x, 72.0, anchor_width, 64.0)
+            );
+            assert_eq!(
+                visible.origin.y,
+                anchor_bounds.origin.y + anchor_bounds.size.height + 4.0
+            );
+            let surface = native
+                .native_surfaces
+                .iter()
+                .find(|surface| surface.node == popup)
+                .unwrap();
+            assert_eq!(surface.bounds, accepted);
+            let painted = surface
+                .display_list
+                .commands()
+                .iter()
+                .find_map(|command| match command {
+                    DisplayCommand::Quad(quad)
+                        if quad.background == Some(Fill::Solid(Color::WHITE)) =>
+                    {
+                        Some(quad.transform.transform_rect(quad.bounds))
+                    }
+                    _ => None,
+                })
+                .expect("visible native panel paint");
+            assert_eq!(
+                painted,
+                rect(shadow_inset, shadow_inset, anchor_width, 64.0)
+            );
+            let hit = native
+                .hit_regions
+                .iter()
+                .find(|region| region.node == panel)
+                .unwrap();
+            assert_eq!(hit.bounds, visible);
+            assert!(hit.contains(Point::new(visible.origin.x + 1.0, visible.origin.y + 1.0)));
+            assert!(!hit.contains(Point::new(accepted.origin.x + 1.0, visible.origin.y + 1.0)));
+        }
+    }
 }

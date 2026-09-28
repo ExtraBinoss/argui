@@ -5,7 +5,7 @@ import type { WidgetTheme } from '../shared/theme'
 import { keyName, nextEnabledOption, type SelectOptions } from '../shared/types'
 import type { AssetRef } from '@argui/host'
 import { ScrollShadow } from './scroll-shadow'
-import { selectMenuOffset } from '../shared/select-layout'
+import { selectMarqueePeriod } from '../shared/select-layout'
 
 /** Props for the native React Select. */
 export type SelectProps = SelectOptions & {
@@ -25,6 +25,7 @@ export function Select(props: SelectProps): ReactElement {
   const [localValue, setLocalValue] = useState(props.defaultValue ?? '')
   const [localOpen, setLocalOpen] = useState(props.defaultOpen ?? false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [triggerWidth, setTriggerWidth] = useState<number>()
   const value = props.value ?? localValue
   const expanded = props.open ?? localOpen
   const controlledReadOnly = props.value !== undefined && !props.onValueChange
@@ -50,7 +51,12 @@ export function Select(props: SelectProps): ReactElement {
     props.onValueChange?.(option.value)
     setOpen(false)
   }
+  const measureTrigger = (payload: unknown) => {
+    const width = (payload as { width?: number } | null)?.width
+    if (typeof width === 'number' && Number.isFinite(width) && width > 0) setTriggerWidth(width)
+  }
   const onKey = (payload: unknown) => {
+    measureTrigger(payload)
     if (disabled) return
     const key = keyName(payload)
     if (!key) return
@@ -73,21 +79,16 @@ export function Select(props: SelectProps): ReactElement {
 
   const selected = props.options.find((option) => option.value === value)
   const width = props.width ?? theme.selectWidth
-  const popupWidth = props.contentWidth ?? (typeof width === 'number' ? width : theme.selectWidth)
+  const popupWidth = props.contentWidth ?? triggerWidth ?? (typeof width === 'number' ? width : theme.selectWidth)
   const shadcn = props.variant === 'shadcn'
   const clearable = shadcn && props.allowClear !== false
   const shadowInset = Math.ceil(theme.overlayShadowBlur + Math.abs(theme.overlayShadowOffsetY))
   const labelWidth = Math.max(1, (typeof popupWidth === 'number' ? popupWidth : theme.selectWidth)
-    - (shadcn ? 38 : 10 + theme.spacing * 2) - shadowInset * 2)
+    - (shadcn ? 38 : 10 + theme.spacing * 2))
   const rowHeight = shadcn ? theme.selectCompactRowHeight : theme.selectRowHeight
   const rowCount = Math.max(1, props.options.length + Number(clearable))
   const contentHeight = 8 + rowCount * rowHeight + (rowCount - 1) * 2 + (shadcn ? 26 : 0)
   const optionHeight = Math.min(theme.selectMaxPopupHeight, contentHeight)
-  // Native initial focus reveals the selected row before aligning its center.
-  const placementOffset = shadcn
-    ? selectMenuOffset(theme.selectCompactHeight, rowHeight, selectedIndex + Number(clearable),
-      optionHeight, shadowInset, theme.overlayBorderWidth)
-    : undefined
   const initialFocus = selected ? `${id}-option-${encodeURIComponent(selected.value)}`
     : clearable ? `${id}-placeholder` : 'first'
 
@@ -109,7 +110,7 @@ export function Select(props: SelectProps): ReactElement {
       activeDescendant={expanded && currentIndex >= 0
         ? `${id}-option-${encodeURIComponent(props.options[currentIndex]!.value)}` : undefined}
       keyboardActivation="none"
-      onClick={() => expanded ? setOpen(false) : showOptions()}
+      onClick={event => { measureTrigger(event); expanded ? setOpen(false) : showOptions() }}
       onKey={onKey}
     >
       <rectangle
@@ -142,8 +143,11 @@ export function Select(props: SelectProps): ReactElement {
       accessibleName={props.label}
       anchor={id}
       placement="bottomStart"
-      placementOffset={placementOffset}
-      width={popupWidth}
+      anchorWidth={props.contentWidth === undefined ? "matchAnchor" : "content"}
+      anchorWidthOffset={2 * shadowInset}
+      placementOffset={4 - shadowInset}
+      placementCrossOffset={-shadowInset}
+      width={(typeof popupWidth === 'number' ? popupWidth : theme.selectWidth) + 2 * shadowInset}
       windowLayer="popover"
       dismissPolicy="outsidePointerOrEscape"
       containment="trap"
@@ -205,8 +209,6 @@ export function Select(props: SelectProps): ReactElement {
                 mouseCursor={option.disabled || disabled ? 'notAllowed' : 'pointer'}
                 onClick={() => choose(index)}
               >
-                  <touchArea width="100%" height={rowHeight}
-                    onPointerEnter={() => setActiveIndex(-1)} onPointerLeave={() => setActiveIndex(-1)}>
                   <rectangle
                     width="100%"
                     height={rowHeight}
@@ -218,14 +220,13 @@ export function Select(props: SelectProps): ReactElement {
                   >
                     <row width="100%" height="100%" alignItems="center">
                       <container width={0} grow={1} minWidth={0}>
-                        <SelectLabel label={option.label} viewportWidth={labelWidth} />
+                        <SelectLabel label={option.label} viewportWidth={labelWidth} onHover={() => setActiveIndex(-1)} />
                       </container>
                       {shadcn ? <container width={16} shrink={0}>
                         {value === option.value ? <>{props.selectedIcon ? <svg source={props.selectedIcon} width={14} height={14} color={theme.text} /> : <text color={theme.text}>✓</text>}</> : null}
                       </container> : null}
                     </row>
                   </rectangle>
-                  </touchArea>
               </focusScope>
             }) : !shadcn ? <text color={theme.textMuted}>No options</text> : null}
           </column>
@@ -237,7 +238,7 @@ export function Select(props: SelectProps): ReactElement {
 }
 
 /** Measures an option's actual text box on hover and moves it with a native loop. */
-function SelectLabel(props: { label: string; viewportWidth: number }): ReactElement {
+function SelectLabel(props: { label: string; viewportWidth: number; onHover: () => void }): ReactElement {
   const theme = useTheme<WidgetTheme>()
   const [overflow, setOverflow] = useState(0)
   const [hovered, setHovered] = useState(false)
@@ -248,9 +249,9 @@ function SelectLabel(props: { label: string; viewportWidth: number }): ReactElem
       <touchArea
         onPointerEnter={event => {
           setOverflow(Math.max(0, (event.width ?? 0) - props.viewportWidth))
-          setHovered(true)
-        }} onPointerLeave={() => setHovered(false)}>
-        <rectangle height={20} loopMs={running ? Math.max(1400, overflow / 28 * 1000) : undefined}
+          setHovered(true); props.onHover()
+        }} onPointerLeave={() => { setHovered(false); props.onHover() }}>
+        <rectangle height={20} loopMs={running ? selectMarqueePeriod(overflow) : undefined}
           loopTranslateX={running ? -overflow : undefined} loopHold={running ? true : undefined}>
           <text noWrap={true} color={theme.text} fontSize={13} lineHeight={20}>{props.label}</text>
         </rectangle>

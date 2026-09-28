@@ -20,6 +20,12 @@ fn anchored_popup_uses_portal_and_focus_policies_without_paint() {
                 .property(builtin::ANCHOR, SchemaValue::String("trigger".into()))
                 .property(builtin::PLACEMENT, SchemaValue::String("topEnd".into()))
                 .property(builtin::PLACEMENT_OFFSET, SchemaValue::Float(-18.0))
+                .property(builtin::PLACEMENT_CROSS_OFFSET, SchemaValue::Float(-12.0))
+                .property(
+                    builtin::ANCHOR_WIDTH,
+                    SchemaValue::String("matchAnchor".into()),
+                )
+                .property(builtin::ANCHOR_WIDTH_OFFSET, SchemaValue::Float(24.0))
                 .property(builtin::WINDOW_LAYER, SchemaValue::String("modal".into()))
                 .property(
                     builtin::DISMISS_POLICY,
@@ -43,7 +49,9 @@ fn anchored_popup_uses_portal_and_focus_policies_without_paint() {
         &portal.target,
         PortalTarget::Anchor(anchor)
             if anchor.key == "trigger" && anchor.placement.preferred == Placement::TopEnd
-                && anchor.placement.offset == -18.0
+                && anchor.placement.offset == -18.0 && anchor.placement.cross_offset == -12.0
+                && anchor.placement.anchor_width == argui_ui::AnchorWidth::MatchAnchor
+                && anchor.placement.anchor_width_offset == 24.0
     ));
     let focus = popup.focus_scope.as_ref().unwrap();
     assert_eq!(focus.containment, FocusContainment::Modal);
