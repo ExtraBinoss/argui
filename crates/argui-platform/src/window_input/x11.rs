@@ -7,11 +7,33 @@ use x11rb::{
     connection::Connection,
     protocol::{
         shape::{ConnectionExt as _, SK, SO},
-        xproto::{ClipOrdering, Rectangle},
+        xproto::{ClipOrdering, ConnectionExt as _, Rectangle},
     },
 };
 
 use super::{WindowInputRegion, WindowInputRegionError};
+
+/// Samples the authoritative X11 pointer; enter/focus events can carry stale positions.
+/// `scale` maps physical client coordinates to UI pixels. Native query failures
+/// or an invalid scale return `None`, preserving the event-based fallback.
+pub(super) fn pointer_position(window: &Window, scale: f64) -> Option<argui_core::Point> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return None;
+    }
+    let xid = match window.window_handle().ok()?.as_raw() {
+        RawWindowHandle::Xlib(handle) => handle.window as u32,
+        RawWindowHandle::Xcb(handle) => handle.window.get(),
+        _ => return None,
+    };
+    let (connection, _) = x11rb::connect(None).ok()?;
+    let pointer = connection.query_pointer(xid).ok()?.reply().ok()?;
+    pointer.same_screen.then(|| {
+        argui_core::Point::new(
+            (f64::from(pointer.win_x) / scale) as f32,
+            (f64::from(pointer.win_y) / scale) as f32,
+        )
+    })
+}
 
 /// Installs a checked input shape for an X11 window; returns `None` on another backend.
 /// `scale` converts UI logical coordinates to physical X11 coordinates.

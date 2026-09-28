@@ -23,6 +23,8 @@ mod native_global_shortcuts;
 mod native_tray;
 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
 pub mod popup;
+#[cfg(target_os = "linux")]
+mod portal_runtime;
 mod preferences;
 mod tray;
 #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
@@ -75,4 +77,7 @@ pub use window::{
     CloseBehavior, WindowBackend, WindowCapabilities, WindowConfig, WindowKey, WindowLevel,
     WindowSpec, window_capabilities,
 };
-pub use window_input::{WindowInputRegion, WindowInputRegionError, apply_window_input_region};
+pub use window_input::{
+    WindowInputRegion, WindowInputRegionError, apply_window_input_region, window_pointer_position,
+};
+pub use winit::window::ResizeDirection;

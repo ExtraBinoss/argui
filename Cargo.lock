@@ -382,6 +382,7 @@ dependencies = [
  "raw-window-handle",
  "rfd",
  "tao",
+ "tokio",
  "tray-icon",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -567,6 +568,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.4.3",
  "serde",
+ "tokio",
  "zbus",
 ]
 
@@ -5266,7 +5268,9 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
+ "tracing",
  "windows-sys 0.61.2",
 ]
 
@@ -6909,6 +6913,7 @@ dependencies = [
  "rustix 1.1.4",
  "serde",
  "serde_repr",
+ "tokio",
  "tracing",
  "uds_windows",
  "uuid",

@@ -47,7 +47,11 @@ pub use launch::WebHostHandle;
 #[cfg(not(target_arch = "wasm32"))]
 pub use launch::run_native_host;
 #[cfg(not(target_arch = "wasm32"))]
-pub use launch::{NativeHostApplicationChannels, run_native_host_application};
+pub use launch::{
+    NativeHostApplicationChannels, run_native_host_application,
+    run_native_host_application_with_text_engine,
+    run_native_host_application_with_text_engine_and_windows,
+};
 pub use launch::{
     run, run_app, run_app_with_text_engine, run_application, run_application_with_text_engine,
     run_ui, run_ui_with_text_engine, run_with_text, run_with_text_engine,

@@ -3,9 +3,13 @@ import { useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useTheme } from '@argui/react'
 import type { WidgetTheme } from '../shared/theme'
 import { keyName, nextEnabledOption, type SelectOptions } from '../shared/types'
+import type { AssetRef } from '@argui/host'
+import { ScrollShadow } from './scroll-shadow'
 
 /** Props for the native React Select. */
 export type SelectProps = SelectOptions & {
+  /** Application vector for the selected option; avoids dependence on font glyph coverage. */
+  selectedIcon?: AssetRef
   leading?: ReactNode
   /** App-supplied chevron, rotated while the option list is open. */
   trailing?: ReactNode
@@ -68,14 +72,18 @@ export function Select(props: SelectProps): ReactElement {
 
   const selected = props.options.find((option) => option.value === value)
   const width = props.width ?? theme.selectWidth
+  const popupWidth = props.contentWidth ?? (typeof width === 'number' ? width : theme.selectWidth)
   const shadcn = props.variant === 'shadcn'
+  const shadowInset = Math.ceil(theme.overlayShadowBlur + Math.abs(theme.overlayShadowOffsetY))
+  const labelWidth = Math.max(1, (typeof popupWidth === 'number' ? popupWidth : theme.selectWidth)
+    - (shadcn ? 38 : 10 + theme.spacing * 2) - shadowInset * 2)
   const rowHeight = shadcn ? theme.selectCompactRowHeight : theme.selectRowHeight
   const rowCount = Math.max(1, props.options.length + Number(shadcn))
   const contentHeight = 8 + rowCount * rowHeight + (rowCount - 1) * 2 + (shadcn ? 26 : 0)
   const optionHeight = Math.min(theme.selectMaxPopupHeight, contentHeight)
   // Align the selected compact row with the trigger when the whole menu fits.
   const placementOffset = shadcn && contentHeight <= theme.selectMaxPopupHeight
-    ? -(theme.selectCompactHeight / 2 + 1 + 4 + 24 + 2
+    ? -(theme.selectCompactHeight / 2 + 1 + 4 + shadowInset + 24 + 2
       + Math.max(0, selectedIndex + 1) * (theme.selectCompactRowHeight + 2)
       + theme.selectCompactRowHeight / 2)
     : undefined
@@ -113,8 +121,8 @@ export function Select(props: SelectProps): ReactElement {
       >
         <row width="100%" height="100%" gap={theme.spacing} alignItems="center">
           {props.leading}
-          <container grow={1} minWidth={0}>
-            <text color={selected ? theme.text : theme.textMuted}>
+          <container width={0} grow={1} minWidth={0} clip={true}>
+            <text width="100%" noWrap={true} textOverflow="ellipsis" color={selected ? theme.text : theme.textMuted} fontSize={13}>
               {selected?.label ?? props.placeholder ?? 'Choose an option'}
             </text>
           </container>
@@ -132,7 +140,7 @@ export function Select(props: SelectProps): ReactElement {
       anchor={id}
       placement="bottomStart"
       placementOffset={placementOffset}
-      width={width}
+      width={popupWidth}
       windowLayer="popover"
       dismissPolicy="outsidePointerOrEscape"
       containment="trap"
@@ -140,16 +148,17 @@ export function Select(props: SelectProps): ReactElement {
       restoreFocus={true}
       onDismiss={() => setOpen(false)}
     >
+      <container width="100%" padding={shadowInset}>
       <rectangle
         width="100%"
         background={theme.surface}
         clip={true}
         border={{ width: theme.overlayBorderWidth, color: theme.border }}
         radii={theme.overlayRadius}
-        shadow={props.allowOutsideWindow ? undefined : { offsetY: theme.overlayShadowOffsetY, blur: theme.overlayShadowBlur, color: theme.overlayShadowColor }}
+        shadow={{ offsetY: theme.overlayShadowOffsetY, blur: theme.overlayShadowBlur, color: theme.overlayShadowColor }}
       >
-        <scrollView width="100%" height={optionHeight} scrollY={true}>
-          <column width="100%" gap={2} padding={4}>
+        <ScrollShadow width="100%" height={optionHeight} scrollbarEndInset={0}>
+          <column width="100%" minWidth={0} maxWidth="100%" gap={2} padding={4}>
             {shadcn ? <container height={24} padding={{ start: 6, top: 3 }}>
               <text color={theme.textMuted} fontSize={theme.fieldLabelSize}>{props.label}</text>
             </container> : null}
@@ -172,8 +181,8 @@ export function Select(props: SelectProps): ReactElement {
                   background={!selected ? theme.surfaceHover : theme.surface}
                   hoverBackground={theme.controlHover} radii={theme.radius}>
                   <row width="100%" height="100%" alignItems="center">
-                    <container grow={1} minWidth={0}><text color={theme.text}>{props.placeholder ?? 'Choose an option'}</text></container>
-                    {!selected ? <text color={theme.text}>✓</text> : null}
+                    <container width={0} grow={1} minWidth={0} clip={true}><text width="100%" noWrap={true} textOverflow="ellipsis" color={theme.text} fontSize={13}>{props.placeholder ?? 'Choose an option'}</text></container>
+                    {!selected ? <>{props.selectedIcon ? <svg source={props.selectedIcon} width={14} height={14} color={theme.text} /> : <text color={theme.text}>✓</text>}</> : null}
                   </row>
                 </rectangle>
               </touchArea>
@@ -189,13 +198,9 @@ export function Select(props: SelectProps): ReactElement {
                 selected={value === option.value}
                 enabled={!option.disabled && !disabled}
                 keyboardActivation="enterOrSpace"
+                mouseCursor={option.disabled || disabled ? 'notAllowed' : 'pointer'}
                 onClick={() => choose(index)}
               >
-                <touchArea
-                  enabled={!option.disabled && !disabled}
-                  mouseCursor={option.disabled || disabled ? 'notAllowed' : 'pointer'}
-                  onPointerEnter={() => { if (!option.disabled) setActiveIndex(index) }}
-                >
                   <rectangle
                     width="100%"
                     height={rowHeight}
@@ -206,16 +211,46 @@ export function Select(props: SelectProps): ReactElement {
                     opacity={option.disabled ? 0.5 : 1}
                   >
                     <row width="100%" height="100%" alignItems="center">
-                      <container grow={1} minWidth={0}><text color={theme.text}>{option.label}</text></container>
-                      {shadcn && value === option.value ? <text color={theme.text}>✓</text> : null}
+                      <container width={0} grow={1} minWidth={0}>
+                        <SelectLabel label={option.label} viewportWidth={labelWidth}
+                          onHover={() => { if (!option.disabled) setActiveIndex(index) }} />
+                      </container>
+                      {shadcn ? <container width={16} shrink={0}>
+                        {value === option.value ? <>{props.selectedIcon ? <svg source={props.selectedIcon} width={14} height={14} color={theme.text} /> : <text color={theme.text}>✓</text>}</> : null}
+                      </container> : null}
                     </row>
                   </rectangle>
-                </touchArea>
               </focusScope>
             }) : !shadcn ? <text color={theme.textMuted}>No options</text> : null}
           </column>
-        </scrollView>
+        </ScrollShadow>
       </rectangle>
+      </container>
     </popupWindow> : null}
   </column>
+}
+
+/** Measures an option's actual text box on hover and moves it with a native loop. */
+function SelectLabel(props: { label: string; viewportWidth: number; onHover: () => void }): ReactElement {
+  const theme = useTheme<WidgetTheme>()
+  const [overflow, setOverflow] = useState(0)
+  const [hovered, setHovered] = useState(false)
+  const running = hovered && overflow > 1
+  return <ScrollShadow width="100%" height={20} orientation="horizontal" size={12} scrollbarVisible={false}>
+    <row height={20}>
+      <container shrink={0}>
+      <touchArea
+        onPointerEnter={event => {
+          props.onHover()
+          setOverflow(Math.max(0, (event.width ?? 0) - props.viewportWidth))
+          setHovered(true)
+        }} onPointerLeave={() => setHovered(false)}>
+        <rectangle height={20} loopMs={running ? Math.max(1400, overflow / 28 * 1000) : undefined}
+          loopTranslateX={running ? -overflow : undefined} loopHold={running ? true : undefined}>
+          <text noWrap={true} color={theme.text} fontSize={13}>{props.label}</text>
+        </rectangle>
+      </touchArea>
+      </container>
+    </row>
+  </ScrollShadow>
 }

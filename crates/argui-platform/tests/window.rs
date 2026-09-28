@@ -17,8 +17,35 @@ fn default_window_is_a_decorated_resizable_surface() {
     assert!(config.append_to_document);
     assert_eq!(config.focus_on_launch, cfg!(not(target_arch = "wasm32")));
     assert_eq!(config.safe_area_insets, None);
+    assert_eq!(config.minimum_size, None);
+    assert_eq!(config.maximum_size, None);
     let attributes = config.into_attributes();
     assert_eq!(attributes.active, cfg!(not(target_arch = "wasm32")));
+}
+
+#[test]
+fn logical_client_constraints_reach_the_native_window() {
+    use winit::dpi::{LogicalSize, Size};
+    for (minimum, maximum) in [
+        (Some((440.0, 208.0)), None),
+        (None, Some((680.0, 252.0))),
+        (Some((440.0, 208.0)), Some((680.0, 252.0))),
+    ] {
+        let attributes = WindowConfig {
+            minimum_size: minimum,
+            maximum_size: maximum,
+            ..Default::default()
+        }
+        .into_attributes();
+        assert_eq!(
+            attributes.min_inner_size,
+            minimum.map(|(width, height)| Size::Logical(LogicalSize::new(width, height)))
+        );
+        assert_eq!(
+            attributes.max_inner_size,
+            maximum.map(|(width, height)| Size::Logical(LogicalSize::new(width, height)))
+        );
+    }
 }
 
 #[test]

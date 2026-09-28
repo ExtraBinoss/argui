@@ -99,7 +99,7 @@ epaint_default_fonts = "=0.31.1"
 accesskit = "=0.24.1"
 accesskit_consumer = "=0.38.0"
 accesskit_winit = "=0.33.2"
-ashpd = { version = "=0.13.13", default-features = false, features = ["async-io", "settings"] }
+ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "settings"] }
 windows = "=0.62.2"
 objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["NSAccessibility", "NSWorkspace"] }
 

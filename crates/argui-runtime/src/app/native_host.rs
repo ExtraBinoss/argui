@@ -34,6 +34,29 @@ pub(super) fn native_host_root_with_safe_area(mut root: Element, insets: Insets)
 }
 
 impl Application {
+    /// Reads the current native layout of `key`, in UI pixels.
+    ///
+    /// # Errors
+    /// Returns an error when the scene has not laid out or the key is absent.
+    pub(crate) fn native_element_bounds(&self, key: &str) -> Result<argui_core::Rect, String> {
+        let tree = self.ui_tree.as_ref().ok_or("native scene is not mounted")?;
+        let layout = self
+            .ui_layout
+            .as_ref()
+            .ok_or("native scene has not laid out")?;
+        let node = tree
+            .node_ids()
+            .iter()
+            .find(|node| tree.key(**node) == Some(key))
+            .ok_or_else(|| format!("element '{key}' is unavailable"))?;
+        layout
+            .nodes
+            .iter()
+            .find(|entry| entry.node == *node)
+            .map(|entry| entry.layout_bounds)
+            .ok_or_else(|| format!("element '{key}' has no layout"))
+    }
+
     /// Delivers `event` to the current presentation callback, if one is installed.
     /// Native hosts use a channel and browser hosts call their subscriber directly.
     pub(super) fn deliver_native_host_event(&self, event: &UiEvent) {
@@ -202,6 +225,45 @@ impl Application {
         })
     }
 
+    /// Registers or replaces `image` in this scene and its open popup renderers.
+    /// Reusing an ID releases the prior texture; the caller owns the ID budget.
+    /// Returns after retaining the image and scheduling a layout and redraw.
+    ///
+    /// # Errors
+    /// Returns an error if the GPU rejects the validated image.
+    pub(crate) fn register_native_image(
+        &mut self,
+        image: argui_paint::ImageAsset,
+    ) -> Result<(), String> {
+        if let super::RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+            renderer
+                .register_image(&image)
+                .map_err(|error| error.to_string())?;
+        }
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        for popup in &mut self.popups.entries {
+            popup
+                .register_image(&image)
+                .map_err(|error| error.to_string())?;
+        }
+        if let Some(previous) = self
+            .image_assets
+            .iter_mut()
+            .find(|asset| asset.id == image.id)
+        {
+            *previous = image;
+        } else {
+            self.image_assets.push(image);
+        }
+        self.layout_engine
+            .set_assets(&self.image_assets, &self.vector_assets);
+        self.pending_ui_frame.request_layout();
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+        Ok(())
+    }
+
     /// Registers a validated SVG in the active renderer and layout engine.
     /// `vector` supplies its stable ID and source. Returns an error if an ID
     /// names different bytes or GPU registration fails; equal repeats do no work.
@@ -253,3 +315,6 @@ impl Application {
         Ok(())
     }
 }
+
+#[path = "../../tests/app/native_host.rs"]
+mod tests;

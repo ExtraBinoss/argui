@@ -89,6 +89,15 @@ impl MultiApplication {
                 };
                 let _ = reply.send(result);
             }
+            NativeHostApplicationRequest::FocusNamedWindow(key, reply) => {
+                let result = if self.windows.contains_key(&key) {
+                    self.apply_command(event_loop, AppCommand::FocusWindow(key));
+                    Ok(())
+                } else {
+                    Err(format!("window '{}' is unavailable", key.as_str()))
+                };
+                let _ = reply.send(result);
+            }
             NativeHostApplicationRequest::GetWindowInfo(key, reply) => {
                 let result = self
                     .windows
@@ -147,6 +156,43 @@ impl MultiApplication {
                             "native monitors are unavailable for window '{}'",
                             key.as_str()
                         )
+                    });
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::RegisterWindowImage(key, image, reply) => {
+                let result = self
+                    .windows
+                    .get_mut(&key)
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                    .and_then(|entry| entry.runtime.register_native_image(image));
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::GetElementBounds(key, element, reply) => {
+                let result = self
+                    .windows
+                    .get(&key)
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                    .and_then(|entry| entry.runtime.native_element_bounds(&element));
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::SetWindowPhysicalPosition(key, x, y, reply) => {
+                let result = self
+                    .windows
+                    .get(&key)
+                    .and_then(|entry| entry.runtime.window())
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                    .and_then(|window| {
+                        if !window.capabilities().absolute_position {
+                            return Err(
+                                "absolute screen positioning is unavailable on this window backend"
+                                    .into(),
+                            );
+                        }
+                        let native = window
+                            .winit()
+                            .ok_or("physical positioning requires a native window")?;
+                        native.set_outer_position(winit::dpi::PhysicalPosition::new(x, y));
+                        Ok(())
                     });
                 let _ = reply.send(result);
             }
@@ -229,6 +275,55 @@ impl MultiApplication {
                         });
                 let _ = reply.send(result);
             }
+            NativeHostApplicationRequest::DragWindow(key, reply) => {
+                let result = self
+                    .windows
+                    .get(&key)
+                    .and_then(|entry| entry.runtime.window())
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                    .and_then(|window| {
+                        if !window.capabilities().native_drag {
+                            return Err(
+                                "native window dragging is unavailable on this backend".into()
+                            );
+                        }
+                        window.drag_window()
+                    });
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::ResizeWindow(key, direction, reply) => {
+                let result = self
+                    .windows
+                    .get(&key)
+                    .and_then(|entry| entry.runtime.window())
+                    .and_then(|window| window.winit())
+                    .ok_or_else(|| {
+                        format!("native edge resizing is unavailable for '{}'", key.as_str())
+                    })
+                    .and_then(|window| {
+                        window
+                            .drag_resize_window(direction)
+                            .map_err(|error| error.to_string())
+                    });
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::MinimizeWindow(key, reply) => {
+                let result = self
+                    .windows
+                    .get(&key)
+                    .and_then(|entry| entry.runtime.window())
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()))
+                    .and_then(|window| {
+                        if !window.capabilities().minimize {
+                            return Err(
+                                "native window minimization is unavailable on this backend".into(),
+                            );
+                        }
+                        window.set_minimized(true);
+                        Ok(())
+                    });
+                let _ = reply.send(result);
+            }
             NativeHostApplicationRequest::SetWindowLevel(key, level, reply) => {
                 let result =
                     self.windows
@@ -255,6 +350,14 @@ impl MultiApplication {
                     .windows
                     .contains_key(&key)
                     .then(|| self.set_visible(&key, true))
+                    .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()));
+                let _ = reply.send(result);
+            }
+            NativeHostApplicationRequest::HideWindow(key, reply) => {
+                let result = self
+                    .windows
+                    .contains_key(&key)
+                    .then(|| self.set_visible(&key, false))
                     .ok_or_else(|| format!("window '{}' is unavailable", key.as_str()));
                 let _ = reply.send(result);
             }
@@ -334,7 +437,11 @@ impl MultiApplication {
         shortcuts: &[GlobalShortcut],
     ) -> Result<argui_platform::NativeGlobalShortcuts, String> {
         #[cfg(target_os = "linux")]
-        if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        if std::env::var_os("WAYLAND_DISPLAY").is_some()
+            && std::env::var("DISPLAY")
+                .ok()
+                .is_none_or(|display| display.is_empty())
+        {
             argui_platform::prepare_wayland_global_shortcuts(
                 self.config.identity.linux_application_id(),
             )?;

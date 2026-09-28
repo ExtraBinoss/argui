@@ -484,9 +484,25 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
         'viewport includes option rows, gaps, and vertical padding')
       assert.equal(descendant(languagePopup, 'ScrollView')?.properties.scrollY, true,
         'long option lists can scroll within the border')
+      assert.equal(languagePopup.properties.width, 240, 'popup width remains bounded')
+      assert.equal(descendant(languagePopup, 'Container')?.properties.padding, 18,
+        'native surface reserves transparent space for the full shadow')
+      assert(descendant(languagePopup, 'Rectangle')?.properties.shadow, 'native popup keeps its theme shadow')
+      assert.equal(descendant(languagePopup, 'ScrollView')?.properties.shadowWidth, 18,
+        'the menu uses the native scroll shadow')
       const option = view.find('FocusScope', (node) => node.properties.role === 'option'
         && node.properties.accessibleName === 'TypeScript')
       assert(option, 'TypeScript option is mounted')
+      const label = view.all('TouchArea').filter((node) => view.text(node) === 'TypeScript'
+        && node.listeners.has('pointerEnter')).at(-1)
+      view.dispatch(label, 'pointerEnter', { kind: 'pointerEnter', width: 600 })
+      await turn()
+      assert(view.all('Rectangle').some((node) => node.properties.loopTranslateX === -422),
+        'measured overflow starts a native marquee loop')
+      view.dispatch(label, 'pointerLeave', { kind: 'pointerLeave' })
+      await turn()
+      assert(!view.all('Rectangle').some((node) => node.properties.loopTranslateX !== undefined),
+        'leaving the label stops native marquee work')
       view.dispatch(option, 'click')
       await turn()
       select = view.find('FocusScope', (node) => node.properties.role === 'comboBox')
@@ -502,7 +518,7 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       await turn()
       let fruitPopup = view.find('PopupWindow', (node) => node.properties.id === 'fruit-select-popup')
       assert(fruitPopup, 'shadcn popup is mounted')
-      assert.equal(fruitPopup.properties.placementOffset, -61,
+      assert.equal(fruitPopup.properties.placementOffset, -79,
         'placeholder row is centered on the trigger when the menu fits')
       assert.equal(descendant(fruitPopup, 'ScrollView')?.properties.height, 212,
         'compact menu fits its title, placeholder, options, gaps, and padding')
@@ -520,7 +536,7 @@ for (const [adapter, mount] of [['Solid', mountSolid], ['React', mountReact]]) {
       view.dispatch(fruitSelect, 'click')
       await turn()
       fruitPopup = view.find('PopupWindow', (node) => node.properties.id === 'fruit-select-popup')
-      assert.equal(fruitPopup?.properties.placementOffset, -151,
+      assert.equal(fruitPopup?.properties.placementOffset, -169,
         'selected Blueberry row is centered on the trigger when reopened')
       const selectedBlueberry = view.find('FocusScope', (node) => node.properties.role === 'option'
         && node.properties.accessibleName === 'Blueberry')

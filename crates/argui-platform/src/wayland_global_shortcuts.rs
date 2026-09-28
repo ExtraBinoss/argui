@@ -38,7 +38,8 @@ static HOST_REGISTRATION: OnceLock<HostRegistration> = OnceLock::new();
 pub fn prepare_wayland_global_shortcuts(application_id: &str) -> Result<(), String> {
     let registration = HOST_REGISTRATION.get_or_init(|| HostRegistration {
         application_id: application_id.to_owned(),
-        result: pollster::block_on(register_host_application(application_id)),
+        result: crate::portal_runtime::runtime()
+            .and_then(|runtime| runtime.block_on(register_host_application(application_id))),
     });
     if registration.application_id != application_id {
         return Err(format!(
@@ -81,9 +82,11 @@ impl WaylandGlobalShortcuts {
         let worker = std::thread::Builder::new()
             .name("argui-wayland-shortcuts".into())
             .spawn(move || {
-                if let Err(error) =
-                    pollster::block_on(run_portal(application_id, shortcuts, handler, stopped))
-                {
+                let result = prepare_wayland_global_shortcuts(&application_id).and_then(|()| {
+                    crate::portal_runtime::runtime()?
+                        .block_on(run_portal(shortcuts, handler, stopped))
+                });
+                if let Err(error) = result {
                     on_error(format!("Wayland global shortcuts portal failed: {error}"));
                 }
             })
@@ -110,16 +113,13 @@ impl Drop for WaylandGlobalShortcuts {
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Runs the portal session until the owner requests shutdown.
 ///
-/// `application_id` associates an unsandboxed process with its desktop ID,
 /// `shortcuts` contains the validated portable accelerators, `handler`
 /// receives portal activations, and `stopped` closes the session cleanly.
 async fn run_portal(
-    application_id: String,
     shortcuts: Vec<GlobalShortcut>,
     handler: GlobalShortcutEventHandler,
     stopped: oneshot::Receiver<()>,
 ) -> Result<(), String> {
-    prepare_wayland_global_shortcuts(&application_id)?;
     let portal = GlobalShortcuts::new()
         .await
         .map_err(|error| error.to_string())?;

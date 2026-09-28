@@ -6,13 +6,14 @@ transparent clear on an opaque swapchain, or an alpha swapchain in an opaque
 window, still leaves rectangular corner patches around a rounded panel. Set
 the native window transparent and use a transparent renderer surface and clear.
 
-The popup's native window currently fits the panel bounds. A widget shadow
-extends beyond those bounds and gets clipped against the rectangular native
-surface. On a transparent popup this leaves straight shadow remnants near the
-rounded corners, especially at the bottom. Popover, Select, and Tooltip omit
-their theme shadow when requesting `allowOutsideWindow`. If a future design
-needs a shadow there, first reserve transparent margin in the native window
-and adjust placement, painting, and hit geometry together.
+The popup's native window fits its content bounds. A shadow requires transparent
+padding inside those bounds; otherwise its blur is clipped at square surface
+edges. Select reserves theme-sized shadow padding and adjusts its placement and
+label viewport accordingly. Popover and Tooltip omit the theme shadow for
+`allowOutsideWindow`; add padding and update placement together before enabling
+their shadows. Keep `contentWidth` independent of trigger width, and account for
+the padding when measuring long labels. Use native scroll shadows and native
+hover motion rather than expanding the menu to the longest option.
 
 The popup's physical scale is native DPI multiplied by UI zoom. Convert the
 usable desktop area back through that combined scale while preserving its

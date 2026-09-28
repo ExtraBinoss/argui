@@ -21,6 +21,16 @@ pub(super) struct Popup {
 }
 
 impl Popup {
+    /// Registers or replaces `image` in an already-open native popup.
+    ///
+    /// # Errors
+    /// Returns the underlying GPU upload error.
+    pub(super) fn register_image(
+        &mut self,
+        image: &argui_paint::ImageAsset,
+    ) -> Result<(), argui_render::RendererError> {
+        self.renderer.register_image(image)
+    }
     /// Registers `vector` in an already-open native popup renderer.
     /// Returns an error if GPU registration fails.
     ///

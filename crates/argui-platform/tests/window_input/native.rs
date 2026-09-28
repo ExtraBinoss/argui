@@ -5,7 +5,7 @@ fn exercise() {
     use argui_core::{Point, Rect, Size};
     use argui_platform::{
         WindowConfig, WindowInputRegion, WindowInputRegionError, apply_window_input_region,
-        window_capabilities,
+        window_capabilities, window_pointer_position,
     };
     use winit::{
         application::ApplicationHandler,
@@ -16,6 +16,7 @@ fn exercise() {
         window::WindowId,
     };
     use x11rb::protocol::shape::{ConnectionExt as _, SK};
+    use x11rb::protocol::xproto::ConnectionExt as _;
 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     if std::env::var_os("ARGUI_WINDOW_INPUT_TEST_CHILD").is_none() {
@@ -59,6 +60,23 @@ fn exercise() {
                 _ => panic!("X11 window expected"),
             };
             let (connection, _) = x11rb::connect(None).unwrap();
+            connection.map_window(xid).unwrap().check().unwrap();
+            connection
+                .warp_pointer(x11rb::NONE, xid, 0, 0, 0, 0, 300, 200)
+                .unwrap()
+                .check()
+                .unwrap();
+            assert_eq!(
+                window_pointer_position(&window, 1.0),
+                Some(Point::new(300.0, 200.0))
+            );
+            assert_eq!(
+                window_pointer_position(&window, 2.0),
+                Some(Point::new(150.0, 100.0))
+            );
+            for scale in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+                assert_eq!(window_pointer_position(&window, scale), None);
+            }
             let shape = || {
                 connection
                     .shape_get_rectangles(xid, SK::INPUT)

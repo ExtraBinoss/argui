@@ -3,14 +3,27 @@ use argui_ui::Element;
 use super::Application;
 
 impl Application {
-    /// Renders the current model view and applies platform and inspection wrappers.
+    /// Restores the retained native scene or renders the current model view.
     ///
-    /// Returns the rendered root when this application owns a model.
+    /// Returns the root with platform and inspection wrappers. Native scenes
+    /// remain available during visibility, theme, and viewport rebuilds.
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) fn inspected_view(&self) -> Option<Element> {
-        let root = self.model.as_ref().map(|model| {
-            model.render(self.environment.clone(), self.interaction_snapshot.clone())
-        })?;
+        let root = self
+            .native_host
+            .as_ref()
+            .and_then(|host| host.root_element())
+            .map(|root| {
+                super::native_host::native_host_root_with_safe_area(
+                    root,
+                    self.environment.safe_area_insets,
+                )
+            })
+            .or_else(|| {
+                self.model.as_ref().map(|model| {
+                    model.render(self.environment.clone(), self.interaction_snapshot.clone())
+                })
+            })?;
         #[cfg(any(feature = "inspect", all(feature = "webview", target_os = "linux")))]
         let mut root = root;
         #[cfg(all(feature = "webview", target_os = "linux"))]
@@ -38,3 +51,6 @@ impl Application {
         Some(root)
     }
 }
+
+#[path = "../../tests/app/view.rs"]
+mod tests;

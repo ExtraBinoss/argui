@@ -36,6 +36,7 @@ rfd = { version = "=0.17.2", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd.workspace = true
+tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
 x11rb = { version = "=0.13.2", optional = true }
 futures-util.workspace = true
 ksni = { workspace = true, optional = true }

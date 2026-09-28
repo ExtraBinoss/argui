@@ -177,6 +177,10 @@ pub struct WindowConfig {
     ///
     /// A Web canvas takes its size from CSS instead.
     pub height: f64,
+    /// Minimum client width and height in logical pixels, when constrained.
+    pub minimum_size: Option<(f64, f64)>,
+    /// Maximum client width and height in logical pixels, when constrained.
+    pub maximum_size: Option<(f64, f64)>,
     /// Initial top-left position in physical desktop pixels, when supported.
     pub physical_position: Option<(i32, i32)>,
     /// Whether the operating system draws its standard title bar and borders.
@@ -225,6 +229,8 @@ impl Default for WindowConfig {
             title: "Argui".into(),
             width: 960.0,
             height: 640.0,
+            minimum_size: None,
+            maximum_size: None,
             physical_position: None,
             decorations: true,
             resizable: true,
@@ -266,13 +272,19 @@ impl WindowConfig {
     /// Converts this portable configuration into Winit window attributes.
     #[must_use]
     pub fn into_attributes(self) -> WindowAttributes {
-        let attributes = WindowAttributes::default()
+        let mut attributes = WindowAttributes::default()
             .with_title(self.title)
             .with_decorations(self.decorations)
             .with_resizable(self.resizable)
             .with_transparent(self.transparent || self.desktop_backdrop.is_some())
             .with_window_level(self.level.into())
             .with_active(self.focus_on_launch);
+        if let Some((width, height)) = self.minimum_size {
+            attributes = attributes.with_min_inner_size(LogicalSize::new(width, height));
+        }
+        if let Some((width, height)) = self.maximum_size {
+            attributes = attributes.with_max_inner_size(LogicalSize::new(width, height));
+        }
 
         #[cfg(target_os = "windows")]
         let attributes = {

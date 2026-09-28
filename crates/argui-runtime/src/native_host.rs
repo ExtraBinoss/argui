@@ -111,6 +111,8 @@ pub enum NativeHostApplicationRequest {
     SetCloseBehavior(CloseBehavior, Sender<Result<(), String>>),
     /// Makes the main window visible and requests keyboard focus.
     FocusWindow(Sender<Result<(), String>>),
+    /// Restores and focuses the existing window identified by `WindowKey`.
+    FocusNamedWindow(WindowKey, Sender<Result<(), String>>),
     /// Opens a new application window with its own model-provided view.
     OpenWindow(WindowSpec, Sender<Result<(), String>>),
     /// Sends a text message to the model associated with an existing window.
@@ -119,14 +121,34 @@ pub enum NativeHostApplicationRequest {
     GetWindowInfo(WindowKey, Sender<Result<NativeWindowInfo, String>>),
     /// Reads current native monitor geometry in physical desktop pixels.
     GetMonitors(WindowKey, Sender<Result<Vec<NativeMonitorInfo>, String>>),
+    /// Registers or replaces a validated raster image in one native scene.
+    RegisterWindowImage(
+        WindowKey,
+        argui_paint::ImageAsset,
+        Sender<Result<(), String>>,
+    ),
+    /// Reads the last native layout bounds of a keyed scene element in UI pixels.
+    GetElementBounds(WindowKey, String, Sender<Result<argui_core::Rect, String>>),
     /// Changes one window's native title.
     SetWindowTitle(WindowKey, String, Sender<Result<(), String>>),
     /// Requests a new logical client size for one window.
     SetWindowSize(WindowKey, f64, f64, Sender<Result<(), String>>),
     /// Requests outer top-left coordinates in logical screen pixels.
     SetWindowPosition(WindowKey, f64, f64, Sender<Result<(), String>>),
+    /// Positions the outer top-left directly in physical desktop pixels.
+    SetWindowPhysicalPosition(WindowKey, i32, i32, Sender<Result<(), String>>),
     /// Enables or removes a window's native decorations.
     SetWindowDecorations(WindowKey, bool, Sender<Result<(), String>>),
+    /// Starts a native title-bar drag while the pointer button is pressed.
+    DragWindow(WindowKey, Sender<Result<(), String>>),
+    /// Starts native edge resizing while the pointer button is pressed.
+    ResizeWindow(
+        WindowKey,
+        argui_platform::ResizeDirection,
+        Sender<Result<(), String>>,
+    ),
+    /// Minimizes an existing native window.
+    MinimizeWindow(WindowKey, Sender<Result<(), String>>),
     /// Changes stacking level when supported by the native backend.
     SetWindowLevel(
         WindowKey,
@@ -135,6 +157,8 @@ pub enum NativeHostApplicationRequest {
     ),
     /// Shows an existing window without forcing keyboard focus.
     ShowWindow(WindowKey, Sender<Result<(), String>>),
+    /// Hides an existing window without destroying its native UI tree.
+    HideWindow(WindowKey, Sender<Result<(), String>>),
     /// Closes an existing window.
     CloseWindow(WindowKey, Sender<Result<(), String>>),
     /// Sets the native input region in the same UI units used for rendering.

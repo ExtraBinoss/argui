@@ -137,6 +137,8 @@ export type SelectVariant = 'default' | 'shadcn'
 
 /** Shared options for the Solid and React Select implementations. */
 export type SelectOptions = WidgetLayoutProps & {
+  /** Popup width in UI pixels or another native dimension, independent of the field. */
+  contentWidth?: DimensionValue
   /** Standard field or compact trigger with its group title inside the open menu. */
   variant?: SelectVariant
   options: readonly SelectOption[]

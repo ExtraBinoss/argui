@@ -68,7 +68,11 @@ impl NativeGlobalShortcuts {
     ) -> Result<Self, String> {
         validate_global_shortcuts(shortcuts).map_err(|error| error.to_string())?;
         #[cfg(target_os = "linux")]
-        if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        if std::env::var_os("WAYLAND_DISPLAY").is_some()
+            && std::env::var("DISPLAY")
+                .ok()
+                .is_none_or(|display| display.is_empty())
+        {
             return crate::wayland_global_shortcuts::WaylandGlobalShortcuts::new(
                 application_id,
                 shortcuts,

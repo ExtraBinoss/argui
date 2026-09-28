@@ -8,6 +8,10 @@ that do not use them.
 
 ### Added
 
+- Added native host requests for retained window visibility and focus, dragging,
+  edge resizing, physical positioning, raster image replacement and keyed element
+  bounds. Window configurations can now constrain minimum and maximum client size,
+  and applications can supply fonts for independent native presentation windows.
 - Added separate bounded glyph atlases: four R8 mask pages and two sRGB color
   pages, with frame-pinned LRU eviction and fresh transparent upload borders.
   `TextEngine::stats()` and `RenderProfile::text_atlas` expose cache and upload
@@ -57,6 +61,13 @@ that do not use them.
 
 ### Fixed
 
+- Fixed reopening retained native scenes, X11 pointer coordinates after focus
+  changes, and transparent surface reconfiguration. X11 applications now register
+  X11 shortcuts even when Wayland is also available; Linux portal calls use an
+  owned Tokio executor.
+- Select menus now keep their requested width, show borders and shadows on native
+  popup surfaces, and use native scrolling and hover motion for long labels. Solid
+  and React can supply an SVG selection icon.
 - Corrected fractional-scroll raster keys, alignment-sensitive selection caches,
   font-change invalidation, and premultiplied color-outline glyph edges.
   Uniform text transforms now rasterize at their physical size, and settled

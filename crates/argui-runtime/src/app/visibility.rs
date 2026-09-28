@@ -42,6 +42,12 @@ impl Application {
         }
         self.sync_animations();
         if visible {
+            if let super::RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+                renderer.reconfigure_surface();
+            }
+            // A remapped native surface needs fresh layout, paint, and hit
+            // regions even when its retained JavaScript graph has not changed.
+            self.pending_ui_frame.request_layout();
             self.invalidate(ViewUpdate::Rebuild);
         }
         (self.on_event)(RuntimeEvent::Platform(PlatformEvent::VisibilityChanged(

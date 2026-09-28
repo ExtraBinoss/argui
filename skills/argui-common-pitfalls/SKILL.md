@@ -112,6 +112,9 @@ assets; widgets do not impose an icon library.
   zoom details in [native popup surfaces](references/argui-native-popup-surfaces.md).
   For screen overlays and native pointer holes, read
   [desktop overlay pitfalls](references/argui-desktop-overlays.md).
+  For independent QuickJS scenes, retained auxiliary windows, embedded fonts,
+  and Linux portal dependencies, read
+  [native presentation pitfalls](references/argui-native-presentations.md).
   Keep new built-in property IDs distinct from all existing IDs, including IDs
   declared later in `builtin.rs`.
 - Icons belong to the application. A widget may accept app-provided JSX or

@@ -3,6 +3,20 @@
 use argui_core::Rect;
 use winit::window::Window;
 
+/// Reads the current X11 pointer position relative to `window` in UI pixels.
+///
+/// `ui_scale` is DPI multiplied by application zoom. Returns `None` for an
+/// unsupported backend, invalid scale, or an unavailable native pointer.
+pub fn window_pointer_position(window: &Window, ui_scale: f64) -> Option<argui_core::Point> {
+    #[cfg(all(target_os = "linux", feature = "window-input-regions"))]
+    return x11::pointer_position(window, ui_scale);
+    #[cfg(not(all(target_os = "linux", feature = "window-input-regions")))]
+    {
+        let _ = (window, ui_scale);
+        None
+    }
+}
+
 /// Native pointer policy for one window. Rectangles use Argui UI logical units.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum WindowInputRegion {

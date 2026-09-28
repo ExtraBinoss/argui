@@ -75,13 +75,88 @@ pub fn run_native_host_application(
     app: impl AppModel,
     on_event: impl FnMut(RuntimeEvent) + 'static,
 ) -> Result<(), RuntimeError> {
+    run_native_host_application_with_text_engine(
+        config,
+        renderer,
+        TextEngine::new(),
+        host,
+        assets,
+        channels,
+        app,
+        on_event,
+    )
+}
+
+/// Runs a JavaScript presentation with a caller-supplied native text engine.
+/// `config` supplies the windows, `renderer` selects GPU options, and
+/// `text_engine` supplies fonts installed before the first frame. `host` owns
+/// the main graph, `assets` its media, and `channels` the presentation protocol.
+/// `app` handles domain commands; `on_event` receives lifecycle notifications.
+/// Returns after the native event loop exits.
+///
+/// # Errors
+/// Returns an error if configuration, native event loop, or window setup fails.
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[allow(clippy::too_many_arguments)]
+pub fn run_native_host_application_with_text_engine(
+    config: ApplicationConfig,
+    renderer: RendererConfig,
+    text_engine: TextEngine,
+    host: crate::NativeHost,
+    assets: crate::NativeHostAssets,
+    channels: NativeHostApplicationChannels,
+    app: impl AppModel,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_native_host_application_with_text_engine_and_windows(
+        config,
+        renderer,
+        text_engine,
+        host,
+        assets,
+        channels,
+        [argui_platform::WindowKey::main()],
+        [],
+        app,
+        on_event,
+    )
+}
+
+/// Runs JavaScript presentations in the selected native application windows.
+/// `config` defines window policy and `renderer` selects GPU options. The main
+/// `text_engine` holds the application's fonts; `host` is its retained graph and
+/// `assets` supplies shared media. `channels` carries commits, events and requests.
+/// Each key in `windows` receives a separate host graph. `window_text_engines`
+/// provides font engines for secondary windows. `app` handles domain commands and
+/// `on_event` receives native lifecycle events. Returns when the application exits.
+///
+/// # Errors
+/// Returns a configuration, native event-loop or window-creation error.
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[allow(clippy::too_many_arguments)]
+pub fn run_native_host_application_with_text_engine_and_windows(
+    config: ApplicationConfig,
+    renderer: RendererConfig,
+    text_engine: TextEngine,
+    host: crate::NativeHost,
+    assets: crate::NativeHostAssets,
+    channels: NativeHostApplicationChannels,
+    windows: impl IntoIterator<Item = argui_platform::WindowKey>,
+    window_text_engines: impl IntoIterator<Item = (argui_platform::WindowKey, TextEngine)>,
+    app: impl AppModel,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
     let NativeHostApplicationChannels {
         batches,
         events,
         requests,
     } = channels;
-    let mut application = MultiApplication::new(config, renderer, app, on_event)?;
-    application.install_native_host(host, assets, events);
+    let mut application =
+        MultiApplication::new_with_text_engine(config, renderer, Some(text_engine), app, on_event)?;
+    application.install_native_host(host, assets, events, windows);
+    application.install_window_text_engines(window_text_engines);
     let event_loop = native_event_loop()?;
     let proxy = event_loop.create_proxy();
     application.set_event_proxy(proxy.clone());

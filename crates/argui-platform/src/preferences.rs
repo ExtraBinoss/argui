@@ -77,7 +77,10 @@ impl SystemPreferences {
             use futures_util::StreamExt;
 
             let mut current = current;
-            pollster::block_on(async move {
+            let Ok(runtime) = crate::portal_runtime::runtime() else {
+                return;
+            };
+            runtime.block_on(async move {
                 let Ok(settings) = Settings::new().await else {
                     return;
                 };
@@ -128,7 +131,10 @@ fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
         ColorScheme as PortalScheme, Contrast, ReducedMotion, Settings,
     };
 
-    pollster::block_on(async {
+    let Ok(runtime) = crate::portal_runtime::runtime() else {
+        return (None, None, None);
+    };
+    runtime.block_on(async {
         let Ok(settings) = Settings::new().await else {
             return (None, None, None);
         };
