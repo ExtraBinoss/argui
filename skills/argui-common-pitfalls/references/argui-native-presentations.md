@@ -30,6 +30,14 @@
   timers, or cancellation APIs. Supply required host APIs explicitly and test
   rejected promises and timer callbacks in the real QuickJS host. Even passing
   `.catch(console.error)` reads `console` immediately and can abort startup.
+- Linked workspaces must bundle one SolidJS runtime and one `@argui/solid`
+  adapter. Keeping symlink paths distinct can duplicate both even when their
+  versions match. A widget then reads a different context identity and throws
+  `useTheme requires a root ThemeProvider` under a valid provider. In Vite,
+  resolve real paths with `preserveSymlinks: false` and deduplicate `solid-js`,
+  `@argui/solid`, `@argui/host`, and `@argui/widgets`. Inspect the emitted module
+  paths when diagnosing this error; adding another provider does not join
+  separate framework runtimes.
 - Cargo unifies features across the consuming application. ASHPD accepts
   exactly one async backend; do not combine `async-io` and `tokio`. Its Tokio
   backend needs an owned, persistent executor for connection background tasks.
