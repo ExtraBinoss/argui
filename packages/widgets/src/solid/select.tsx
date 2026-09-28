@@ -1,10 +1,11 @@
-import { createSignal, createUniqueId } from 'solid-js'
+import { createMemo, createSignal, createUniqueId, For } from 'solid-js'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { useTheme } from '@argui/solid'
 import type { WidgetTheme } from '../shared/theme'
 import { keyName, nextEnabledOption, type SelectOptions } from '../shared/types'
 import type { AssetRef } from '@argui/host'
 import { ScrollShadow } from './scroll-shadow'
+import { selectMenuOffset } from '../shared/select-layout'
 
 /** Props for the native Solid Select. */
 export type SelectProps = SelectOptions & {
@@ -16,7 +17,7 @@ export type SelectProps = SelectOptions & {
 }
 
 /** Measures an option's actual text box on hover and moves it with a native loop. */
-function SelectLabel(props: { label: string; viewportWidth: number; onHover: () => void }): JSX.Element {
+function SelectLabel(props: { label: string; viewportWidth: number }): JSX.Element {
   const theme = useTheme<WidgetTheme>()
   const [overflow, setOverflow] = createSignal(0)
   const [hovered, setHovered] = createSignal(false)
@@ -26,13 +27,12 @@ function SelectLabel(props: { label: string; viewportWidth: number; onHover: () 
       <container shrink={0}>
       <touchArea
         onPointerEnter={event => {
-          props.onHover()
           setOverflow(Math.max(0, (event.width ?? 0) - props.viewportWidth))
           setHovered(true)
         }} onPointerLeave={() => setHovered(false)}>
         <rectangle height={20} loopMs={running() ? Math.max(1400, overflow() / 28 * 1000) : undefined}
           loopTranslateX={running() ? -overflow() : undefined} loopHold={running() ? true : undefined}>
-          <text noWrap={true} color={theme().text} fontSize={13}>{props.label}</text>
+          <text noWrap={true} color={theme().text} fontSize={13} lineHeight={20}>{props.label}</text>
         </rectangle>
       </touchArea>
       </container>
@@ -97,23 +97,26 @@ export function Select(props: SelectProps): JSX.Element {
   }
 
   const selected = () => props.options.find((option) => option.value === value())
+  const optionsByValue = createMemo(() => new Map(props.options.map(option => [option.value, option])))
   const width = () => props.width ?? theme().selectWidth
   const popupWidth = () => props.contentWidth ?? (typeof width() === 'number' ? width() : theme().selectWidth)
   const shadowInset = () => Math.ceil(theme().overlayShadowBlur + Math.abs(theme().overlayShadowOffsetY))
   const labelWidth = () => Math.max(1, (typeof popupWidth() === 'number' ? popupWidth() as number : theme().selectWidth)
     - (shadcn() ? 38 : 10 + theme().spacing * 2) - shadowInset() * 2)
   const shadcn = () => props.variant === 'shadcn'
+  const clearable = () => shadcn() && props.allowClear !== false
   const rowHeight = () => shadcn() ? theme().selectCompactRowHeight : theme().selectRowHeight
-  const rowCount = () => Math.max(1, props.options.length + Number(shadcn()))
+  const rowCount = () => Math.max(1, props.options.length + Number(clearable()))
   const contentHeight = () => 8 + rowCount() * rowHeight() + (rowCount() - 1) * 2
     + (shadcn() ? 26 : 0)
   const optionHeight = () => Math.min(theme().selectMaxPopupHeight, contentHeight())
-  // Align the selected compact row with the trigger when the whole menu fits.
-  const placementOffset = () => shadcn() && contentHeight() <= theme().selectMaxPopupHeight
-    ? -(theme().selectCompactHeight / 2 + 1 + 4 + shadowInset() + 24 + 2
-      + Math.max(0, selectedIndex() + 1) * (theme().selectCompactRowHeight + 2)
-      + theme().selectCompactRowHeight / 2)
+  // Native initial focus reveals the selected row before aligning its center.
+  const placementOffset = () => shadcn()
+    ? selectMenuOffset(theme().selectCompactHeight, rowHeight(), selectedIndex() + Number(clearable()),
+      optionHeight(), shadowInset(), theme().overlayBorderWidth)
     : undefined
+  const initialFocus = () => selected()
+    ? `${id}-option-${encodeURIComponent(selected()!.value)}` : clearable() ? `${id}-placeholder` : 'first'
 
   return <column width={width()} height={props.height}
     minWidth={props.minWidth} maxWidth={props.maxWidth} minHeight={props.minHeight} maxHeight={props.maxHeight}
@@ -139,7 +142,7 @@ export function Select(props: SelectProps): JSX.Element {
       <rectangle
         width="100%"
         height={shadcn() ? theme().selectCompactHeight : theme().inputHeight}
-        padding={theme().spacing}
+        padding={{ start: theme().spacing, end: theme().spacing }}
         background={theme().surface}
         border={{ width: 1, color: theme().border }}
         radii={theme().radius}
@@ -148,11 +151,11 @@ export function Select(props: SelectProps): JSX.Element {
       >
         <row width="100%" height="100%" gap={theme().spacing} alignItems="center">
           {props.leading}
-          <container width={0} grow={1} minWidth={0} clip={true}>
+          <row width={0} grow={1} minWidth={0} height={20} alignItems="center" clip={true}>
             <text width="100%" noWrap={true} textOverflow="ellipsis" color={selected() ? theme().text : theme().textMuted} fontSize={13}>
               {selected()?.label ?? props.placeholder ?? 'Choose an option'}
             </text>
-          </container>
+          </row>
           {props.trailing ? <container id={`${id}-chevron`} shrink={0}
             rotation={expanded() ? 180 : 0} transitionMs={180}
             transitionTimingFunction="cubic-bezier(0.2, 0, 0, 1)">{props.trailing}</container> : null}
@@ -171,25 +174,25 @@ export function Select(props: SelectProps): JSX.Element {
       windowLayer="popover"
       dismissPolicy="outsidePointerOrEscape"
       containment="trap"
-      initialFocus="first"
+      initialFocus={initialFocus()}
       restoreFocus={true}
       onDismiss={() => setOpen(false)}
     >
       <container width="100%" padding={shadowInset()}>
       <rectangle
         width="100%"
-        background={theme().surface}
+        background={theme().popover}
         clip={true}
-        border={{ width: theme().overlayBorderWidth, color: theme().border }}
+        border={{ width: theme().overlayBorderWidth, color: theme().outlineBorder }}
         radii={theme().overlayRadius}
         shadow={{ offsetY: theme().overlayShadowOffsetY, blur: theme().overlayShadowBlur, color: theme().overlayShadowColor }}
       >
         <ScrollShadow width="100%" height={optionHeight()} scrollbarEndInset={0}>
           <column width="100%" minWidth={0} maxWidth="100%" gap={2} padding={4}>
-            {shadcn() ? <container height={24} padding={{ start: 6, top: 3 }}>
+            {shadcn() ? <row height={24} padding={{ start: 6 }} alignItems="center">
               <text color={theme().textMuted} fontSize={theme().fieldLabelSize}>{props.label}</text>
-            </container> : null}
-            {shadcn() ? <focusScope
+            </row> : null}
+            {clearable() ? <focusScope
               id={`${id}-placeholder`}
               role="option"
               accessibleName={props.placeholder ?? 'Choose an option'}
@@ -203,9 +206,10 @@ export function Select(props: SelectProps): JSX.Element {
                 setOpen(false)
               }}
             >
-              <touchArea enabled={!disabled()} mouseCursor={disabled() ? 'notAllowed' : 'pointer'}>
+              <touchArea enabled={!disabled()} mouseCursor={disabled() ? 'notAllowed' : 'pointer'}
+                onPointerEnter={() => setActiveIndex(-1)} onPointerLeave={() => setActiveIndex(-1)}>
                 <rectangle width="100%" height={rowHeight()} padding={{ start: 6, end: 6 }}
-                  background={!selected() ? theme().surfaceHover : theme().surface}
+                  background={!selected() ? theme().surfaceHover : 'transparent'}
                   hoverBackground={theme().controlHover} radii={theme().radius}>
                   <row width="100%" height="100%" alignItems="center">
                     <container width={0} grow={1} minWidth={0} clip={true}><text width="100%" noWrap={true} textOverflow="ellipsis" color={theme().text} fontSize={13}>{props.placeholder ?? 'Choose an option'}</text></container>
@@ -214,41 +218,46 @@ export function Select(props: SelectProps): JSX.Element {
                 </rectangle>
               </touchArea>
             </focusScope> : null}
-            {props.options.length ? props.options.map((option, index) => {
-              const optionId = `${id}-option-${encodeURIComponent(option.value)}`
-              const active = () => index === currentIndex()
+            <For each={props.options.map(option => option.value)}
+              fallback={!shadcn() ? <text color={theme().textMuted}>No options</text> : null}>
+              {(optionValue, index) => {
+              const initialOption = optionsByValue().get(optionValue)!
+              const option = () => optionsByValue().get(optionValue) ?? initialOption
+              const optionId = `${id}-option-${encodeURIComponent(optionValue)}`
+              const active = () => index() === currentIndex()
               return <focusScope
                 id={optionId}
-                key={option.value}
                 role="option"
-                accessibleName={option.label}
-                selected={value() === option.value}
-                enabled={!option.disabled && !disabled()}
+                accessibleName={option().label}
+                selected={value() === optionValue}
+                enabled={!option().disabled && !disabled()}
                 keyboardActivation="enterOrSpace"
-                mouseCursor={option.disabled || disabled() ? 'notAllowed' : 'pointer'}
-                onClick={() => choose(index)}
+                mouseCursor={option().disabled || disabled() ? 'notAllowed' : 'pointer'}
+                onClick={() => choose(index())}
               >
+                  <touchArea width="100%" height={rowHeight()}
+                    onPointerEnter={() => setActiveIndex(-1)} onPointerLeave={() => setActiveIndex(-1)}>
                   <rectangle
                     width="100%"
                     height={rowHeight()}
                     padding={shadcn() ? { start: 6, end: 6 } : theme().spacing}
-                    background={active() || value() === option.value ? theme().surfaceHover : theme().surface}
+                    background={active() || value() === optionValue ? theme().surfaceHover : 'transparent'}
                     hoverBackground={theme().controlHover}
                     radii={theme().radius}
-                    opacity={option.disabled ? 0.5 : 1}
+                    opacity={option().disabled ? 0.5 : 1}
                   >
                     <row width="100%" height="100%" alignItems="center">
                       <container width={0} grow={1} minWidth={0}>
-                        <SelectLabel label={option.label} viewportWidth={labelWidth()}
-                          onHover={() => { if (!option.disabled) setActiveIndex(index) }} />
+                        <SelectLabel label={option().label} viewportWidth={labelWidth()} />
                       </container>
                       {shadcn() ? <container width={16} shrink={0}>
-                        {value() === option.value ? <>{props.selectedIcon ? <svg source={props.selectedIcon} width={14} height={14} color={theme().text} /> : <text color={theme().text}>✓</text>}</> : null}
+                        {value() === optionValue ? <>{props.selectedIcon ? <svg source={props.selectedIcon} width={14} height={14} color={theme().text} /> : <text color={theme().text}>✓</text>}</> : null}
                       </container> : null}
                     </row>
                   </rectangle>
+                  </touchArea>
               </focusScope>
-            }) : !shadcn() ? <text color={theme().textMuted}>No options</text> : null}
+            }}</For>
           </column>
         </ScrollShadow>
       </rectangle>

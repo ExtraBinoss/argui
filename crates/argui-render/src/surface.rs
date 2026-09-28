@@ -36,23 +36,8 @@ use device::next_device_generation;
 use offscreen_api::offscreen_texture;
 use retained::full_damage_profile;
 
-enum FrameContent<'a> {
-    None,
-    Text {
-        engine: &'a mut TextEngine,
-        text: &'a PreparedText,
-    },
-    Ui {
-        engine: &'a mut TextEngine,
-        text: &'a PreparedText,
-        display_list: &'a DisplayList,
-        scale_factor: f32,
-    },
-    Composite {
-        display_list: &'a DisplayList,
-        scale_factor: f32,
-    },
-}
+mod frame_content;
+use frame_content::FrameContent;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RenderStatus {
@@ -102,6 +87,7 @@ pub struct SurfaceRenderer {
     damage: DamageGpu,
     scene_snapshot: Option<DamageSnapshot>,
     effect_root: Option<crate::target::TextureTarget>,
+    deferred_reconfigure: bool,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -258,6 +244,7 @@ impl SurfaceRenderer {
             damage,
             scene_snapshot: None,
             effect_root: None,
+            deferred_reconfigure: false,
         })
     }
 
@@ -269,6 +256,11 @@ impl SurfaceRenderer {
         content: FrameContent<'_>,
         notify: impl FnOnce(),
     ) -> Result<RenderStatus, RendererError> {
+        // Preserve a valid suboptimal presentation until its replacement is ready.
+        // A native resize may already have applied the replacement configuration.
+        if std::mem::take(&mut self.deferred_reconfigure) {
+            self.reconfigure_surface();
+        }
         let (frame, texture, status) = if let Some(surface) = &self.surface {
             match surface.get_current_texture() {
                 CurrentSurfaceTexture::Success(frame) => {
@@ -277,7 +269,8 @@ impl SurfaceRenderer {
                 }
                 CurrentSurfaceTexture::Suboptimal(frame) => {
                     let texture = frame.texture.clone();
-                    (Some(frame), texture, RenderStatus::Reconfigure)
+                    self.deferred_reconfigure = true;
+                    (Some(frame), texture, RenderStatus::Presented)
                 }
                 CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => {
                     return Ok(RenderStatus::Skipped);

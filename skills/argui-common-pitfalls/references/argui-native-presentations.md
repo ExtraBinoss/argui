@@ -25,6 +25,22 @@
 - Install embedded fonts in each scene's `TextEngine` before its first mount.
   Shared image and SVG assets do not transfer an application's custom font
   engine to an independent auxiliary window.
+- Paint a custom client border as the last sibling outside the rounded content
+  clip, sharing the surface's bounds and corner radii. Insetting the stroke by
+  one UI pixel and reducing its radius leaves a dark background ring outside
+  the border, especially visible at antialiased corners. Keep the content inset
+  separately. If straight sides fade, inspect ancestor and viewport clips;
+  moving the border inside changes the silhouette without resolving clipping.
+- Propagate committed preference snapshots as events to every live scene,
+  including hidden ones. Wake a parked QuickJS actor on service replies, events,
+  native input and shutdown. A 100 ms polling sleep delays every window's theme
+  update; a lazy scene also needs a wake when its native window is first opened.
+  Guard the initial preference read so it cannot overwrite a newer event.
+- A valid suboptimal swapchain frame should still be presented. Defer surface
+  reconfiguration to the following frame; discarding an already-presented
+  drawable during resize can expose the native backing. Transparent X11 clients
+  preserve top-left contents and clear newly exposed pixels via bit gravity
+  and a zero-alpha background; do not substitute an opaque black backing.
 - QuickJS is a JavaScript engine, with no automatic browser or Node globals.
   Inspect the concrete bootstrap before using `console`, `TextEncoder`,
   timers, or cancellation APIs. Supply required host APIs explicitly and test

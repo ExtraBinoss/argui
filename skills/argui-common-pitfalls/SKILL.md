@@ -39,7 +39,9 @@ assets; widgets do not impose an icon library.
 - Public schema and TSX names are `camelCase`; Rust identifiers stay idiomatic
   `snake_case`. Change the Rust schema first, regenerate both declarations,
   and sync the CLI SDK snapshot. Do not add aliases for removed names.
-- Framework `key` controls reconciliation. Native `id` is optional and
+- In React, framework `key` controls reconciliation. Solid's JSX `key` does
+  not key a reactive `.map()`; use `<For>` over stable primitive identities.
+  Native `id` is optional and
   addressable for anchors, accessibility relations, and tests. Do not derive an
   ID from visible text or a list index. A virtual list still needs a stable
   item key independent of native `id`. In Solid, use `<For>` for a reactive
@@ -111,10 +113,13 @@ assets; widgets do not impose an icon library.
   current Linux backend, native popups use X11. Check the alpha, shadow, and
   zoom details in [native popup surfaces](references/argui-native-popup-surfaces.md).
   For screen overlays and native pointer holes, read
-  [desktop overlay pitfalls](references/argui-desktop-overlays.md).
+  [desktop overlay pitfalls](references/argui-desktop-overlays.md) and follow
+  the [screen spotlight implementation](references/argui-screen-spotlight.md).
   For independent QuickJS scenes, retained auxiliary windows, embedded fonts,
   and Linux portal dependencies, read
   [native presentation pitfalls](references/argui-native-presentations.md).
+  For native release checks, verified downloads and installation boundaries,
+  read [native updater integration](references/argui-native-updater.md).
   Keep new built-in property IDs distinct from all existing IDs, including IDs
   declared later in `builtin.rs`.
 - Icons belong to the application. A widget may accept app-provided JSX or

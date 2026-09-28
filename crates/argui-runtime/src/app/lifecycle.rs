@@ -98,6 +98,15 @@ impl ApplicationHandler<UserEvent> for Application {
         match event_loop.create_window(attributes) {
             Ok(window) => {
                 let window = Arc::new(window);
+                if let Err(error) = argui_platform::prepare_window_presentation(
+                    &window,
+                    self.window_config.transparent || self.window_config.desktop_backdrop.is_some(),
+                ) {
+                    (self.on_event)(RuntimeEvent::CommandFailed(error.clone()));
+                    self.fatal_error = Some(crate::RuntimeError::Configuration(error));
+                    event_loop.exit();
+                    return;
+                }
                 #[cfg(target_arch = "wasm32")]
                 if let Err(error) = argui_platform::attach_web_canvas(
                     &window,

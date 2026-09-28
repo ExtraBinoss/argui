@@ -16,6 +16,7 @@ impl SurfaceRenderer {
         }
         self.surface_config.width = width;
         self.surface_config.height = height;
+        self.deferred_reconfigure = false;
         if let Some(surface) = &self.surface {
             surface.configure(&self.device, &self.surface_config);
         } else {
@@ -35,6 +36,7 @@ impl SurfaceRenderer {
     /// discard surface contents. An offscreen renderer has no surface to configure.
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn reconfigure_surface(&mut self) {
+        self.deferred_reconfigure = false;
         if let Some(surface) = &self.surface {
             surface.configure(&self.device, &self.surface_config);
         }
@@ -62,6 +64,7 @@ impl SurfaceRenderer {
                 .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?,
         );
         self.offscreen_target = None;
+        self.deferred_reconfigure = false;
         self.surface
             .as_ref()
             .expect("replacement surface exists")

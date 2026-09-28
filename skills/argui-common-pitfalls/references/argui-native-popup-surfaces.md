@@ -15,6 +15,23 @@ their shadows. Keep `contentWidth` independent of trigger width, and account for
 the padding when measuring long labels. Use native scroll shadows and native
 hover motion rather than expanding the menu to the longest option.
 
+For shadcn Select, align the selected row with the trigger even when the list
+scrolls. Target that row by stable option ID in `initialFocus`; native focus
+reveals it with `Nearest`, so subtract its revealed scroll from the row's
+placement offset. Dropping the offset for long lists moves the panel below the
+trigger by both the popup gap and shadow padding. Keep screen-edge collision
+handling. Use `allowClear={false}` for required settings values and allow it
+for optional devices whose placeholder means Off. Supply one chevron through
+`trailing`; Select owns its retained rotation.
+
+Solid's native renderer ignores React-style `key` props. Refreshable options must
+retain nodes by primitive option value: `<For each={options.map(o => o.value)}>`
+and read current labels/disabled state by that value. `<For each={options}>`
+still replaces nodes when a catalog returns fresh objects. Ordinary `.map()`
+creates the replacement ID before retiring the old one and can throw
+`Duplicate native id` while the popup is open. Test an open menu through a source
+refresh and verify both the retained native node and its updated label.
+
 The popup's physical scale is native DPI multiplied by UI zoom. Convert the
 usable desktop area back through that combined scale while preserving its
 physical origin. Otherwise Ctrl+ and Ctrl+wheel change the UI layout while

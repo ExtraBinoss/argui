@@ -146,6 +146,8 @@ export type SelectOptions = WidgetLayoutProps & {
   allowOutsideWindow?: boolean
   label: string
   placeholder?: string
+  /** Whether a compact menu includes a selectable empty placeholder; defaults to true. */
+  allowClear?: boolean
   disabled?: boolean
 } & (
   | { value: string; onValueChange?: (value: string) => void; defaultValue?: never }

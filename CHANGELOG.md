@@ -61,6 +61,11 @@ that do not use them.
 
 ### Fixed
 
+- Select removes departed pointer highlights while preserving the selected option and keyboard navigation.
+- Centered Select menu line boxes and Button icon content; text buttons apply horizontal padding without squeezing their vertical content.
+- Transparent X11 windows now preserve existing content during resize, and valid suboptimal swapchain frames remain presented until the following reconfiguration.
+- Shadcn Select keeps its selected option aligned with the trigger in long menus and supports required values through `allowClear={false}`.
+- Solid Select retains option nodes by their values when a device catalog refreshes, preventing duplicate native IDs in open menus.
 - Fixed reopening retained native scenes, X11 pointer coordinates after focus
   changes, and transparent surface reconfiguration. X11 applications now register
   X11 shortcuts even when Wayland is also available; Linux portal calls use an

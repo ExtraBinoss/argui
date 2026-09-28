@@ -35,6 +35,7 @@ mod wayland_global_shortcuts;
 mod web_identity;
 mod window;
 mod window_input;
+mod window_presentation;
 
 pub use application::{ApplicationConfig, ApplicationConfigError, UiZoomConfig};
 pub use argui_core::{
@@ -80,4 +81,5 @@ pub use window::{
 pub use window_input::{
     WindowInputRegion, WindowInputRegionError, apply_window_input_region, window_pointer_position,
 };
+pub use window_presentation::prepare_window_presentation;
 pub use winit::window::ResizeDirection;

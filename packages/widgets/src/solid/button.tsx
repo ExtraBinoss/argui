@@ -54,7 +54,7 @@ export function Button(props: ButtonProps): JSX.Element {
     <rectangle
       width={hasPreferredWidth() ? '100%' : props.iconOnly || sizing().icon ? sizing().height : undefined}
       height={sizing().height}
-      padding={props.iconOnly || sizing().icon ? 0 : sizing().padding}
+      padding={props.iconOnly || sizing().icon ? 0 : { start: sizing().padding, end: sizing().padding }}
       background={paint().background}
       hoverBackground={paint().hover}
       border={{ width: 1, color: !grouped && props.variant === 'outline' ? theme().outlineBorder : 'transparent' }}
@@ -64,7 +64,7 @@ export function Button(props: ButtonProps): JSX.Element {
       transitionTimingFunction="cubic-bezier(0.4, 0, 0.2, 1)"
       opacity={props.disabled ? 0.5 : 1}
     >
-      <row width={hasPreferredWidth() ? '100%' : undefined} height="100%" gap={sizing().gap} alignItems="center" justifyContent={props.contentAlign ?? 'center'}>
+      <row width={hasPreferredWidth() || props.iconOnly || sizing().icon ? '100%' : undefined} height="100%" gap={sizing().gap} alignItems="center" justifyContent={props.contentAlign ?? 'center'}>
         {content}
       </row>
     </rectangle>
