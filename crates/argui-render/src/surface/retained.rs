@@ -65,6 +65,7 @@ impl SurfaceRenderer {
         profiler: Option<&GpuFrameCapture>,
     ) -> DamageProfile {
         let extent = [viewport[0] as u32, viewport[1] as u32];
+        let repaint = regions.iter().copied().reduce(DamageRegion::union);
         let seed = self
             .damage
             .ensure_target(&self.device, self.target_format, extent);
@@ -87,11 +88,15 @@ impl SurfaceRenderer {
             } else {
                 DamageMode::Partial
             },
-            regions: if seed { 1 } else { regions.len() },
+            regions: if seed {
+                1
+            } else {
+                usize::from(repaint.is_some())
+            },
             damaged_pixels: if seed {
                 u64::from(extent[0]) * u64::from(extent[1])
             } else {
-                regions.iter().copied().map(DamageRegion::pixels).sum()
+                repaint.map_or(0, DamageRegion::pixels)
             },
             retained_bytes: self.damage.bytes(),
         }
@@ -114,7 +119,8 @@ impl SurfaceRenderer {
         }
     }
 
-    /// Clears and redraws each changed region of `retained` under a GPU scissor.
+    /// Clears exactly the union scissor used to redraw `retained`.
+    /// Transparent pixels between separate damage regions must not blend twice.
     fn draw_damage_regions(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -127,7 +133,8 @@ impl SurfaceRenderer {
         let offsets = self.target_offsets(target);
         self.damage
             .prepare_clear(&self.queue, self.renderer_config.wgpu_clear_color());
-        let damaged_pixels = regions.iter().copied().map(DamageRegion::pixels).sum();
+        let repaint = regions.iter().copied().reduce(DamageRegion::union);
+        let damaged_pixels = repaint.map_or(0, DamageRegion::pixels);
         let timestamp_writes = profiler.and_then(|capture| {
             capture.timestamp_writes("surface.damage.partial", None, damaged_pixels)
         });
@@ -145,12 +152,9 @@ impl SurfaceRenderer {
             timestamp_writes,
             ..Default::default()
         });
-        for region in regions {
-            crate::damage::DamageGpu::scissor(&mut pass, *region);
-            self.damage.clear(&mut pass);
-        }
-        if let Some(union) = regions.iter().copied().reduce(DamageRegion::union) {
+        if let Some(union) = repaint {
             crate::damage::DamageGpu::scissor(&mut pass, union);
+            self.damage.clear(&mut pass);
             self.draw_prepared_batches(&mut pass, &offsets);
         }
     }

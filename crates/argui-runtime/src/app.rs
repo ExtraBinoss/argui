@@ -71,7 +71,7 @@ pub(crate) struct Application {
     identity: Option<ApplicationIdentity>,
     pub(crate) window_key: argui_platform::WindowKey,
     exit_on_close: bool,
-    initial_visible: bool,
+    pub(crate) initial_visible: bool,
     pub(super) presentation_visible: bool,
     pub(super) occluded: bool,
     preference_overrides: argui_platform::PreferenceOverrides,

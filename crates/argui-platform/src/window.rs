@@ -197,6 +197,9 @@ pub struct WindowConfig {
     pub native_shadow: bool,
     /// The native stacking level of the window.
     pub level: WindowLevel,
+    /// Excludes an auxiliary window from the taskbar on Windows and X11.
+    /// Other backends do not expose a per-window taskbar entry.
+    pub skip_taskbar: bool,
     /// Whether Winit appends a newly created Web canvas to the document body.
     ///
     /// Set this to `false` when the host attaches the canvas itself. Native
@@ -238,6 +241,7 @@ impl Default for WindowConfig {
             desktop_backdrop: None,
             native_shadow: false,
             level: WindowLevel::Normal,
+            skip_taskbar: false,
             append_to_document: true,
             web_parent_id: None,
             close_behavior: CloseBehavior::Quit,
@@ -292,6 +296,7 @@ impl WindowConfig {
 
             attributes
                 .with_undecorated_shadow(self.native_shadow)
+                .with_skip_taskbar(self.skip_taskbar)
                 .with_no_redirection_bitmap(self.transparent || self.desktop_backdrop.is_some())
         };
 

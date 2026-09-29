@@ -5,6 +5,13 @@ React application in the windowless QuickJS host. It needs no display server.
 The test bundle contains the app, and the optional automation and metrics code
 is linked into the test host rather than the ordinary release host.
 
+For an app with generated image/SVG assets, set `ARGUI_AUTOMATION_ASSETS` to
+its `assets.generated.json` before running the CLI or QuickJS automation host.
+Paths in this manifest resolve beneath its sibling `assets/` directory. The
+host validates IDs, rejects paths or symlinks escaping that directory, and
+installs the decoded resources for native painting and screenshots. Gallery
+tests can instead use `ARGUI_AUTOMATION_GALLERY_ASSETS=1`.
+
 For the Solid gallery, run:
 
 ```sh

@@ -53,6 +53,10 @@ pub enum AppCommand {
     HideWindow(WindowKey),
     ToggleWindow(WindowKey),
     FocusWindow(WindowKey),
+    /// Restores every currently open window, retaining activation on `source`
+    /// and raising it last. Hidden retained scenes and closed windows stay hidden.
+    /// Backends without independent stacking leave other windows unchanged.
+    RaiseOpenWindows(WindowKey),
     SetWindowTitle {
         window: WindowKey,
         title: String,

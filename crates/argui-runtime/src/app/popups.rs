@@ -1,23 +1,29 @@
 use std::collections::HashMap;
+use std::sync::{Arc, atomic::AtomicBool};
 
 use argui_core::Rect;
 use argui_platform::popup::{NativePopup, PopupEnvironment, PopupKind, PopupUnavailable};
-use argui_render::{GpuCanvasDiagnosticKind, RenderStatus, SurfaceAlphaMode, SurfaceRenderer};
+use argui_render::{SurfaceAlphaMode, SurfaceRenderer};
 use argui_ui::{InteractionUpdate, NodeId, OverlaySurface, Role, UiEventKind};
 use winit::window::WindowId;
 
 use super::Application;
 
 mod input;
+mod presentation;
+mod renderer;
+use renderer::PopupRenderer;
 
 pub(super) struct Popup {
     node: NodeId,
     pub(super) native: NativePopup,
-    renderer: SurfaceRenderer,
+    renderer: PopupRenderer,
     bounds: Rect,
     requested_bounds: Rect,
     environment: PopupEnvironment,
     pub(super) shown: bool,
+    first_frame_queued: bool,
+    first_frame_ready: Arc<AtomicBool>,
 }
 
 impl Popup {
@@ -47,6 +53,7 @@ impl Popup {
 #[derive(Default)]
 pub(super) struct Popups {
     pub(super) entries: Vec<Popup>,
+    spare: Option<PopupRenderer>,
     rejected: HashMap<NodeId, PopupUnavailable>,
     environment: Option<Result<PopupEnvironment, PopupUnavailable>>,
     focus_owner: Option<NodeId>,
@@ -138,7 +145,10 @@ impl Application {
         for index in (0..self.popups.entries.len()).rev() {
             if !requested.contains(&self.popups.entries[index].node) {
                 let popup = self.popups.entries.remove(index);
+                popup.native.window().set_visible(false);
                 changed |= ui.set_native_portal(popup.node, None);
+                // Keep one renderer, without retaining any logical popup or focus owner.
+                self.popups.spare = Some(popup.renderer);
             }
         }
         self.popups
@@ -233,29 +243,42 @@ impl Application {
                 continue;
             };
             let result: Result<Popup, PopupUnavailable> = (|| {
+                let profile = self.renderer_config.profiling.then(std::time::Instant::now);
                 let native = event_loop.popup(native_parent, kind, environment, bounds)?;
+                let native_ms = profile.map_or(0.0, |start| start.elapsed().as_secs_f64() * 1000.0);
                 let size = native.window().inner_size();
                 let config = self
                     .renderer_config
                     .clone()
                     .surface_alpha(SurfaceAlphaMode::Transparent);
-                let mut renderer = pollster::block_on(SurfaceRenderer::new_with_device(
-                    native.window().clone(),
-                    size.width,
-                    size.height,
-                    config,
-                    device,
-                ))
-                .map_err(|error| PopupUnavailable::Platform(error.to_string()))?;
-                for image in &self.image_assets {
+                let reused = self.popups.spare.is_some();
+                let mut renderer = if let Some(mut renderer) = self.popups.spare.take() {
                     renderer
-                        .register_image(image)
+                        .surface
+                        .recreate_surface(native.window().clone())
                         .map_err(|error| PopupUnavailable::Platform(error.to_string()))?;
-                }
-                for vector in &self.vector_assets {
+                    renderer.surface.resize(size.width, size.height);
                     renderer
-                        .register_vector(vector)
-                        .map_err(|error| PopupUnavailable::Platform(error.to_string()))?;
+                } else {
+                    PopupRenderer::new(
+                        pollster::block_on(SurfaceRenderer::new_with_device(
+                            native.window().clone(),
+                            size.width,
+                            size.height,
+                            config,
+                            device,
+                        ))
+                        .map_err(|error| PopupUnavailable::Platform(error.to_string()))?,
+                    )
+                };
+                renderer
+                    .surface
+                    .set_damage_tracking(self.renderer_config.damage_tracking);
+                if let Some(start) = profile {
+                    eprintln!(
+                        "argui-popup-profile reused={reused} native_ms={native_ms:.3} renderer_ms={:.3}",
+                        start.elapsed().as_secs_f64() * 1000.0 - native_ms
+                    );
                 }
                 Ok(Popup {
                     node,
@@ -265,6 +288,8 @@ impl Application {
                     requested_bounds: bounds,
                     environment,
                     shown: false,
+                    first_frame_queued: false,
+                    first_frame_ready: Arc::new(AtomicBool::new(false)),
                 })
             })();
             match result {
@@ -282,102 +307,6 @@ impl Application {
             }
         }
         changed
-    }
-
-    pub(super) fn render_popups(&mut self) {
-        let (Some(layout), Some(text)) = (&self.ui_layout, &self.prepared_text) else {
-            return;
-        };
-        let mut failed = Vec::new();
-        for popup in &mut self.popups.entries {
-            let Some(surface) = layout
-                .native_surfaces
-                .iter()
-                .find(|surface| surface.node == popup.node)
-            else {
-                continue;
-            };
-            let window = popup.native.window();
-            let size = window.inner_size();
-            popup.renderer.resize(size.width, size.height);
-            let result = if self.composite_frame && popup.shown {
-                popup.renderer.render_composite_notified(
-                    &surface.display_list,
-                    self.scale_factor,
-                    || window.pre_present_notify(),
-                )
-            } else {
-                popup.renderer.render_ui_notified(
-                    &mut self.text_engine,
-                    text,
-                    &surface.display_list,
-                    self.scale_factor,
-                    || window.pre_present_notify(),
-                )
-            };
-            for diagnostic in popup.renderer.take_gpu_canvas_diagnostics() {
-                let event = match diagnostic.kind {
-                    GpuCanvasDiagnosticKind::Failed => {
-                        crate::RuntimeEvent::GpuCanvasFailed(diagnostic)
-                    }
-                    GpuCanvasDiagnosticKind::Recovered => {
-                        crate::RuntimeEvent::GpuCanvasRecovered(diagnostic)
-                    }
-                };
-                (self.on_event)(event);
-            }
-            match result {
-                Ok(RenderStatus::Presented) => {
-                    if !popup.shown {
-                        window.set_visible(true);
-                        popup.shown = true;
-                    }
-                }
-                Ok(RenderStatus::Skipped) => {}
-                Ok(RenderStatus::Reconfigure) => {
-                    popup.renderer.resize(size.width, size.height);
-                    window.request_redraw();
-                }
-                Ok(RenderStatus::RecreateSurface) => {
-                    if popup.renderer.recreate_surface(window.clone()).is_err() {
-                        failed.push(popup.node);
-                    } else {
-                        window.request_redraw();
-                    }
-                }
-                Err(_) => failed.push(popup.node),
-            }
-        }
-        if !failed.is_empty() {
-            // A lost parent surface invalidates all of its OS children. Retire children first.
-            for index in (0..self.popups.entries.len()).rev() {
-                let node = self.popups.entries[index].node;
-                let mut ancestor = Some(node);
-                let mut affected = false;
-                while let Some(current) = ancestor {
-                    affected |= failed.contains(&current);
-                    ancestor = self.ui_tree.as_ref().and_then(|ui| ui.parent_of(current));
-                }
-                if affected {
-                    self.popups.entries.remove(index);
-                    let reason =
-                        PopupUnavailable::Platform("native GPU surface unavailable".into());
-                    (self.on_event)(crate::RuntimeEvent::PopupFallback {
-                        node,
-                        reason: reason.to_string(),
-                    });
-                    self.popups.rejected.insert(node, reason);
-                    if let Some(ui) = &mut self.ui_tree {
-                        ui.set_native_portal(node, None);
-                    }
-                }
-            }
-            self.pending_ui_frame.request_layout();
-            if let Some(window) = &self.window {
-                window.request_redraw();
-            }
-        }
-        self.sync_popup_focus();
     }
 
     fn sync_popup_focus(&mut self) {
@@ -430,7 +359,13 @@ impl Popups {
         registry: &argui_render::EffectRegistry,
     ) -> Result<(), argui_render::RendererError> {
         for popup in &mut self.entries {
-            popup.renderer.replace_effect_registry(registry.clone())?;
+            popup
+                .renderer
+                .surface
+                .replace_effect_registry(registry.clone())?;
+        }
+        if let Some(renderer) = &mut self.spare {
+            renderer.surface.replace_effect_registry(registry.clone())?;
         }
         Ok(())
     }
@@ -441,7 +376,10 @@ impl Popups {
     /// the owning application's renderer configuration.
     pub(super) fn set_damage_tracking(&mut self, tracking: argui_render::DamageTracking) {
         for popup in &mut self.entries {
-            popup.renderer.set_damage_tracking(tracking);
+            popup.renderer.surface.set_damage_tracking(tracking);
+        }
+        if let Some(renderer) = &mut self.spare {
+            renderer.surface.set_damage_tracking(tracking);
         }
     }
 }

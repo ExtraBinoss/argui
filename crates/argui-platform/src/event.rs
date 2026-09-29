@@ -25,6 +25,13 @@ pub enum PlatformEvent {
     Suspended,
     /// Window visibility changed.
     VisibilityChanged(bool),
+    /// The native outer origin moved in physical desktop pixels.
+    Moved {
+        /// Desktop x coordinate, including negative monitor origins.
+        x: i32,
+        /// Desktop y coordinate, including negative monitor origins.
+        y: i32,
+    },
     /// The native window was closed.
     Closed,
     /// Drawable size changed.

@@ -1,8 +1,19 @@
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 
+#[path = "surface/acquisition.rs"]
+mod acquisition;
+
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "surface/offscreen_api.rs"]
 mod offscreen_api;
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "surface/alpha.rs"]
+mod alpha;
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "surface/retained.rs"]
+mod retained;
 
 const PRIMITIVES: [(&str, &str); 4] = [
     ("quad", include_str!("../src/shaders/primitives/quad.wgsl")),

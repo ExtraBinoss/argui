@@ -110,7 +110,10 @@ fn render_composite(
         if status == RenderStatus::Presented {
             return Ok(());
         }
-        assert_eq!(status, RenderStatus::Skipped);
+        assert!(matches!(
+            status,
+            RenderStatus::Skipped | RenderStatus::Retry
+        ));
         assert!(
             web_time::Instant::now() < deadline,
             "compositor surface did not present within {NATIVE_TIMEOUT:?}"

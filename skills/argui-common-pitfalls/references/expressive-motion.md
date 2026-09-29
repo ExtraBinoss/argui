@@ -70,6 +70,19 @@ light because those ask layout to run.
 
 ## Review it as a product surface
 
+For a popup entrance, use native `PopupWindow.openingMs`, `openingScale` and
+`openingTranslateY`, with a positive duration from 1 to 60000 ms. Keep the OS
+window's geometry fixed. An anchored entrance pivots at its trigger and reverses
+vertical translation when collision placement puts it above. Compact item-aligned
+menus should use zero translation. Do not drive the entry with JS timers or an
+`onMount` change that can merge into the first commit and skip its initial frame.
+Retain equivalent finite timelines after completion as well as while running;
+otherwise a hover or data update can replay the fade. A real close / remount must
+start a fresh timeline. Reduced motion must immediately present the settled menu.
+Verify both in-window and native surfaces: when collision placement exposes pixels
+outside the retained source clip, normal repaint is required rather than an
+incorrect compositor patch. Shadow padding is part of the native surface bounds.
+
 Inspect the idle, entering, active, exiting, paused, and reduced-motion states.
 Check at compact and wide sizes, in both light and dark themes. The color should
 be concentrated enough to look intentional but never obscure the foreground.

@@ -67,7 +67,9 @@ impl Application {
             }
             let animation_changed = self.sync_animations();
             if self.presentation_visible
-                && (self.pending_ui_frame.needs_frame() || animation_changed)
+                && (animation_changed
+                    || (self.pending_ui_frame.needs_frame()
+                        && self.animations.requests_immediate_frame()))
             {
                 window.request_redraw();
             }

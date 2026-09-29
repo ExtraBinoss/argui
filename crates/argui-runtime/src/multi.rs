@@ -13,6 +13,8 @@ use argui_text::TextEngine;
 #[cfg(not(target_arch = "wasm32"))]
 use argui_ui::UiTree;
 
+mod activation;
+mod activation_types;
 mod command;
 mod event_loop;
 mod global_shortcuts;
@@ -79,6 +81,7 @@ pub(crate) struct MultiApplication {
     #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
     global_shortcut_setup_error: Option<String>,
     pending_activation_token: Option<String>,
+    activation: activation_types::WindowActivationState,
     ui_zoom_factor: f32,
     #[cfg(not(all(
         feature = "global-shortcuts",
@@ -158,6 +161,7 @@ impl MultiApplication {
             #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
             global_shortcut_setup_error,
             pending_activation_token: None,
+            activation: activation_types::WindowActivationState::default(),
             ui_zoom_factor: 1.0,
             #[cfg(not(all(
                 feature = "global-shortcuts",

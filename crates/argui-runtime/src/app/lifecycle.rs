@@ -98,10 +98,9 @@ impl ApplicationHandler<UserEvent> for Application {
         match event_loop.create_window(attributes) {
             Ok(window) => {
                 let window = Arc::new(window);
-                if let Err(error) = argui_platform::prepare_window_presentation(
-                    &window,
-                    self.window_config.transparent || self.window_config.desktop_backdrop.is_some(),
-                ) {
+                if let Err(error) =
+                    argui_platform::prepare_window_presentation(&window, &self.window_config)
+                {
                     (self.on_event)(RuntimeEvent::CommandFailed(error.clone()));
                     self.fatal_error = Some(crate::RuntimeError::Configuration(error));
                     event_loop.exit();
@@ -242,11 +241,14 @@ impl ApplicationHandler<UserEvent> for Application {
         }
         let platform_event = match event {
             WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
-            #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
-            WindowEvent::Moved(_) => {
+            WindowEvent::Moved(position) => {
+                #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
                 self.invalidate_popup_environment();
                 window.request_redraw();
-                return;
+                PlatformEvent::Moved {
+                    x: position.x,
+                    y: position.y,
+                }
             }
             WindowEvent::Resized(_) => {
                 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
@@ -283,12 +285,15 @@ impl ApplicationHandler<UserEvent> for Application {
                     ..PointerEvent::mouse(PointerPhase::Moved, point)
                 })
             }
-            WindowEvent::CursorEntered { .. } => PlatformEvent::Pointer(PointerEvent {
-                buttons: self.pointer_buttons,
-                modifiers: self.modifiers,
-                timestamp: self.input_epoch.elapsed(),
-                ..PointerEvent::mouse(PointerPhase::Entered, self.pointer.unwrap_or_default())
-            }),
+            WindowEvent::CursorEntered { .. } => {
+                self.host_pointer_entered();
+                PlatformEvent::Pointer(PointerEvent {
+                    buttons: self.pointer_buttons,
+                    modifiers: self.modifiers,
+                    timestamp: self.input_epoch.elapsed(),
+                    ..PointerEvent::mouse(PointerPhase::Entered, self.pointer.unwrap_or_default())
+                })
+            }
             WindowEvent::CursorLeft { .. } => {
                 let point = self.pointer.unwrap_or_default();
                 self.pointer_left(&window, event_loop);
@@ -387,12 +392,11 @@ impl ApplicationHandler<UserEvent> for Application {
                 PlatformEvent::Ime(input)
             }
             WindowEvent::Occluded(occluded) => {
-                self.occluded = occluded;
-                self.sync_host_visibility();
+                self.host_occlusion_changed(occluded);
                 return;
             }
             WindowEvent::Focused(focused) => {
-                self.sync_host_visibility();
+                self.host_focus_changed(focused);
                 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
                 if focused {
                     self.popups.suspended = false;

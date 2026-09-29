@@ -1,12 +1,7 @@
-use std::sync::Arc;
-
-#[cfg(target_arch = "wasm32")]
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 #[cfg(feature = "inspect")]
-use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
-#[cfg(feature = "inspect")]
-use argui_render::{AdapterProfile, DamageMode, GpuFrameProfile};
+use argui_inspect::{FrameRecord, Invalidation};
 use argui_render::{
     EffectDefinition, EffectRegistry, GpuCanvasDiagnosticKind, RenderStatus, SurfaceAlphaMode,
     SurfaceRenderer,
@@ -16,6 +11,9 @@ use winit::{event_loop::ActiveEventLoop, window::Window};
 use crate::{RuntimeEvent, app::Application};
 
 use super::RendererState;
+
+mod presentation;
+mod profiling;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
@@ -208,6 +206,7 @@ impl Application {
     ) {
         match renderer {
             Ok(mut renderer) => {
+                self.configure_native_presentation(&mut renderer, window);
                 if let Some(message) = renderer.initialization_fallback() {
                     (self.on_event)(RuntimeEvent::RendererFallback(message.into()));
                 }
@@ -337,7 +336,8 @@ impl Application {
             return;
         };
         let resize_started = self.profile_clock();
-        let mut state = self.renderer.borrow_mut();
+        let renderer_state = Rc::clone(&self.renderer);
+        let mut state = renderer_state.borrow_mut();
 
         #[cfg(target_arch = "wasm32")]
         if let RendererState::Failed(message) = &*state {
@@ -432,61 +432,11 @@ impl Application {
             (self.on_event)(event);
         }
         let result = match rendered {
-            Ok(RenderStatus::Presented | RenderStatus::Skipped) => {
-                #[cfg(feature = "inspect")]
-                if let Some(inspector) = &self.inspector {
-                    let profile = renderer.last_profile();
-                    inspector.record_render(FrameRecord {
-                        render_cpu: profile.cpu_time,
-                        layers: profile.effects.offscreen_layers,
-                        passes: profile.effects.filter_passes,
-                        offscreen_pixels: profile.effects.offscreen_pixels,
-                        cached_layers: profile.effects.cached_layers,
-                        damaged_pixels: profile.damage.damaged_pixels,
-                        textures: profile.texture_pool.textures
-                            + 2
-                            + profile.gpu_canvases.entries
-                            + usize::from(profile.damage.retained_bytes > 0)
-                            + 1,
-                        reused_textures: profile.texture_pool.reused_this_frame
-                            + profile.gpu_canvases.hits_this_frame
-                            + usize::from(matches!(
-                                profile.damage.mode,
-                                DamageMode::Partial | DamageMode::Reused
-                            )),
-                        texture_bytes: profile.texture_pool.allocated_bytes
-                            + profile.text_atlas.allocated_bytes
-                            + profile.vector_atlas.allocated_bytes
-                            + profile.gpu_canvases.allocated_bytes
-                            + profile.damage.retained_bytes,
-                        gpu_canvas_entries: profile.gpu_canvases.entries,
-                        gpu_canvas_bytes: profile.gpu_canvases.allocated_bytes,
-                        gpu_canvas_renders: profile.gpu_canvases.renders_this_frame,
-                        gpu_canvas_hits: profile.gpu_canvases.hits_this_frame,
-                        gpu_canvas_failures: profile.gpu_canvases.failures_this_frame,
-                        gpu_canvas_encode_cpu: profile.gpu_canvases.encode_time,
-                        text_atlas_bytes: profile.text_atlas.allocated_bytes,
-                        text_atlas_entries: profile.text_atlas.entries,
-                        text_atlas_hits: profile.text_atlas.hits_this_frame,
-                        text_raster_requests: profile.text_atlas.raster_requests_this_frame,
-                        text_upload_bytes: profile.text_atlas.uploaded_bytes_this_frame,
-                        text_page_evictions: profile.text_atlas.evictions_this_frame,
-                        vector_atlas_entries: profile.vector_atlas.entries,
-                        vector_atlas_bytes: profile.vector_atlas.allocated_bytes,
-                        vector_atlas_hits: profile.vector_atlas.hits_this_frame,
-                        vector_rasterizations: profile.vector_atlas.rasterizations_this_frame,
-                        adapter: adapter_record(&profile.adapter),
-                        gpu: profile.gpu.as_ref().map(gpu_record),
-                        ..FrameRecord::default()
-                    });
-                }
-                if self.renderer_profiling_requested {
-                    (self.on_event)(RuntimeEvent::RenderProfile(Box::new(
-                        renderer.last_profile(),
-                    )));
-                }
+            Ok(RenderStatus::Presented) => {
+                self.report_render(renderer);
                 Ok(())
             }
+            Ok(RenderStatus::Skipped) => Ok(()),
             Ok(RenderStatus::Reconfigure) => {
                 let size = crate::host::WindowHost::drawable_size(&window);
                 if size.width > 0 && size.height > 0 {
@@ -495,6 +445,10 @@ impl Application {
                     }
                     window.request_redraw();
                 }
+                Ok(())
+            }
+            Ok(RenderStatus::Retry) => {
+                window.request_redraw();
                 Ok(())
             }
             Ok(RenderStatus::RecreateSurface) => window
@@ -507,45 +461,6 @@ impl Application {
             self.fatal_error = Some(error.into());
             event_loop.exit();
         }
-    }
-}
-
-#[cfg(feature = "inspect")]
-fn adapter_record(profile: &AdapterProfile) -> AdapterRecord {
-    AdapterRecord {
-        name: profile.name.clone(),
-        vendor: profile.vendor,
-        device: profile.device,
-        device_type: profile.device_type.clone(),
-        driver: profile.driver.clone(),
-        driver_info: profile.driver_info.clone(),
-        backend: profile.backend.clone(),
-        features: profile.features.clone(),
-        timestamp_queries: profile.timestamp_queries,
-        max_texture_dimension_2d: profile.max_texture_dimension_2d,
-        max_buffer_size: profile.max_buffer_size,
-        max_storage_buffer_binding_size: profile.max_storage_buffer_binding_size,
-        max_bind_groups: profile.max_bind_groups,
-    }
-}
-
-#[cfg(feature = "inspect")]
-fn gpu_record(profile: &GpuFrameProfile) -> GpuFrameRecord {
-    GpuFrameRecord {
-        sequence: profile.frame,
-        total: profile.total,
-        passes: profile
-            .passes
-            .iter()
-            .map(|pass| GpuPassRecord {
-                label: pass.label.clone(),
-                start: pass.start,
-                duration: pass.duration,
-                pixels: pass.pixels,
-                object_domain: pass.object.map(|object| format!("{:?}", object.domain)),
-                object_id: pass.object.map(|object| object.value),
-            })
-            .collect(),
     }
 }
 

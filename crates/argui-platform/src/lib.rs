@@ -34,6 +34,7 @@ mod wayland_global_shortcuts;
 #[cfg(target_arch = "wasm32")]
 mod web_identity;
 mod window;
+mod window_activation;
 mod window_input;
 mod window_presentation;
 
@@ -78,6 +79,7 @@ pub use window::{
     CloseBehavior, WindowBackend, WindowCapabilities, WindowConfig, WindowKey, WindowLevel,
     WindowSpec, window_capabilities,
 };
+pub use window_activation::restore_and_raise_window;
 pub use window_input::{
     WindowInputRegion, WindowInputRegionError, apply_window_input_region, window_pointer_position,
 };

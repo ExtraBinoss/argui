@@ -308,6 +308,7 @@ impl MultiApplication {
                 let _ = reply.send(result);
             }
             NativeHostApplicationRequest::MinimizeWindow(key, reply) => {
+                self.activation.minimize_requested(web_time::Instant::now());
                 let result = self
                     .windows
                     .get(&key)

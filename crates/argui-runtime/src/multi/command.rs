@@ -24,6 +24,7 @@ impl MultiApplication {
                     self.set_visible(&key, !window.is_visible().unwrap_or(true));
                 }
             }
+            AppCommand::RaiseOpenWindows(source) => self.raise_open_windows(&source),
             AppCommand::FocusWindow(key) => {
                 self.set_visible(&key, true);
                 if let Some(window) = self
@@ -64,6 +65,7 @@ impl MultiApplication {
                 }
             }
             AppCommand::MinimizeWindow(key) => {
+                self.activation.minimize_requested(web_time::Instant::now());
                 self.with_window_capability(
                     &key,
                     "minimization",
@@ -179,7 +181,30 @@ impl MultiApplication {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn set_visible(&mut self, key: &WindowKey, visible: bool) {
         if let Some(entry) = self.windows.get_mut(key) {
+            let position = entry.runtime.window().and_then(|window| {
+                window.outer_position().map(|(x, y)| {
+                    (
+                        (x * window.native_scale_factor()).round() as i32,
+                        (y * window.native_scale_factor()).round() as i32,
+                    )
+                })
+            });
             entry.runtime.set_window_visible(visible);
+            if visible && let Some(window) = entry.runtime.window() {
+                // X11 window managers can discard pre-map stacking requests.
+                // Reassert the configured level after mapping a retained surface.
+                if entry.spec.window.level == WindowLevel::Normal
+                    || window.capabilities().window_level
+                {
+                    window.set_window_level(entry.spec.window.level.into());
+                }
+                if window.capabilities().absolute_position
+                    && let Some((x, y)) = position
+                    && let Some(native) = window.winit()
+                {
+                    native.set_outer_position(winit::dpi::PhysicalPosition::new(x, y));
+                }
+            }
         }
     }
 }

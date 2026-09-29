@@ -116,6 +116,20 @@ fn composite(source: vec4<f32>, backdrop: vec4<f32>, pixel: vec2<f32>) -> vec4<f
     );
 }
 
+// The attachment will sRGB-encode this result. Native premultiplied surfaces
+// need encode(straight linear RGB) * alpha, rather than encode(RGB * alpha).
+fn encoded_premultiplied(source: vec4<f32>) -> vec4<f32> {
+    if source.a <= 0.000001 { return vec4<f32>(0.0); }
+    let straight = max(source.rgb / source.a, vec3<f32>(0.0));
+    let encoded = select(straight * 12.92,
+        1.055 * pow(straight, vec3<f32>(1.0 / 2.4)) - 0.055,
+        straight > vec3<f32>(0.0031308)) * source.a;
+    let linear = select(encoded / 12.92,
+        pow((encoded + 0.055) / 1.055, vec3<f32>(2.4)),
+        encoded > vec3<f32>(0.04045));
+    return vec4<f32>(linear, source.a);
+}
+
 @fragment
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let pixel = global_pixel(input.uv);
@@ -162,6 +176,7 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     if params.mode == 12u {
         return mix(backdrop, source, mask_coverage(pixel) * clamp(params.data.x, 0.0, 1.0));
     }
+    if params.mode == 98u { return encoded_premultiplied(source); }
     if params.mode == 99u { return source; }
     return mix(original, source, mask_coverage(pixel));
 }

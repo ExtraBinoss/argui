@@ -1,7 +1,7 @@
 use argui_paint::{DisplayList, ImageAsset, VectorAsset};
 use argui_text::{PreparedText, TextEngine};
 use std::{collections::HashMap, mem::size_of, sync::Arc};
-use wgpu::{CurrentSurfaceTexture, SurfaceTarget, TextureFormat, TextureViewDescriptor};
+use wgpu::{SurfaceTarget, TextureFormat, TextureViewDescriptor};
 
 use crate::{
     DamagePlan, DamageProfile, EffectGraphStats, RenderProfile, RendererConfig, RendererError,
@@ -19,6 +19,8 @@ use crate::{
     vector::VectorGpu,
 };
 
+mod acquisition;
+mod alpha;
 mod api;
 mod blur;
 mod composite;
@@ -26,6 +28,7 @@ mod effect_damage;
 mod effect_registry;
 mod effects;
 mod filter_shadow;
+mod initialization;
 mod offscreen_api;
 mod retained;
 
@@ -42,6 +45,8 @@ use frame_content::FrameContent;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RenderStatus {
     Presented,
+    /// Frame acquisition timed out; request another redraw without new input.
+    Retry,
     Reconfigure,
     RecreateSurface,
     Skipped,
@@ -64,6 +69,7 @@ pub struct SurfaceRenderer {
     instance: wgpu::Instance,
     surface: Option<wgpu::Surface<'static>>,
     offscreen_target: Option<wgpu::Texture>,
+    alpha_target: Option<wgpu::Texture>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
@@ -102,158 +108,6 @@ impl SurfaceRenderer {
         let _ = self.device.poll(poll_type);
     }
 
-    /// Reuses `device_handle` and `instance` for a visible `surface` of the
-    /// requested pixel size, applying `renderer_config` to its render resources.
-    /// Returns a renderer or a surface/resource configuration error.
-    fn from_existing_device(
-        instance: wgpu::Instance,
-        surface: wgpu::Surface<'static>,
-        device_handle: RendererDevice,
-        width: u32,
-        height: u32,
-        renderer_config: RendererConfig,
-    ) -> Result<Self, RendererError> {
-        Self::finish_new(
-            instance,
-            Some(surface),
-            device_handle.0.adapter.clone(),
-            device_handle.0.device.clone(),
-            device_handle.0.queue.clone(),
-            device_handle,
-            width,
-            height,
-            renderer_config,
-        )
-    }
-
-    /// Creates shared render resources from `instance`, `adapter`, `device`,
-    /// `queue`, and `device_handle`. `surface` selects visible or offscreen
-    /// output; `width`, `height`, and `renderer_config` set target properties.
-    /// Returns a renderer or a device, surface, or resource configuration error.
-    #[allow(clippy::too_many_arguments)]
-    fn finish_new(
-        instance: wgpu::Instance,
-        surface: Option<wgpu::Surface<'static>>,
-        adapter: wgpu::Adapter,
-        device: wgpu::Device,
-        queue: wgpu::Queue,
-        device_handle: RendererDevice,
-        width: u32,
-        height: u32,
-        renderer_config: RendererConfig,
-    ) -> Result<Self, RendererError> {
-        renderer_config
-            .gpu_canvases
-            .validate_device(device.features(), &device.limits())?;
-        let mut surface_config = if let Some(surface) = &surface {
-            let mut config = surface
-                .get_default_config(&adapter, width.max(1), height.max(1))
-                .ok_or(RendererError::UnsupportedSurface)?;
-            config.present_mode = renderer_config.present_mode;
-            config.desired_maximum_frame_latency = renderer_config.maximum_frame_latency;
-            config.alpha_mode = surface_alpha_mode(
-                renderer_config.surface_alpha,
-                &surface.get_capabilities(&adapter).alpha_modes,
-            )?;
-            config
-        } else {
-            wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format: TextureFormat::Rgba8Unorm,
-                color_space: wgpu::SurfaceColorSpace::Auto,
-                width: width.max(1),
-                height: height.max(1),
-                present_mode: wgpu::PresentMode::Fifo,
-                desired_maximum_frame_latency: 2,
-                alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-                view_formats: Vec::new(),
-            }
-        };
-        let target_format = srgb_target(surface_config.format);
-        if target_format != surface_config.format {
-            surface_config.view_formats.push(target_format);
-        }
-        if let Some(surface) = &surface {
-            surface.configure(&device, &surface_config);
-        }
-        let offscreen_target = surface
-            .is_none()
-            .then(|| offscreen_texture(&device, surface_config.width, surface_config.height));
-        let quad = QuadGpu::new(
-            &device,
-            target_format,
-            renderer_config.gradient_stop_capacity,
-        );
-        let text = TextGpu::new(&device, target_format);
-        let image = ImageGpu::new(&device, target_format, renderer_config.image_cache_bytes);
-        let vector = VectorGpu::new(&device, target_format);
-        renderer_config.gpu_canvases.device_ready(
-            &device,
-            &queue,
-            target_format,
-            device_handle.0.generation,
-        );
-        let gpu_canvas = CanvasGpu::new(
-            &device,
-            &queue,
-            target_format,
-            device_handle.0.generation,
-            renderer_config.gpu_canvases.clone(),
-            renderer_config.gpu_canvas_cache_bytes,
-        );
-        let maximum_parameter_words = renderer_config
-            .effects
-            .definitions()
-            .iter()
-            .map(crate::EffectDefinition::parameter_words)
-            .max()
-            .unwrap_or(1);
-        let maximum_storage_bytes = device.limits().max_storage_buffer_binding_size as usize;
-        let parameter_bytes = maximum_parameter_words * size_of::<u32>();
-        if parameter_bytes > maximum_storage_bytes {
-            return Err(RendererError::EffectParametersTooLarge {
-                provided: parameter_bytes,
-                maximum: maximum_storage_bytes,
-            });
-        }
-        let effect = EffectGpu::new(&device, target_format, maximum_parameter_words);
-        let damage = DamageGpu::new(&device, target_format);
-        let offscreen = TexturePool::new(target_format, 32 * 1024 * 1024);
-        let gpu_profiler = GpuProfiler::new(&adapter, &device, &queue, renderer_config.profiling);
-
-        let profiling_active = renderer_config.profiling;
-        Ok(Self {
-            device_handle,
-            instance,
-            surface,
-            offscreen_target,
-            device,
-            queue,
-            surface_config,
-            target_format,
-            renderer_config,
-            batches: Vec::new(),
-            text_ranges: Vec::new(),
-            text_bounds: Vec::new(),
-            quad,
-            text,
-            image,
-            vector,
-            gpu_canvas,
-            effect,
-            offscreen,
-            gpu_profiler,
-            last_profile: RenderProfile::default(),
-            profiling_active,
-            layer_cache: HashMap::new(),
-            content_revision: 0,
-            damage,
-            scene_snapshot: None,
-            effect_root: None,
-            deferred_reconfigure: false,
-        })
-    }
-
     /// Renders `content` to the configured target, calls `notify` after work is
     /// queued, and returns presentation status or a renderer error.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -262,28 +116,22 @@ impl SurfaceRenderer {
         content: FrameContent<'_>,
         notify: impl FnOnce(),
     ) -> Result<RenderStatus, RendererError> {
+        // Acquisition can block on an occluded or remapped swapchain; include it
+        // in CPU timing instead of hiding that wait from the native profiler.
+        let profiler = FrameProfiler::start(self.profiling_active);
         // Preserve a valid suboptimal presentation until its replacement is ready.
         // A native resize may already have applied the replacement configuration.
         if std::mem::take(&mut self.deferred_reconfigure) {
             self.reconfigure_surface();
         }
         let (frame, texture, status) = if let Some(surface) = &self.surface {
-            match surface.get_current_texture() {
-                CurrentSurfaceTexture::Success(frame) => {
+            match acquisition::resolve(surface.get_current_texture())? {
+                acquisition::Acquisition::Ready { frame, suboptimal } => {
                     let texture = frame.texture.clone();
+                    self.deferred_reconfigure = suboptimal;
                     (Some(frame), texture, RenderStatus::Presented)
                 }
-                CurrentSurfaceTexture::Suboptimal(frame) => {
-                    let texture = frame.texture.clone();
-                    self.deferred_reconfigure = true;
-                    (Some(frame), texture, RenderStatus::Presented)
-                }
-                CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => {
-                    return Ok(RenderStatus::Skipped);
-                }
-                CurrentSurfaceTexture::Outdated => return Ok(RenderStatus::Reconfigure),
-                CurrentSurfaceTexture::Lost => return Ok(RenderStatus::RecreateSurface),
-                CurrentSurfaceTexture::Validation => return Err(RendererError::Validation),
+                acquisition::Acquisition::Deferred(status) => return Ok(status),
             }
         } else {
             (
@@ -300,7 +148,6 @@ impl SurfaceRenderer {
             self.surface_config.width as f32,
             self.surface_config.height as f32,
         ];
-        let profiler = FrameProfiler::start(self.profiling_active);
         let gpu_capture = self.gpu_profiler.begin_frame(self.profiling_active);
         let mut graph_stats = EffectGraphStats::default();
         let mut effect_graph = None;
@@ -449,10 +296,11 @@ impl SurfaceRenderer {
                 effect_graph = Some(graph);
             }
         }
-        let view = texture.create_view(&TextureViewDescriptor {
+        let surface_view = texture.create_view(&TextureViewDescriptor {
             format: Some(self.target_format),
             ..Default::default()
         });
+        let view = self.scene_output_view(&texture);
         let mut encoder = self.device.create_command_encoder(&Default::default());
         self.quad.begin_frame();
         self.text.begin_frame();
@@ -482,6 +330,7 @@ impl SurfaceRenderer {
             }
             graph_stats.cached_layers = cached_layers;
             graph_stats.damaged_pixels = damaged_pixels;
+            self.present_alpha(&mut encoder, &surface_view, viewport, gpu_capture.as_ref());
             notify();
             if let Some(capture) = gpu_capture {
                 capture.finish(&mut encoder);
@@ -543,6 +392,7 @@ impl SurfaceRenderer {
                 (full_damage_profile(viewport), true)
             }
         };
+        self.present_alpha(&mut encoder, &surface_view, viewport, gpu_capture.as_ref());
         notify();
         if let Some(capture) = gpu_capture {
             capture.finish(&mut encoder);
@@ -559,7 +409,7 @@ impl SurfaceRenderer {
             viewport,
             graph_stats,
             damage_profile,
-            direct_surface,
+            direct_surface && !self.is_transparent(),
         );
         Ok(status)
     }

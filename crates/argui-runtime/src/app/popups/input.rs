@@ -58,7 +58,7 @@ impl Application {
                     size.width as f32 / self.scale_factor,
                     size.height as f32 / self.scale_factor,
                 );
-                popup.renderer.resize(size.width, size.height);
+                popup.renderer.surface.resize(size.width, size.height);
                 if logical != popup.bounds.size && logical.width > 0.0 && logical.height > 0.0 {
                     popup.bounds.size = logical;
                     if let Some(ui) = &mut self.ui_tree {

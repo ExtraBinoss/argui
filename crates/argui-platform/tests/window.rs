@@ -14,6 +14,7 @@ fn default_window_is_a_decorated_resizable_surface() {
     assert_eq!(config.desktop_backdrop, None);
     assert!(!config.native_shadow);
     assert_eq!(config.level, WindowLevel::Normal);
+    assert!(!config.skip_taskbar);
     assert!(config.append_to_document);
     assert_eq!(config.focus_on_launch, cfg!(not(target_arch = "wasm32")));
     assert_eq!(config.safe_area_insets, None);

@@ -5,9 +5,22 @@
   painted hole are both UI logical. Convert to physical input pixels with the
   window's native DPI multiplied by UI zoom. Reapply an input shape on resize,
   DPI change, and zoom change.
+- A ScreenCast portal stream's `position` and `size` are compositor coordinates,
+  not necessarily the PipeWire raster's physical pixels. Preserve that metadata
+  with the captured frame and resolve the authorized monitor, which can differ
+  from the launcher's monitor. Under Wayland/XWayland scaling, keep native
+  placement/input DPI separate from capture-pixel scales: sample the loupe,
+  report dimensions and snap crop presets against the actual raster without
+  resampling it. Reject ambiguous source geometry, not merely a different
+  stream resolution. See the [ScreenCast contract](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html#org-freedesktop-portal-screencast-start).
 - Use the same retained rectangle for paint and input. During a pointer drag,
   temporarily restore full-window input so crossing the old hole does not
   interrupt the drag. Restore the excluded rectangle when the selection ends.
+- Place crop controls while they are hidden after a drag, then present them once.
+  A preset change should update and reposition the retained visible controls,
+  without hiding/remapping them or replaying native entrance animations. Keep
+  measurements over the desktop on a stable contrasting label surface rather
+  than applying a light theme's dark text to the capture overlay.
 - X11 Shape controls which window receives a click; transparent paint alone
   does not. A full-size transparent X11 window needs an active compositor.
   Without one, the surface can appear black even when the alpha plane contains

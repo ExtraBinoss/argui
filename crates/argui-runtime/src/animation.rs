@@ -3,15 +3,35 @@ use argui_animation::{AnimationId, Clock, Frame, Scheduler, Time};
 use argui_ui::{InteractionUpdate, TreeUpdate};
 use web_time::Instant;
 
+#[cfg(test)]
+#[path = "../tests/animation.rs"]
+mod tests;
+
+const NATIVE_FRAME_INTERVAL: argui_animation::Duration =
+    argui_animation::Duration::from_nanos(16_666_667);
+
 pub(super) struct RuntimeAnimations {
     clock: MonotonicClock,
     scheduler: Scheduler,
     model_animation: Option<AnimationId>,
     model_active: bool,
     wake_at: Option<Time>,
+    last_frame_at: Option<Time>,
+    native_paced: bool,
 }
 
 impl RuntimeAnimations {
+    /// Enables bounded animation deadlines when `enabled` selects native software pacing.
+    pub(super) fn set_native_pacing(&mut self, enabled: bool) {
+        self.native_paced = enabled;
+    }
+
+    /// Returns whether pending model paint needs an immediate native redraw.
+    /// Active native animation work already has a bounded scheduled tick.
+    pub(super) fn requests_immediate_frame(&self) -> bool {
+        !self.native_paced || !self.scheduler.needs_frame()
+    }
+
     pub(super) fn new(model: Option<&AnyEntity>) -> Self {
         let mut animations = Self {
             clock: MonotonicClock::new(),
@@ -19,6 +39,8 @@ impl RuntimeAnimations {
             model_animation: None,
             model_active: false,
             wake_at: None,
+            last_frame_at: None,
+            native_paced: false,
         };
         animations.model_active = model.is_some_and(AnyEntity::wants_frame);
         animations.sync(animations.model_active);
@@ -34,6 +56,7 @@ impl RuntimeAnimations {
             (false, Some(id)) => {
                 self.scheduler.stop(id);
                 self.model_animation = None;
+                self.last_frame_at = None;
                 true
             }
             _ => false,
@@ -45,7 +68,21 @@ impl RuntimeAnimations {
         if !self.scheduler.needs_frame() {
             return None;
         }
-        self.scheduler.frame(self.clock.now())
+        let now = self.clock.now();
+        self.last_frame_at = Some(now);
+        self.scheduler.frame(now)
+    }
+
+    /// Returns the earliest one-shot wake or bounded native animation tick.
+    fn next_frame_at(&self) -> Option<Time> {
+        let paced = (self.native_paced && self.scheduler.needs_frame()).then(|| {
+            self.last_frame_at
+                .map_or_else(|| self.clock.now(), |last| last + NATIVE_FRAME_INTERVAL)
+        });
+        match (self.wake_at, paced) {
+            (Some(wake), Some(paced)) => Some(wake.min(paced)),
+            (wake, paced) => wake.or(paced),
+        }
     }
 }
 
@@ -73,20 +110,33 @@ impl Application {
         self.animations.sync(active)
     }
 
-    /// Returns the next event-loop wake deadline for a one-shot animation frame.
+    /// Returns the next active animation deadline; hidden and idle windows have none.
     pub(crate) fn next_animation_deadline(&self) -> Option<Instant> {
+        if !self.presentation_visible {
+            return None;
+        }
         self.animations
-            .wake_at
+            .next_frame_at()
             .map(|time| self.animations.clock.instant(time))
     }
 
-    /// Activates a single presentation frame when its scheduled deadline is due.
+    /// Requests a presentation frame when a one-shot or native tick is due.
     pub(crate) fn wake_due_animation(&mut self) {
-        if !self.presentation_visible || !self.animations.take_due_wake() {
+        if !self.presentation_visible {
             return;
         }
-        self.animations.sync(true);
-        if let Some(window) = self.window() {
+        let due = self.animations.take_due_wake();
+        if due {
+            self.animations.sync(true);
+        }
+        let paced_due = self.animations.native_paced
+            && self
+                .animations
+                .next_frame_at()
+                .is_some_and(|deadline| self.animations.clock.now() >= deadline);
+        if (due || paced_due)
+            && let Some(window) = self.window()
+        {
             window.request_redraw();
         }
     }
@@ -136,7 +186,7 @@ impl Application {
             false,
         );
         self.sync_animations();
-        if self.animations.scheduler.needs_frame() {
+        if self.animations.scheduler.needs_frame() && !self.animations.native_paced {
             #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
             if !self.request_top_popup_redraw() {
                 window.request_redraw();

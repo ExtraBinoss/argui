@@ -28,6 +28,16 @@ pub(crate) trait WindowHost {
     fn set_visible(&self, visible: bool);
     fn is_visible(&self) -> Option<bool>;
     fn focus_window(&self);
+    /// Restores and raises this open window, retaining `source` as the activation.
+    /// Returns whether this host supports independent stacking.
+    fn restore_and_raise(&self, source: &dyn WindowHost) -> Result<bool, String> {
+        match (self.winit(), source.winit()) {
+            (Some(window), Some(source)) => {
+                argui_platform::restore_and_raise_window(window, source)
+            }
+            _ => Ok(false),
+        }
+    }
     /// Attempts compositor-authorized activation with a platform token.
     ///
     /// `token` originates from a trusted desktop integration such as the
@@ -82,7 +92,8 @@ pub(crate) trait WindowHost {
         None
     }
     /// Hints the native window system that a frame is about to be presented.
-    /// Linux leaves Wayland redraw requests unthrottled; WGPU's vsync mode paces presentation.
+    /// Linux schedules frames independently: a suspended Wayland callback must
+    /// not prevent updates after compositor activation or native remapping.
     fn pre_present_notify(&self);
     fn set_cursor(&self, cursor: CursorIcon);
     fn set_ime_allowed(&self, allowed: bool);

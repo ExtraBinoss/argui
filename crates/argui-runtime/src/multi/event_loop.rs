@@ -162,6 +162,9 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
             return;
         };
         let close = matches!(event, WindowEvent::CloseRequested);
+        if matches!(event, WindowEvent::Focused(_) | WindowEvent::Occluded(_)) {
+            self.observe_window_minimization();
+        }
         let geometry_changed = matches!(
             event,
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }

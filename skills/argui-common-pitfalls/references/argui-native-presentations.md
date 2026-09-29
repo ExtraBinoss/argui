@@ -41,11 +41,28 @@
   drawable during resize can expose the native backing. Transparent X11 clients
   preserve top-left contents and clear newly exposed pixels via bit gravity
   and a zero-alpha background; do not substitute an opaque black backing.
+- A retained transparent target must clear the exact footprint it redraws. If
+  separate damage rectangles are combined into one union scissor, clear that
+  union too: drawing translucent content over uncleared gaps accumulates alpha
+  and leaves rectangular artifacts. Apply this contract to both plain and
+  effect roots; compare incremental GPU pixels with a fully cleared reference.
 - QuickJS is a JavaScript engine, with no automatic browser or Node globals.
   Inspect the concrete bootstrap before using `console`, `TextEncoder`,
   timers, or cancellation APIs. Supply required host APIs explicitly and test
   rejected promises and timer callbacks in the real QuickJS host. Even passing
   `.catch(console.error)` reads `console` immediately and can abort startup.
+- Native copy actions use the host clipboard service, not `navigator.clipboard`.
+  On Linux, retain its clipboard handle for the application's lifetime: creating,
+  writing and immediately dropping the last handle can lose the selection before
+  another process reads it. Serialize reads/writes and verify a copy from an
+  independent process in a private display without a clipboard manager. Keep
+  original errors visible if copying fails, and ignore late feedback after the
+  copied value changes or its component is disposed.
+- For bounded multiline error text, pair `lineClamp` with `textOverflow="ellipsis"`
+  and clip its layout container. Clamped measurement alone can leave an extra
+  shaped line painted beyond the intended height. Copy the original diagnostic,
+  never the shortened visual label, and inspect a genuinely long error in the
+  native window at its minimum size.
 - Linked workspaces must bundle one SolidJS runtime and one `@argui/solid`
   adapter. Keeping symlink paths distinct can duplicate both even when their
   versions match. A widget then reads a different context identity and throws
@@ -65,3 +82,9 @@ Build scripts should compile the checked-out dependency revision. Reapplying
 a separately maintained patch over an evolving checkout makes subsequent
 launches fail with patch conflicts; commit library fixes in their repository
 and advance the application's submodule revision.
+
+When Rust compilation follows bundling, retain that invocation's bundles in a
+private output directory until staging finishes. Another frontend build can
+clean a shared `dist` while Cargo runs. Validate every required scene before
+compiling, publish complete files atomically, and clean up only the owning
+invocation's temporary directory.

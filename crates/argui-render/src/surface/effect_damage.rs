@@ -42,16 +42,15 @@ impl SurfaceRenderer {
         };
         let damage = match plan {
             DamagePlan::Partial(regions) if had_root => {
-                self.clear_effect_regions(encoder, root, regions);
-                if let Some(clip) = regions
-                    .iter()
-                    .copied()
-                    .map(|damage| PixelRegion {
+                let repaint = regions.iter().copied().reduce(DamageRegion::union);
+                if let Some(damage) = repaint {
+                    // Composition uses the union clip. Clear that same footprint,
+                    // including gaps, before translucent roots blend into it.
+                    self.clear_effect_regions(encoder, root, &[damage]);
+                    let clip = PixelRegion {
                         origin: [damage.x, damage.y],
                         size: [damage.width, damage.height],
-                    })
-                    .reduce(|acc, r| acc.union(r))
-                {
+                    };
                     self.render_effect_nodes(
                         encoder,
                         &graph.roots,
@@ -67,8 +66,8 @@ impl SurfaceRenderer {
                 }
                 DamageProfile {
                     mode: DamageMode::Partial,
-                    regions: regions.len(),
-                    damaged_pixels: regions.iter().copied().map(DamageRegion::pixels).sum(),
+                    regions: usize::from(repaint.is_some()),
+                    damaged_pixels: repaint.map_or(0, DamageRegion::pixels),
                     retained_bytes: self.effect_root_bytes(),
                 }
             }

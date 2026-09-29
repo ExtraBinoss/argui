@@ -30,6 +30,8 @@ impl MultiApplication {
 
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn close_window(&mut self, key: &WindowKey) {
+        self.activation.minimized.remove(key);
+        self.activation.restored.remove(key);
         if let Some(entry) = self.windows.remove(key) {
             if let Some(window_id) = entry.runtime.window_id() {
                 self.by_native.remove(&window_id);

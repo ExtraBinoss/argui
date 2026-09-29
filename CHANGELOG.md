@@ -8,9 +8,11 @@ that do not use them.
 
 ### Added
 
-- GPU canvases accept leased external frames through Vulkan DMA-BUF, Direct3D shared textures and retained IOSurface/Metal imports.
-- Added native split-pane resizing to TouchArea with measured bounds, retained layout updates, cancellation and one final onResizeCommit event.
+- Added `RaiseOpenWindows` for focus-preserving restoration of requested-open presentations, excluding hidden scenes and automatic focus fallback during minimization.
 
+- Added native split-pane resizing to `TouchArea`, with measured target bounds,
+  retained layout updates, cancellation restoration and a single final
+  `onResizeCommit` callback instead of JavaScript callbacks during dragging.
 - Added native host requests for retained window visibility and focus, dragging,
   edge resizing, physical positioning, raster image replacement and keyed element
   bounds. Window configurations can now constrain minimum and maximum client size,
@@ -64,9 +66,11 @@ that do not use them.
 
 ### Fixed
 
-- Automatic floating surfaces fit their content before viewport constraints; percentage widths retain their viewport sizing basis.
-- Retained resize and removed transitions restore authored layout, keeping native controls responsive.
+- X11 and native popup surfaces now prefer supported Mailbox presentation; active Linux animations have independent frame deadlines even when Mailbox is unavailable, keeping other windows responsive when a surface is covered or restored.
 
+- Floating surfaces with automatic width fit their content before viewport constraints are applied; percentage widths retain the viewport as their sizing basis when the surface is measured again.
+- Retained Wayland windows recover after compositor activation or pointer return, including a previously hidden window restored with unchanged keyboard focus. Automatic presentation uses supported tear-free mailbox with bounded animation ticks to avoid FIFO image waits blocking other windows.
+- Transparent native output preserves grey rounded corners through premultiplied sRGB transfer, and new popup windows wait for their first GPU frame before mapping.
 - Select removes departed pointer highlights while preserving the selected option and keyboard navigation.
 - Centered Select menu line boxes and Button icon content; text buttons apply horizontal padding without squeezing their vertical content.
 - Transparent X11 windows now preserve existing content during resize, and valid suboptimal swapchain frames remain presented until the following reconfiguration.
