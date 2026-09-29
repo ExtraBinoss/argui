@@ -187,6 +187,12 @@ impl SurfaceRenderer {
         let text = TextGpu::new(&device, target_format);
         let image = ImageGpu::new(&device, target_format, renderer_config.image_cache_bytes);
         let vector = VectorGpu::new(&device, target_format);
+        renderer_config.gpu_canvases.device_ready(
+            &device,
+            &queue,
+            target_format,
+            device_handle.0.generation,
+        );
         let gpu_canvas = CanvasGpu::new(
             &device,
             &queue,
@@ -482,6 +488,7 @@ impl SurfaceRenderer {
             }
             canvas_commands.push(encoder.finish());
             self.queue.submit(canvas_commands);
+            self.gpu_canvas.submitted(&self.queue);
             if let Some(frame) = frame {
                 self.queue.present(frame);
             }
@@ -542,6 +549,7 @@ impl SurfaceRenderer {
         }
         canvas_commands.push(encoder.finish());
         self.queue.submit(canvas_commands);
+        self.gpu_canvas.submitted(&self.queue);
         if let Some(frame) = frame {
             self.queue.present(frame);
         }

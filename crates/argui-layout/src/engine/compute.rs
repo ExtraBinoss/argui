@@ -3,24 +3,18 @@ use crate::layout_tree::LayoutTree;
 use argui_core::MetricTrace;
 use argui_core::{Point, Rect, Size};
 use argui_text::TextEngine;
-use argui_ui::{ElementKind, TreeUpdate, UiTree};
+use argui_ui::{TreeUpdate, UiTree};
 #[cfg(feature = "metrics")]
 use std::time::Duration;
-use taffy::{
-    AvailableSpace, Dimension, LengthPercentageAuto, NodeId, compute_leaf_layout,
-    geometry::Size as TaffySize, tree::LayoutOutput as TaffyLayoutOutput,
-};
+use taffy::{Dimension, LengthPercentageAuto, NodeId, geometry::Size as TaffySize};
 #[cfg(feature = "metrics")]
 use web_time::Instant;
 
-use crate::{
-    LayoutError,
-    assets::{AssetMetrics, resolve_intrinsic},
-    overlay::PortalConstraint,
-    style::taffy_style,
-};
+use crate::{LayoutError, assets::AssetMetrics, overlay::PortalConstraint, style::taffy_style};
 
-use super::{LayoutEngine, LayoutOutput, Placement, collect_layout, flattened};
+use super::{
+    LayoutEngine, LayoutOutput, Placement, collect_layout, flattened, measurement::Measurement,
+};
 
 const MAX_CONTAINER_QUERY_PASSES: usize = 4;
 
@@ -225,7 +219,7 @@ impl LayoutEngine {
             if crate::overlay::detached(element) {
                 #[cfg(feature = "metrics")]
                 let _measure = trace.map(|trace| trace.span("layout.measure"));
-                measurement.compute(&mut self.tree, node, viewport, None)?;
+                measurement.compute_portal(&mut self.tree, node, viewport)?;
                 let measured = self.tree.layout(node)?.size;
                 desired_sizes.push((
                     ui.node_id_at(index),
@@ -239,10 +233,10 @@ impl LayoutEngine {
                     viewport_rect,
                     node,
                 )? {
-                    let (node, size) = apply_constraint(&mut self.tree, constraint)?;
+                    let (node, _) = apply_constraint(&mut self.tree, constraint)?;
                     #[cfg(feature = "metrics")]
                     let _measure = trace.map(|trace| trace.span("layout.measure"));
-                    measurement.compute(&mut self.tree, node, size, None)?;
+                    measurement.compute_portal(&mut self.tree, node, viewport)?;
                 }
             }
             if element.layout_boundary {
@@ -288,6 +282,12 @@ impl LayoutEngine {
             }
         }
         drop(elements);
+        ui.observe_resize_bounds(
+            output
+                .nodes
+                .iter()
+                .map(|node| (node.node, node.layout_bounds.size)),
+        );
         output.virtualization_changed = crate::virtual_list::measure(root, &mut output, ui);
         let anchored = crate::anchor::apply(&self.scroll_anchors, ui, &output);
         for region in &output.text_inputs {
@@ -391,88 +391,4 @@ fn apply_constraint(
         }
     };
     Ok((node, size))
-}
-
-struct Measurement<'a> {
-    assets: &'a AssetMetrics,
-    elements: &'a [&'a argui_ui::Element],
-    ui: &'a UiTree,
-    text_engine: &'a mut TextEngine,
-}
-
-impl Measurement<'_> {
-    fn compute(
-        &mut self,
-        tree: &mut LayoutTree,
-        root: NodeId,
-        available: Size,
-        boundary_input: Option<taffy::tree::LayoutInput>,
-    ) -> Result<(), LayoutError> {
-        tree.compute_layout_with_measure(
-            root,
-            TaffySize {
-                width: AvailableSpace::Definite(available.width),
-                height: AvailableSpace::Definite(available.height),
-            },
-            boundary_input,
-            |inputs, _, context, style| {
-                let index = context;
-                let intrinsic =
-                    index.and_then(|index| self.assets.intrinsic(&self.elements[index].kind));
-                let text = index.and_then(|index| {
-                    let node = self.ui.node_id_at(index)?;
-                    let (content, text_style) =
-                        crate::text::content(self.ui, node, self.elements[index])?;
-                    let width = inputs
-                        .known_dimensions
-                        .width
-                        .or_else(|| inputs.available_space.width.into_option());
-                    Some(
-                        if matches!(self.elements[index].kind, ElementKind::TextEditor { .. }) {
-                            self.text_engine
-                                .measure_editor_content(&content, &text_style, width)
-                        } else {
-                            self.text_engine
-                                .measure_content(&content, &text_style, width)
-                        },
-                    )
-                });
-                if index.is_some_and(|index| {
-                    matches!(
-                        self.elements[index].kind,
-                        ElementKind::Text { .. } | ElementKind::TextEditor { .. }
-                    )
-                }) {
-                    debug_assert!(
-                        text.is_some_and(|measurement| measurement.first_baseline.is_some())
-                    );
-                }
-                let baselines = text.map_or(taffy::tree::Baselines::NONE, |measurement| {
-                    taffy::tree::Baselines {
-                        first: measurement.first_baseline,
-                        last: measurement.last_baseline,
-                    }
-                });
-                let size = compute_leaf_layout(
-                    inputs,
-                    style,
-                    |_, _| 0.0,
-                    |known, _| {
-                        if let Some(intrinsic) = intrinsic {
-                            return resolve_intrinsic(known, intrinsic);
-                        }
-                        let Some(measured) = text else {
-                            return TaffySize::ZERO;
-                        };
-                        TaffySize {
-                            width: known.width.unwrap_or(measured.size.width),
-                            height: known.height.unwrap_or(measured.size.height),
-                        }
-                    },
-                );
-                TaffyLayoutOutput { baselines, ..size }
-            },
-        )?;
-        Ok(())
-    }
 }

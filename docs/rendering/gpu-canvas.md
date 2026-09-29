@@ -208,6 +208,13 @@ recoverable descriptor conflict. The helper deliberately remains WGPU-free so
 `argui-ui`, custom layout, tests and paint caching do not depend on renderer
 handles or device lifetime.
 
+Factories receive `device_ready(&GpuCanvasDeviceContext)` once per surface renderer,
+before its first scene and before lazy `create`. This lets an external video
+producer select a supported GPU-memory transport using the actual enabled
+features. Surfaces sharing a device report the same generation; producers should
+keep their negotiation idempotent for that generation. No canvas texture is
+allocated by this notification, and queue submission remains owned by Argui.
+
 ## Context ownership and submission
 
 `GpuCanvasDeviceContext` exposes the selected device, queue, enabled features,
@@ -304,6 +311,31 @@ final render pass must write the supplied target view using
 hard-code `Bgra8UnormSrgb` or `Rgba8UnormSrgb`.
 
 ## Capabilities and fallback
+
+External native frames use the common `ExternalFrame` /
+`GpuCanvasRenderContext::import_external_frame` contract. Packed RGBA/BGRA
+allocations import through Vulkan DMA-BUF on Linux, Metal IOSurface on Apple
+platforms, and NT shared Direct3D 12 textures on Windows. These adapters do not
+map or upload pixel memory. They borrow Argui's actual device; they do not create
+another device, surface or presentation loop.
+
+Declare `ExternalFrame::requirements()` in the factory and choose a producer
+transport from `device_ready` using `context.external_frame_transport()`. Native
+import is optional: unsupported devices can still use ordinary GPU canvases.
+The unsafe frame constructor is the native producer boundary: the handle,
+format, extent and row layout must match the allocation; writes must be complete;
+a producer lease must prevent recycling until the frame is released. Vulkan
+allocations enter in GENERAL and shared D3D textures in COMMON. IOSurface
+references are retained across threads without exposing mutable surface access.
+
+Import the owned frame inside `render`, then create a view from
+`imported.texture(context)`. When caching the view or bind group, call
+`imported.retain(context)` on every subsequent render that samples it.
+Argui keeps that frame alive across its actual queue submission and releases its
+submission lease only after GPU completion. Failed, unsubmitted work releases
+leases without blocking the UI. Keep the imported object while retaining any
+views/groups which refer to it. The immutable producer lease also protects cached
+resources between dirty renders.
 
 Factories that need more than the WebGPU baseline declare requirements before
 device creation:

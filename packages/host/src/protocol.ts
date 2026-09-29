@@ -97,12 +97,14 @@ export interface GradientStopValue {
 }
 
 /** A solid color or a GPU-shaded gradient in normalized rectangle coordinates. */
-export type BrushValue = string | (
-  { stops: readonly GradientStopValue[]; space?: 'oklab' | 'linear-srgb' | 'srgb' } & (
+export type BrushValue = string | ({ space?: 'oklab' | 'linear-srgb' | 'srgb' } & (
+  | ({ stops: readonly GradientStopValue[] } & (
     | { kind: 'linear'; angle: number }
     | { kind: 'radial'; center: { x: number; y: number }; radius: { x: number; y: number } }
-  )
-)
+  ))
+  /** Corner colors ordered top-left, top-right, bottom-left, bottom-right. */
+  | { kind: 'bilinear'; corners: readonly [string, string, string, string] }
+))
 
 /** Paint-only transform; it does not reserve layout space. */
 export interface TransformValue {

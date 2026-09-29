@@ -31,6 +31,7 @@ impl super::EventType {
             Self::Gesture => "gesture",
             Self::SemanticAction => "semanticAction",
             Self::SelectionChange => "selectionChange",
+            Self::ResizeCommit => "resizeCommit",
         }
     }
 }

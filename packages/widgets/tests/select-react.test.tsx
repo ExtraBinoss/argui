@@ -12,7 +12,7 @@ const devices = Array.from({ length: 10 }, (_, index) => ({
 }))
 
 /** Mounts a compact menu and keeps React's test act environment scoped to it. */
-function fixture(props: Partial<Pick<SelectProps, 'allowClear' | 'options' | 'defaultValue' | 'width' | 'contentWidth'>> = {}) {
+function fixture(props: Partial<Pick<SelectProps, 'allowClear' | 'options' | 'defaultValue' | 'width' | 'contentWidth' | 'variant'>> = {}) {
   const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
   const previous = environment.IS_REACT_ACT_ENVIRONMENT
   environment.IS_REACT_ACT_ENVIRONMENT = true
@@ -20,7 +20,7 @@ function fixture(props: Partial<Pick<SelectProps, 'allowClear' | 'options' | 'de
   const root = createRoot(host)
   const changes: string[] = []
   act(() => root.render(<ThemeProvider runtime={runtime}>
-    <Select id="language" label="Language" variant="shadcn" options={props.options ?? options}
+    <Select id="language" label="Language" variant={props.variant ?? 'shadcn'} options={props.options ?? options}
       defaultValue={props.defaultValue ?? 'rust'} defaultOpen allowClear={props.allowClear}
       width={props.width} contentWidth={props.contentWidth}
       onValueChange={value => changes.push(value)} />
@@ -43,6 +43,21 @@ function propertyValue(node: NativeNode, name: string): unknown {
   const property = node.type.properties.find(item => item.name === name)
   return property ? node.values.get(property.id)?.value : undefined
 }
+
+test('both Select variants open with native compositing and keep options immediately active', () => {
+  for (const variant of ['default', 'shadcn'] as const) {
+    const view = fixture({ variant });
+    try {
+      const popup = mountedRole(view.root.nativeRoot(), 'listBox')!;
+      expect(propertyValue(popup, 'openingMs')).toBe(150);
+      expect(propertyValue(popup, 'openingScale')).toBe(0.98);
+      expect(propertyValue(popup, 'openingTranslateY')).toBe(variant === 'shadcn' ? 0 : -4);
+      emit(view, option(view.root.nativeRoot(), 'Go')!, 'click', {});
+      expect(view.changes).toEqual(['go']);
+      expect(mountedRole(view.root.nativeRoot(), 'listBox')).toBeUndefined();
+    } finally { view.dispose(); }
+  }
+});
 
 /** Finds the option's painted surface without depending on pointer wrapper layout. */
 function optionSurface(node: NativeNode): NativeNode | undefined {

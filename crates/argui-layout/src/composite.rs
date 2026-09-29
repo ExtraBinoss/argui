@@ -147,8 +147,7 @@ fn compositor_patches(
                         let node = output.nodes.get(*index)?;
                         let element = ui.element_at(node.index)?;
                         (
-                            ui.resolved_transform(node.node, element)
-                                .affine(node.bounds, element.transform_origin),
+                            crate::paint::local_transform(ui, output, *node, element),
                             if let Some(style) = &element.layer {
                                 ui.resolved_layer(node.node, element, style).opacity
                             } else {

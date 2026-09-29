@@ -327,11 +327,12 @@ impl UiTree {
         self.animations.entries.len()
     }
 
-    /// Returns preorder indices whose layout is affected by active animations.
+    /// Returns preorder indices whose cached layout needs animation or native resizing.
     #[must_use]
     pub fn layout_animation_indices(&self) -> Vec<usize> {
         let mut indices = self.animations.layout_indices.clone();
         indices.extend(self.transitions.layout_indices(&self.index));
+        indices.extend(self.resize_layout_indices());
         indices.sort_unstable();
         indices.dedup();
         indices

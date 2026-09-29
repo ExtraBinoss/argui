@@ -15,6 +15,16 @@ preparation.
 The type implements `Interpolate` and `MotionValue` and works with keyframes,
 springs, decay, and velocity-preserving retargeting.
 
+`PopupWindow` also exposes a native one-shot entrance: `openingMs` (1–60000 ms),
+`openingScale` (positive, default 1), and `openingTranslateY` (default 0). It fades
+from transparent to the authored opacity with ease-out timing. Scale pivots at the
+anchor and vertical translation reverses above it; viewport popups use their own
+center. The OS window bounds remain fixed, options remain interactive, and reduced
+motion presents the settled menu immediately. Matching declarative updates retain
+the entry's phase, including completion; removing and remounting starts a new one.
+Native surfaces repaint when a transform exposes pixels outside their retained
+source clip, preserving the clipped content instead of applying an invalid patch.
+
 ## Fills and gradients
 
 `Fill` can be solid, linear, radial, or bilinear. Every painted element uses the
@@ -33,7 +43,7 @@ Gradient stops use shared immutable CPU storage and one frame storage buffer.
 `RendererConfig::gradient_stop_capacity` bounds the total; its default is
 65,536. Geometry and stops can bind to typed motions.
 
-TSX `background` accepts a solid color string or a linear/radial brush. Stops
+TSX `background` accepts a solid color string or a linear, radial, or bilinear brush. Stops
 are ordered offsets from 0 to 1; radial centers and radii are relative to the
 painted rectangle. A static gradient can move or fade through its compositor
 layer without recalculating stops in JavaScript:
@@ -57,6 +67,11 @@ const glow: BrushValue = {
 
 `BilinearGradient` interpolates four premultiplied corners. The ColorPicker's
 HSV pad uses one bilinear quad: white/hue at the top and black at the bottom.
+Its TSX contract is `{ kind: 'bilinear', space: 'srgb', corners: [white, hue,
+black, black] }`, with corners ordered top-left, top-right, bottom-left,
+bottom-right. Each corner is a color literal; the native bridge rejects malformed
+colors, additional fields, or a corner count other than four. Identical brush
+values do not create redundant native mutations.
 
 ## Color
 

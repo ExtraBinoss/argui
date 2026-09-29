@@ -8,6 +8,7 @@ mod effect;
 mod effect_graph;
 mod effect_plan;
 mod error;
+mod external_frame;
 mod gpu_canvas;
 mod gpu_profile;
 mod image;
@@ -29,6 +30,10 @@ pub use config::{
 pub use damage::{DamageMode, DamagePlan, DamageProfile, DamageRegion, DamageSnapshot};
 pub use effect_graph::{EffectGraphAnalysis, EffectGraphStats, analyze_display_list};
 pub use error::{RendererAttemptFailure, RendererError};
+pub use external_frame::{
+    ExternalFrame, ExternalFrameDescriptor, ExternalFrameFormat, ExternalFrameMemory,
+    ExternalFrameTransport, ImportedExternalFrame,
+};
 pub use gpu_canvas::{
     GpuCanvasDeviceContext, GpuCanvasDiagnostic, GpuCanvasDiagnosticKind, GpuCanvasError,
     GpuCanvasFactory, GpuCanvasFailureStage, GpuCanvasMailbox, GpuCanvasRegistration,
@@ -47,3 +52,6 @@ pub use surface::{RenderStatus, RendererDevice, SurfaceRenderer};
 pub use text::TextAtlasStats;
 /// Exact WGPU version used by Argui's public GPU-canvas contexts.
 pub use wgpu;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub use external_frame::RetainedIoSurface;

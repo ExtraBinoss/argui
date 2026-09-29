@@ -141,6 +141,7 @@ impl UiTree {
                 bottom: crate::LengthPercentage::length(border.widths.bottom),
             };
         }
+        self.apply_resize_style(node, &mut style);
         style
     }
 

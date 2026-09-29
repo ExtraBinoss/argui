@@ -423,6 +423,30 @@ impl GpuCanvasRegistry {
             .map(|index| &self.registrations[index])
     }
 
+    /// Announces a validated device to producers before any canvas is painted.
+    ///
+    /// Device, queue and target format belong to this surface; generation identifies
+    /// its shared device. Factories receive no canvas allocation or submission.
+    pub(crate) fn device_ready(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        format: wgpu::TextureFormat,
+        generation: u64,
+    ) {
+        let context = super::GpuCanvasDeviceContext {
+            device,
+            queue,
+            features: device.features(),
+            limits: device.limits(),
+            format,
+            generation,
+        };
+        for registration in self.registrations() {
+            registration.0.factory.device_ready(&context);
+        }
+    }
+
     /// Aggregates and validates requirements against one adapter attempt.
     ///
     /// Optional features are intersected with `adapter_features`; `profiling`

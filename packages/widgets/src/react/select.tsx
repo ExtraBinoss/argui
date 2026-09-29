@@ -159,6 +159,9 @@ export function Select(props: SelectProps): ReactElement {
       containment="trap"
       initialFocus={initialFocus}
       restoreFocus={true}
+      openingMs={150}
+      openingScale={0.98}
+      openingTranslateY={shadcn ? 0 : -4}
       onDismiss={() => setOpen(false)}
     >
       <container width="100%" padding={shadowInset}>

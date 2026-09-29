@@ -25,7 +25,7 @@ use crate::{
 ///
 /// Returns a schema error when built-in identifiers or metadata conflict.
 pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError> {
-    let schema = NativeSchema::new(
+    let mut schema = NativeSchema::new(
         POPUP_WINDOW,
         "PopupWindow",
         "Portal and focus boundary whose visual content is supplied by children.",
@@ -125,6 +125,9 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         arity: SlotArity::Many,
         documentation: "Popup visuals and interactions supplied by the author.".into(),
     });
+    for property in super::popup_opening::properties() {
+        schema = schema.property(property);
+    }
     registry.register(schema, |input: &NativeElementInput| {
         let layer = parse_layer(input.get(WINDOW_LAYER))?;
         let dismiss = parse_dismiss(input.get(DISMISS_POLICY))?;
@@ -196,7 +199,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 .on(handler.direct_listener(EventType::Dismiss))
                 .on(handler.direct_listener(EventType::PointerOutside));
         }
-        Ok(element)
+        super::popup_opening::apply(element, input)
     })
 }
 

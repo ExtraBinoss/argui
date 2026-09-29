@@ -336,14 +336,51 @@ fn kind_changes_layout(old: &Element, new: &Element) -> bool {
             },
         ) => {
             // Base text color is refreshed by repaint; it cannot change glyph placement.
-            let mut old_metrics = old_style.clone();
-            old_metrics.color = new_style.color;
-            old_metrics != *new_style
+            text_metrics_changed(old_style, new_style)
                 || (old_content != new_content && !fixed_nonselectable_text(old, new))
         }
-        (ElementKind::TextEditor { .. }, ElementKind::TextEditor { .. }) => old != new,
+        (
+            ElementKind::TextEditor {
+                value: old_value,
+                placeholder: old_placeholder,
+                styled: old_styled,
+                multiline: old_multiline,
+                read_only: old_read_only,
+                filter: old_filter,
+                text: old_text,
+                placeholder_text: old_placeholder_text,
+                ..
+            },
+            ElementKind::TextEditor {
+                value: new_value,
+                placeholder: new_placeholder,
+                styled: new_styled,
+                multiline: new_multiline,
+                read_only: new_read_only,
+                filter: new_filter,
+                text: new_text,
+                placeholder_text: new_placeholder_text,
+                ..
+            },
+        ) => {
+            old_value != new_value
+                || old_placeholder != new_placeholder
+                || old_styled != new_styled
+                || old_multiline != new_multiline
+                || old_read_only != new_read_only
+                || old_filter != new_filter
+                || text_metrics_changed(old_text, new_text)
+                || text_metrics_changed(old_placeholder_text, new_placeholder_text)
+        }
         _ => true,
     }
+}
+
+/// Compares glyph placement in `old` and `new`, ignoring color-only repaint changes.
+fn text_metrics_changed(old: &argui_text::TextStyle, new: &argui_text::TextStyle) -> bool {
+    let mut metrics = old.clone();
+    metrics.color = new.color;
+    metrics != *new
 }
 
 fn fixed_nonselectable_text(old: &Element, new: &Element) -> bool {

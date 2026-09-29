@@ -11,6 +11,12 @@ use argui_ui::{
 
 #[path = "engine/compute.rs"]
 mod compute_tests;
+#[path = "engine/resize.rs"]
+mod resize;
+#[path = "engine/transition_restore.rs"]
+mod transition_restore;
+#[path = "engine/intrinsic_portals.rs"]
+mod intrinsic_portals;
 
 const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 

@@ -1,7 +1,7 @@
 //! Validated GPU brush values accepted from TSX presentation code.
 
-use argui_core::{Color, Point};
-use argui_paint::Fill;
+use argui_core::{Color, ColorInterpolation, Point};
+use argui_paint::{BilinearGradient, Fill};
 use serde_json::Value;
 
 use super::number;
@@ -14,6 +14,9 @@ pub(super) fn brush(value: &Value) -> Option<Fill> {
         return Color::from_literal(literal).ok().map(Fill::Solid);
     }
     let object = value.as_object()?;
+    if object.get("kind")?.as_str()? == "bilinear" {
+        return bilinear(object);
+    }
     let stops = object.get("stops")?.as_array()?;
     if !(2..=64).contains(&stops.len()) {
         return None;
@@ -46,6 +49,28 @@ pub(super) fn brush(value: &Value) -> Option<Fill> {
         }
         _ => None,
     }
+}
+
+/// Decodes four ordered corner colors in `object`; rejects invalid fields or interpolation.
+fn bilinear(object: &serde_json::Map<String, Value>) -> Option<Fill> {
+    if !fields(object, &["kind", "corners", "space"]) {
+        return None;
+    }
+    let corners = object.get("corners")?.as_array()?;
+    if corners.len() != 4 {
+        return None;
+    }
+    let color = |index: usize| Color::from_literal(corners[index].as_str()?).ok();
+    let interpolation = match object.get("space").map(Value::as_str) {
+        None | Some(Some("oklab")) => ColorInterpolation::Oklab,
+        Some(Some("linear-srgb")) => ColorInterpolation::LinearSrgb,
+        Some(Some("srgb")) => ColorInterpolation::Srgb,
+        _ => return None,
+    };
+    Some(Fill::Bilinear(BilinearGradient::new(
+        [color(0)?, color(1)?, color(2)?, color(3)?],
+        interpolation,
+    )))
 }
 
 /// Reads a finite two-dimensional point from `value`, or returns `None`.

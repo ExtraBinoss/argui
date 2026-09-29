@@ -5,6 +5,8 @@ use argui_animation::{
 
 #[path = "controller/frame_schedule.rs"]
 mod frame_schedule;
+#[path = "controller/timeline_retention.rs"]
+mod timeline_retention;
 
 #[test]
 fn tween_retargets_from_the_presented_value() {

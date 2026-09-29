@@ -102,6 +102,40 @@ fn malformed_gradient_brushes_are_rejected() {
 }
 
 #[test]
+fn bilinear_brush_preserves_corner_order_and_color_space() {
+    let wire = serde_json::from_value(serde_json::json!({
+        "type": "Brush", "value": {
+            "kind": "bilinear", "space": "srgb",
+            "corners": ["#ffffff", "#ff0000", "#000000", "#000000"]
+        }
+    }))
+    .unwrap();
+    let SchemaValue::Brush(Fill::Bilinear(gradient)) =
+        argui_runtime::WireValue::into_native(wire).unwrap()
+    else {
+        panic!("expected bilinear brush");
+    };
+    assert_eq!(gradient.interpolation, argui_core::ColorInterpolation::Srgb);
+    assert_eq!(
+        gradient.corners(),
+        &["#ffffff", "#ff0000", "#000000", "#000000"]
+            .map(|literal| Color::from_literal(literal).unwrap())
+    );
+    for invalid in [
+        serde_json::json!({"kind":"bilinear","corners":["#fff","#000","#000"]}),
+        serde_json::json!({"kind":"bilinear","corners":["#fff","#000","#000","#000","#fff"]}),
+        serde_json::json!({"kind":"bilinear","corners":["#fff","invalid","#000","#000"]}),
+        serde_json::json!({"kind":"bilinear","space":"hsl","corners":["#fff","#000","#000","#000"]}),
+        serde_json::json!({"kind":"bilinear","space":null,"corners":["#fff","#000","#000","#000"]}),
+        serde_json::json!({"kind":"bilinear","angle":0,"corners":["#fff","#000","#000","#000"]}),
+    ] {
+        let wire =
+            serde_json::from_value(serde_json::json!({"type":"Brush","value":invalid})).unwrap();
+        assert!(argui_runtime::WireValue::into_native(wire).is_err());
+    }
+}
+
+#[test]
 fn css_color_literals_decode_through_native_wire() {
     for literal in [
         "#ff008080",

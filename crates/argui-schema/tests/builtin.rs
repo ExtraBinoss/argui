@@ -15,12 +15,16 @@ mod loop_motion;
 mod media;
 #[path = "builtin/path.rs"]
 mod path;
+#[path = "builtin/popup_opening.rs"]
+mod popup_opening;
 #[path = "builtin/popup_window.rs"]
 mod popup_window;
 #[path = "builtin/rectangle.rs"]
 mod rectangle;
 #[path = "builtin/rectangle/press.rs"]
 mod rectangle_press;
+#[path = "builtin/resize.rs"]
+mod resize;
 #[path = "builtin/text_editor.rs"]
 mod text_editor;
 #[path = "builtin/touch_area.rs"]

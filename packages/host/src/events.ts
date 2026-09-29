@@ -12,6 +12,7 @@ export interface NativePointerGeometry {
 
 /** Public payload shapes indexed by the schema's native event type. */
 export interface NativeEventPayloads {
+  resizeCommit: { kind: 'resizeCommit'; value: number }
   action: { kind: 'action' }
   pointerEnter: { kind: 'pointerEnter' } & NativePointerGeometry
   pointerLeave: { kind: 'pointerLeave' } & NativePointerGeometry

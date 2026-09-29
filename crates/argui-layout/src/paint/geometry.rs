@@ -1,6 +1,42 @@
 use super::PaintContext;
 use crate::{LayoutNode, LayoutOutput};
-use argui_ui::{Element, HitRegion, PointerEvents};
+use argui_core::{Affine2D, Point, TransformOrigin};
+use argui_ui::{Element, FocusTarget, HitRegion, PointerEvents, PortalTarget, UiTree};
+
+/// Keeps anchored popup entrances attached to their trigger after collision placement.
+pub(crate) fn local_transform(
+    ui: &UiTree,
+    output: &LayoutOutput,
+    node: LayoutNode,
+    element: &Element,
+) -> Affine2D {
+    let mut transform = ui.resolved_transform(node.node, element);
+    if transform == argui_core::Transform2D::IDENTITY {
+        return Affine2D::IDENTITY;
+    }
+    let mut origin = element.transform_origin;
+    if let Some(portal) = &element.portal
+        && portal.transform_from_anchor
+        && let PortalTarget::Anchor(anchor) = &portal.target
+        && let Some(anchor_id) = ui.resolve_node(&FocusTarget::Key(anchor.key.clone()))
+        && let Some(anchor_node) = output.nodes.iter().find(|node| node.node == anchor_id)
+        && node.bounds.size.width > 0.0
+        && node.bounds.size.height > 0.0
+    {
+        let center = Point::new(
+            anchor_node.bounds.origin.x + anchor_node.bounds.size.width / 2.0,
+            anchor_node.bounds.origin.y + anchor_node.bounds.size.height / 2.0,
+        );
+        origin = TransformOrigin::new(
+            (center.x - node.bounds.origin.x) / node.bounds.size.width,
+            (center.y - node.bounds.origin.y) / node.bounds.size.height,
+        );
+        if node.bounds.origin.y + node.bounds.size.height / 2.0 < center.y {
+            transform.translation.y = -transform.translation.y;
+        }
+    }
+    transform.affine(node.bounds, origin)
+}
 
 /// Accessible bounds are surface-space rectangles, not untransformed layout
 /// boxes. Clips are conservatively represented by their transformed bounds.

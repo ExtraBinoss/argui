@@ -112,6 +112,11 @@ fn reconcile_node(
     })
 }
 
+/// Reuses `previous` in `tree`, restoring its current layout to resolved `style`.
+/// `element` supplies measurement context and `index` locates that context.
+///
+/// # Errors
+/// Returns a layout error if the retained node or its style is unavailable.
 fn reuse_node(
     tree: &mut LayoutTree,
     previous: &NodeMap,
@@ -119,8 +124,9 @@ fn reuse_node(
     style: &argui_ui::LayoutStyle,
     index: usize,
 ) -> Result<NodeId, LayoutError> {
-    if previous.style != *style || previous.element.portal != element.portal {
-        tree.set_style(previous.id, taffy_style(style))?;
+    let resolved_style = taffy_style(style);
+    if tree.style(previous.id)? != &resolved_style {
+        tree.set_style(previous.id, resolved_style)?;
     }
     if previous.index != index && !matches!(element.kind, ElementKind::Container) {
         tree.set_node_context(previous.id, Some(index))?;

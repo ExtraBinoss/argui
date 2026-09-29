@@ -7,6 +7,8 @@ use argui_ui::{
     property,
 };
 
+mod restoration;
+
 fn transition() -> StyleTransition {
     StyleTransition::new(Transition::tween(Tween::new(Duration::from_millis(100))))
 }

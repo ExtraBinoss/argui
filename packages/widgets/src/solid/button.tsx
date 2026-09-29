@@ -58,7 +58,7 @@ export function Button(props: ButtonProps): JSX.Element {
       background={paint().background}
       hoverBackground={paint().hover}
       border={{ width: 1, color: !grouped && props.variant === 'outline' ? theme().outlineBorder : 'transparent' }}
-      radii={grouped ? 0 : props.rounded ? sizing().height / 2 : buttonRadius(props.size, theme().radius)}
+      radii={grouped ? 0 : props.rounded ? sizing().height / 2 : props.radius ?? buttonRadius(props.size, theme().radius)}
       focusBorderColor={theme().focusRing}
       transitionMs={150}
       transitionTimingFunction="cubic-bezier(0.4, 0, 0.2, 1)"

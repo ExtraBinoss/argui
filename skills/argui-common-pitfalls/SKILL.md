@@ -50,6 +50,16 @@ assets; widgets do not impose an icon library.
 - `width` and `height` are preferred sizes. A percentage measures the parent;
   `grow` takes remaining flex space. Use `shrink={0}` for a rigid item and
   `minWidth={0}` when long flex content must shrink. There is no `fill` size.
+- `container` uses block layout by default. `justifyContent` and `alignItems`
+  alone do not make it flex: use `row` or `column` to center children. Give the
+  centering wrapper a resolvable width and height, then check the child's actual
+  native bounds; correctly typed alignment props can still leave it at the start.
+- Resolve a composed Solid JSX slot once; retain its reactive descendants rather
+  than calling its getter again to inspect geometry. A keyed `Show` over a fresh
+  object can remount an animated indicator and briefly duplicate its native ID.
+  Keep the indicator itself stable and key option lists by primitive IDs. For
+  responsive form widths, native label collapse and delayed hover hints, read
+  [retained responsive controls](references/argui-retained-responsive-controls.md).
 - Use `scrollView` with a resolvable viewport bound. A native scrollbar appears
   when content overflows and grows on hover by default; use
   `scrollbarVisible={false}` when a viewport needs no visible scrollbar.
@@ -184,6 +194,16 @@ assets; widgets do not impose an icon library.
   Choose the smallest native invalidation path that can express the effect,
   design the idle and active states deliberately, and measure the presented
   result rather than assuming every animation is a compositor update.
+- `transitionMs` accepts only 1–60,000 ms. Disable a timed transition by
+  omitting both `transitionMs` and `transitionTimingFunction`, not by passing
+  zero. Numeric JSX types do not express this runtime bound. Long continuous
+  motion needs bounded segments or another native motion contract.
+  Responsive width/height changes must not inherit a selection animation.
+  For split panes, use `TouchArea`'s native resize contract and commit the final
+  size to application state on release. Keep adjacent flexible panes in native
+  `row`/`column` layout. For splitter hover targets, live resize, color-picker,
+  meter and input-state regressions, read
+  [interactive control performance](references/interactive-control-performance.md).
 - Size Select's popup from its actual rows and header, up to a viewport cap.
   A short list should show its final option without requiring a tiny extra
   scroll. For `variant="shadcn"`, keep the field's visible value and the

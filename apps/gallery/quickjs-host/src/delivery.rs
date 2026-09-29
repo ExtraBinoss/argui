@@ -76,6 +76,7 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             "text": edit.replacement,
         }),
         UiEventKind::Submitted(text) => json!({"kind": "submit", "text": text}),
+        UiEventKind::ResizeCommitted { value } => json!({"kind":"resizeCommit", "value": value}),
         UiEventKind::Focused => json!({"kind": "focus"}),
         UiEventKind::Blurred => json!({"kind": "blur"}),
         UiEventKind::Click(_) => json!({"kind": "click"}),

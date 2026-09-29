@@ -1,3 +1,4 @@
+mod device;
 #[cfg(not(target_arch = "wasm32"))]
 use argui_render::SurfaceRenderer;
 use argui_render::{

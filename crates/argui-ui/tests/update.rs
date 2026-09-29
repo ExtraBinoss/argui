@@ -103,6 +103,49 @@ fn text_color_and_alpha_repaint_but_text_and_font_metrics_still_relayout() {
 }
 
 #[test]
+fn editor_colors_repaint_without_reflowing_or_resetting_the_input() {
+    let editor = |value: &str, color, size| {
+        Element::text_editor(argui_ui::TextEditorSpec {
+            value: value.to_owned(),
+            placeholder: "Script".to_owned(),
+            multiline: true,
+            read_only: false,
+            filter: argui_ui::TextInputFilter::Any,
+            text: argui_text::TextStyle {
+                color,
+                font_size: size,
+                ..Default::default()
+            },
+            placeholder_text: Default::default(),
+            selection: Color::WHITE,
+            caret: Default::default(),
+        })
+        .keyed("script")
+    };
+    let mut tree = UiTree::new(editor("Long script", Color::WHITE, 36.0));
+    let node = tree.node_ids()[0];
+    tree.mark_layout_clean();
+    for color in [Color::BLACK, Color::WHITE.with_alpha(0.2), Color::WHITE] {
+        assert_eq!(
+            tree.update(editor("Long script", color, 36.0)),
+            TreeUpdate::Paint
+        );
+        assert!(!tree.layout_dirty());
+        assert_eq!(tree.text_input_value(node), Some("Long script"));
+        assert_eq!(tree.node_ids()[0], node);
+    }
+    assert_eq!(
+        tree.update(editor("Long script", Color::WHITE, 48.0)),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        tree.update(editor("Edited", Color::WHITE, 48.0)),
+        TreeUpdate::Layout
+    );
+    assert_eq!(tree.text_input_value(node), Some("Edited"));
+}
+
+#[test]
 fn gpu_canvas_revision_retains_identity_while_remount_allocates_a_new_node() {
     let canvas = GpuCanvasId::fresh();
     let view = |revision| {

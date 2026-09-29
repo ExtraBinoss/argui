@@ -52,11 +52,12 @@ pub enum EventType {
     Gesture,
     SemanticAction,
     SelectionChange,
+    ResizeCommit,
 }
 
 impl EventType {
     /// Event kinds that can be emitted by the UI event system.
-    pub const ALL: [Self; 26] = [
+    pub const ALL: [Self; 27] = [
         Self::Action,
         Self::PointerEnter,
         Self::PointerLeave,
@@ -83,6 +84,7 @@ impl EventType {
         Self::Gesture,
         Self::SemanticAction,
         Self::SelectionChange,
+        Self::ResizeCommit,
     ];
 
     /// Returns whether dispatch for this event type depends on pointer hit testing.
@@ -105,6 +107,10 @@ impl EventType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UiEventKind {
+    /// Final clamped size after an engine-owned resize, with no move callbacks.
+    ResizeCommitted {
+        value: f32,
+    },
     Action(crate::ActionInvocation),
     Pointer(PointerEvent),
     PointerOutside(PointerEvent),
@@ -162,6 +168,7 @@ impl UiEventKind {
     #[must_use]
     pub const fn event_type(&self) -> EventType {
         match self {
+            Self::ResizeCommitted { .. } => EventType::ResizeCommit,
             Self::Action(_) => EventType::Action,
             Self::Pointer(event) => match event.phase {
                 PointerPhase::Entered => EventType::PointerEnter,
@@ -199,6 +206,7 @@ impl UiEventKind {
         !matches!(
             self,
             Self::Action(_)
+                | Self::ResizeCommitted { .. }
                 | Self::Pointer(PointerEvent {
                     phase: PointerPhase::Entered | PointerPhase::Left,
                     ..

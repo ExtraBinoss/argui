@@ -26,6 +26,8 @@ pub struct Portal {
     pub dismiss: DismissPolicy,
     /// None inherits the nearest enclosing portal's preference.
     pub surface: Option<OverlaySurface>,
+    /// Pivot presentation transforms at the anchor and reverse vertical entry motion above it.
+    pub transform_from_anchor: bool,
 }
 
 impl Portal {
@@ -40,6 +42,7 @@ impl Portal {
             target,
             dismiss: DismissPolicy::Manual,
             surface: None,
+            transform_from_anchor: false,
         }
     }
 

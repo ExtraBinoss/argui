@@ -6,8 +6,8 @@ use web_time::Instant;
 use crate::image::pipeline::{ImageInstance, ImagePipeline};
 
 use super::{
-    GpuCanvasDeviceContext, GpuCanvasDiagnostic, GpuCanvasDiagnosticKind, GpuCanvasFailureStage,
-    GpuCanvasRegistry, GpuCanvasRenderContext, GpuCanvasRenderer, GpuCanvasStats,
+    GpuCanvasDeviceContext, GpuCanvasDiagnostic, GpuCanvasFailureStage, GpuCanvasRegistry,
+    GpuCanvasRenderContext, GpuCanvasRenderer, GpuCanvasStats,
     cache::{CanvasCache, CanvasExtent, CanvasKey},
     target::{clear_target, placeholder_texture},
 };
@@ -18,10 +18,10 @@ enum RendererSlot {
 }
 
 #[derive(Clone, Debug)]
-struct FailureRecord {
-    stage: GpuCanvasFailureStage,
-    label: String,
-    message: String,
+pub(super) struct FailureRecord {
+    pub(super) stage: GpuCanvasFailureStage,
+    pub(super) label: String,
+    pub(super) message: String,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -51,6 +51,7 @@ pub(crate) struct CanvasPreparation {
 }
 
 pub(crate) struct CanvasGpu {
+    external_frames: Vec<std::sync::Arc<crate::ExternalFrame>>,
     registry: GpuCanvasRegistry,
     renderers: HashMap<GpuCanvasId, RendererSlot>,
     cache: CanvasCache,
@@ -59,8 +60,8 @@ pub(crate) struct CanvasGpu {
     placeholder_linear: wgpu::BindGroup,
     placeholder_nearest: wgpu::BindGroup,
     draws: Vec<DrawSource>,
-    failures: HashMap<CanvasKey, FailureRecord>,
-    diagnostics: Vec<GpuCanvasDiagnostic>,
+    pub(super) failures: HashMap<CanvasKey, FailureRecord>,
+    pub(super) diagnostics: Vec<GpuCanvasDiagnostic>,
     stats: GpuCanvasStats,
     format: wgpu::TextureFormat,
     generation: u64,
@@ -88,6 +89,7 @@ impl CanvasGpu {
         let placeholder_nearest =
             pipeline.texture_group(device, &placeholder_view, ImageSampling::Nearest);
         Self {
+            external_frames: Vec::new(),
             registry,
             renderers: HashMap::new(),
             cache: CanvasCache::new(format, budget),
@@ -107,6 +109,14 @@ impl CanvasGpu {
         }
     }
 
+    /// Retains producer allocations until the just-submitted canvas work completes.
+    pub fn submitted(&mut self, queue: &wgpu::Queue) {
+        let frames = std::mem::take(&mut self.external_frames);
+        if !frames.is_empty() {
+            queue.on_submitted_work_done(move || drop(frames));
+        }
+    }
+
     /// Plans, renders and prepares compositor data for `display_list` canvases.
     ///
     /// The returned command buffers contain only successful canvas work and
@@ -118,6 +128,7 @@ impl CanvasGpu {
         display_list: &DisplayList,
         scale_factor: f32,
     ) -> CanvasPreparation {
+        self.external_frames.clear();
         let started = Instant::now();
         self.frame = self.frame.wrapping_add(1);
         self.stats = GpuCanvasStats::default();
@@ -385,6 +396,7 @@ impl CanvasGpu {
                 device,
                 queue,
                 encoder: &mut encoder,
+                external_frames: &mut self.external_frames,
                 target,
                 format: self.format,
                 extent: extent.size,
@@ -467,69 +479,6 @@ impl CanvasGpu {
             },
         };
         self.renderers.insert(id, renderer);
-    }
-
-    /// Records and emits a changed failure for retained `key` exactly once.
-    fn record_failure(
-        &mut self,
-        key: CanvasKey,
-        canvas: &GpuCanvasPrimitive,
-        label: String,
-        stage: GpuCanvasFailureStage,
-        message: String,
-    ) {
-        if self
-            .failures
-            .get(&key)
-            .is_some_and(|current| current.stage == stage && current.message == message)
-        {
-            return;
-        }
-        let readable = format!("GPU canvas '{label}' failed during {stage:?}: {message}");
-        eprintln!("{readable}");
-        self.failures.insert(
-            key,
-            FailureRecord {
-                stage,
-                label: label.clone(),
-                message: message.clone(),
-            },
-        );
-        self.diagnostics.push(GpuCanvasDiagnostic {
-            kind: GpuCanvasDiagnosticKind::Failed,
-            stage,
-            label,
-            canvas: canvas.canvas,
-            object: canvas.object,
-            slot: canvas.slot,
-            message: readable,
-        });
-    }
-
-    /// Emits one recovery when `key` previously had a recorded failure.
-    fn record_recovery(
-        &mut self,
-        key: CanvasKey,
-        canvas: &GpuCanvasPrimitive,
-        fallback_label: &str,
-    ) {
-        let Some(previous) = self.failures.remove(&key) else {
-            return;
-        };
-        let label = if previous.label.is_empty() {
-            fallback_label.to_owned()
-        } else {
-            previous.label
-        };
-        self.diagnostics.push(GpuCanvasDiagnostic {
-            kind: GpuCanvasDiagnosticKind::Recovered,
-            stage: previous.stage,
-            label: label.clone(),
-            canvas: canvas.canvas,
-            object: canvas.object,
-            slot: canvas.slot,
-            message: format!("GPU canvas '{label}' recovered"),
-        });
     }
 
     /// Starts the shared textured-quad compositor's frame state.

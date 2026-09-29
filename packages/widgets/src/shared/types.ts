@@ -47,6 +47,8 @@ export type ButtonOptions = Omit<WidgetLayoutProps, 'height' | 'minHeight' | 'ma
   contentAlign?: 'start' | 'center' | 'end'
   /** Use pill corners on an ungrouped button. */
   rounded?: boolean
+  /** Overrides the size-dependent corner radius on an ungrouped non-pill button. */
+  radius?: number
   /** Controlled selected state of a toggle button, exposed as pressed to assistive technology. */
   pressed?: boolean
   disabled?: boolean

@@ -1,4 +1,5 @@
 mod cache;
+mod diagnostics;
 mod pipeline;
 mod registry;
 mod target;
@@ -51,6 +52,14 @@ pub trait GpuCanvasFactory: Send + Sync + 'static {
     fn requirements(&self) -> GpuCanvasRequirements {
         GpuCanvasRequirements::default()
     }
+
+    /// Announces the selected device before the first scene or lazy canvas renderer.
+    ///
+    /// The context supplies the enabled capabilities, queue, format and generation
+    /// so external producers can negotiate a transport before publishing frames.
+    /// Called once per surface renderer; shared devices retain the same generation.
+    /// Do not submit queue work or block waiting for a canvas frame here.
+    fn device_ready(&self, _context: &GpuCanvasDeviceContext<'_>) {}
 
     /// Creates the retained renderer using Argui's selected device and queue.
     ///
@@ -154,6 +163,7 @@ pub struct GpuCanvasRenderContext<'a> {
     pub(crate) device: &'a wgpu::Device,
     pub(crate) queue: &'a wgpu::Queue,
     pub(crate) encoder: &'a mut wgpu::CommandEncoder,
+    pub(crate) external_frames: &'a mut Vec<std::sync::Arc<crate::ExternalFrame>>,
     pub(crate) target: &'a wgpu::TextureView,
     pub(crate) format: wgpu::TextureFormat,
     pub(crate) extent: [u32; 2],

@@ -76,9 +76,14 @@ export function encodeValue(property: NativeProperty, value: unknown): WireValue
 }
 
 function validBrush(value: unknown): boolean {
-  if (!plainObject(value) || !Array.isArray(value.stops)
-    || value.stops.length < 2 || value.stops.length > 64) return false
+  if (!plainObject(value)) return false
   if (value.space !== undefined && !['oklab', 'linear-srgb', 'srgb'].includes(value.space as string)) return false
+  if (value.kind === 'bilinear') {
+    return Object.keys(value).every(key => ['kind', 'corners', 'space'].includes(key))
+      && Array.isArray(value.corners) && value.corners.length === 4
+      && value.corners.every(color => typeof color === 'string')
+  }
+  if (!Array.isArray(value.stops) || value.stops.length < 2 || value.stops.length > 64) return false
   let previous = 0
   for (const stop of value.stops) {
     if (!plainObject(stop) || Object.keys(stop).length !== 2
@@ -195,7 +200,7 @@ export function equalValue(left: WireValue | undefined, right: WireValue): boole
   }
   if (right.type === 'GridTracks' || right.type === 'ContainerRules' || right.type === 'Insets' || right.type === 'PositionInsets'
     || right.type === 'Radii' || right.type === 'Border'
-    || right.type === 'Shadow' || right.type === 'Transform') {
+    || right.type === 'Shadow' || right.type === 'Transform' || right.type === 'Brush') {
     return JSON.stringify(left.value) === JSON.stringify(right.value)
   }
   return left.value === right.value

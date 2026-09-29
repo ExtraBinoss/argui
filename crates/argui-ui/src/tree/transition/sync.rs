@@ -68,8 +68,7 @@ impl UiTree {
     /// Full-tree calls also discard transitions whose targets were removed.
     fn sync_transition_subtree(&mut self, root: usize, reduced_motion: bool) -> TreeUpdate {
         if !self.index.has_transitions() {
-            self.transitions.clear();
-            return TreeUpdate::None;
+            return self.transitions.clear();
         }
         let Some(element) = self.index.at(root) else {
             return TreeUpdate::None;

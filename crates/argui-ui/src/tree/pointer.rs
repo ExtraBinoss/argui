@@ -160,6 +160,7 @@ impl UiTree {
             self.dismiss_on_hover_exit(event.position, regions, &mut update);
         }
         self.dispatch_gestures(gestures, &mut update);
+        update.merge(self.resize_pointer(event, hit.map(|(node, _)| node)));
         update
     }
 

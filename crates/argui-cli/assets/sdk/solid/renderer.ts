@@ -16,8 +16,8 @@ export function nativeHost(): NativeHost {
 
 const renderer = createRenderer<NativeNode>({
   createElement: (name) => nativeHost().createElement(name),
-  createTextNode: (value) => nativeHost().createInlineTextNode(value),
-  replaceText: (node, value) => nativeHost().replaceText(node, value),
+  createTextNode: (value) => nativeHost().createInlineTextNode(String(value)),
+  replaceText: (node, value) => nativeHost().replaceText(node, String(value)),
   setProperty: (node, name, value) => {
     if (name !== 'key') nativeHost().setProperty(node, name, value)
   },

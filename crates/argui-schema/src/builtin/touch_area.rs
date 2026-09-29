@@ -188,7 +188,20 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         arity: SlotArity::Many,
         documentation: "Visual descendants of the hit region.".into(),
     });
+    let schema = super::resize::properties()
+        .into_iter()
+        .fold(schema, |schema, property| schema.property(property))
+        .event(
+            EventSchema::new(
+                super::RESIZE_COMMIT,
+                "resizeCommit",
+                EventType::ResizeCommit,
+                "Final clamped pane size after native resizing; no movement callbacks.",
+            )
+            .payload(ValueType::Float),
+        );
     registry.register(schema, |input: &NativeElementInput| {
+        let resize = super::resize::parse(input)?;
         let cursor = match input.get(MOUSE_CURSOR) {
             Some(SchemaValue::String(name)) => parse_cursor(name)?,
             _ => CursorIcon::Auto,
@@ -208,13 +221,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         }
         // Ordinary taps leave touch scrolling available to an ancestor viewport.
         // Pressed-pointer movement and explicit pans retain their drag capture.
-        let captures_drag =
-            gestures.captures_on_press() || input.events.iter().any(|event| event.id == MOVED);
-        let interaction = Interaction::default()
+        let captures_drag = resize.is_some()
+            || gestures.captures_on_press()
+            || input.events.iter().any(|event| event.id == MOVED);
+        let mut interaction = Interaction::default()
             .enabled(optional_bool(input, ENABLED).unwrap_or(true))
             .cursor(cursor)
             .gestures(gestures)
             .capture_on_press(captures_drag);
+        interaction.resize = resize;
         let mut element =
             apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?
                 .interaction(interaction)
@@ -233,6 +248,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 POINTER_CANCEL => EventType::PointerCancel,
                 WHEEL => EventType::Wheel,
                 DRAG_X | DRAG_Y => EventType::Gesture,
+                super::RESIZE_COMMIT => EventType::ResizeCommit,
                 _ => continue,
             };
             let filter = match event.id {

@@ -658,6 +658,11 @@ export namespace JSX {
       visible?: boolean
       enabled?: boolean
       mouseCursor?: "auto" | "default" | "contextMenu" | "help" | "pointer" | "progress" | "wait" | "cell" | "crosshair" | "text" | "verticalText" | "alias" | "copy" | "move" | "noDrop" | "notAllowed" | "grab" | "grabbing" | "eResize" | "nResize" | "neResize" | "nwResize" | "sResize" | "seResize" | "swResize" | "wResize" | "ewResize" | "nsResize" | "neswResize" | "nwseResize" | "colResize" | "rowResize" | "allScroll" | "zoomIn" | "zoomOut" | "dndAsk" | "allResize"
+      resizeTarget?: string
+      resizeAxis?: "horizontal" | "vertical"
+      resizeMinimum?: number
+      resizeMaximum?: number
+      resizeTrailing?: boolean
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
       accessibleDescription?: string
@@ -713,6 +718,7 @@ export namespace JSX {
       onDragX?: (payload: NativeEventPayload<'gesture'>) => void
       onDragY?: (payload: NativeEventPayload<'gesture'>) => void
       onWheel?: (payload: NativeEventPayload<'wheel'>) => void
+      onResizeCommit?: (payload: NativeEventPayload<'resizeCommit'>) => void
       onSemanticAction?: (payload: NativeEventPayload<'semanticAction'>) => void
       key?: import('react').Key
       ref?: Ref<NativeHandle>
@@ -1029,6 +1035,9 @@ export namespace JSX {
       containment?: "none" | "trap" | "modal"
       restoreFocus?: boolean
       initialFocus?: string
+      openingMs?: number
+      openingScale?: number
+      openingTranslateY?: number
       role?: "generic" | "window" | "group" | "navigation" | "text" | "heading" | "image" | "link" | "button" | "checkBox" | "radioButton" | "radioGroup" | "switch" | "textInput" | "textArea" | "searchInput" | "table" | "grid" | "row" | "columnHeader" | "cell" | "list" | "listItem" | "tree" | "treeItem" | "listBox" | "option" | "menu" | "menuItem" | "menuBar" | "menuItemCheckBox" | "menuItemRadio" | "comboBox" | "tooltip" | "status" | "alertDialog" | "slider" | "progress" | "tab" | "tabList" | "tabPanel" | "dialog" | "alert" | "separator"
       accessibleName?: string
       accessibleDescription?: string

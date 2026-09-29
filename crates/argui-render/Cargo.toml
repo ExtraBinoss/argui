@@ -25,9 +25,14 @@ wgpu = { workspace = true, features = ["vulkan", "gles"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 wgpu = { workspace = true, features = ["dx12", "vulkan"] }
+windows = { workspace = true, features = ["Win32_Graphics_Direct3D12", "Win32_Graphics_Dxgi_Common", "Win32_Foundation"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 wgpu = { workspace = true, features = ["metal"] }
+objc2 = "=0.6.4"
+objc2-core-foundation = "=0.3.2"
+objc2-io-surface = "=0.3.2"
+objc2-metal = { version = "=0.3.2", default-features = false, features = ["std", "MTLAllocation", "MTLDevice", "MTLPixelFormat", "MTLResource", "MTLTexture", "objc2-io-surface"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wgpu = { workspace = true, features = ["webgpu"] }
@@ -38,6 +43,10 @@ pollster.workspace = true
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 # Creates a Wayland window for the native surface integration test.
 winit.workspace = true
+
+[[test]]
+name = "external_frame"
+path = "tests/external_frame/mod.rs"
 
 [[test]]
 name = "gpu_canvas"

@@ -327,6 +327,10 @@ fn every_event_kind_maps_to_its_dom_metadata() {
             EventType::TextEdit,
         ),
         (UiEventKind::Submitted("done".into()), EventType::Submit),
+        (
+            UiEventKind::ResizeCommitted { value: 200. },
+            EventType::ResizeCommit,
+        ),
         (UiEventKind::Gesture(gesture), EventType::Gesture),
         (
             UiEventKind::SemanticAction {

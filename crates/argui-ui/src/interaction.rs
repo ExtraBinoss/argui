@@ -114,6 +114,8 @@ pub struct Interaction {
     pub keyboard_activation: KeyboardActivation,
     pub press_bounce_scale: Option<f32>,
     pub window_drag: Option<WindowDragBehavior>,
+    /// Engine-owned pane resizing; callbacks run only when its value commits.
+    pub resize: Option<crate::ResizeHandle>,
 }
 
 impl Default for Interaction {
@@ -128,6 +130,7 @@ impl Default for Interaction {
             keyboard_activation: KeyboardActivation::None,
             press_bounce_scale: None,
             window_drag: None,
+            resize: None,
         }
     }
 }
@@ -156,6 +159,7 @@ impl Interaction {
             keyboard_activation: KeyboardActivation::None,
             press_bounce_scale: None,
             window_drag: None,
+            resize: None,
         }
     }
 

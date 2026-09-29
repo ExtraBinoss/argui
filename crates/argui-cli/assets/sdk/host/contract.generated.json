@@ -1,5 +1,5 @@
 {
-  "abiHash": "3825911427570161454",
+  "abiHash": "13933140341026408462",
   "natives": [
     {
       "id": 1,
@@ -6458,6 +6458,54 @@
           "allowedValues": []
         },
         {
+          "id": 300,
+          "name": "resizeTarget",
+          "valueType": "String",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 301,
+          "name": "resizeAxis",
+          "valueType": "String",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": [
+            "horizontal",
+            "vertical"
+          ]
+        },
+        {
+          "id": 302,
+          "name": "resizeMinimum",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 303,
+          "name": "resizeMaximum",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 304,
+          "name": "resizeTrailing",
+          "valueType": "Bool",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
           "id": 85,
           "name": "role",
           "valueType": "String",
@@ -6990,6 +7038,12 @@
           "name": "wheel",
           "payload": null,
           "eventType": "wheel"
+        },
+        {
+          "id": 27,
+          "name": "resizeCommit",
+          "payload": "Float",
+          "eventType": "resizeCommit"
         },
         {
           "id": 26,
@@ -10011,6 +10065,33 @@
           "id": 83,
           "name": "initialFocus",
           "valueType": "String",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 269,
+          "name": "openingMs",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 270,
+          "name": "openingScale",
+          "valueType": "Float",
+          "readOnly": false,
+          "required": false,
+          "default": null,
+          "allowedValues": []
+        },
+        {
+          "id": 271,
+          "name": "openingTranslateY",
+          "valueType": "Float",
           "readOnly": false,
           "required": false,
           "default": null,
