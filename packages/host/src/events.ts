@@ -30,7 +30,7 @@ export interface NativeEventPayloads {
     kind: 'key'; key: string; state: 'pressed' | 'released'; text: string | null
     shift: boolean; control: boolean; alt: boolean; super: boolean; repeat: boolean
   } & NativePointerGeometry
-  wheel: { kind: 'wheel' } & NativePointerGeometry
+  wheel: { kind: 'wheel'; deltaX: number; deltaY: number; deltaMode: 'lines' | 'pixels' } & NativePointerGeometry
   scroll: { kind: 'scroll'; offsetX: number; offsetY: number } & NativePointerGeometry
   measure: {
     kind: 'measure'; items: readonly { index: number; extent: number }[]

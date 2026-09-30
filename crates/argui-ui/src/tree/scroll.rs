@@ -170,7 +170,7 @@ impl UiTree {
         let target = regions
             .iter()
             .rev()
-            .find(|region| region.config.enabled && region.contains(point))
+            .find(|region| region.contains(point))
             .map(|region| region.node)
             .or_else(|| self.node_ids().first().copied());
         target.map_or_else(InteractionUpdate::default, |target| {

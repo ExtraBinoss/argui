@@ -569,31 +569,5 @@ fn nested_scroll_passes_only_its_unconsumed_delta_to_the_parent() {
     assert_eq!(tree.scroll_offset(parent), Point::new(0.0, 20.0));
 }
 
-#[test]
-fn horizontal_scrollbar_thumb_drag_uses_horizontal_geometry() {
-    let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::default()),
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
-    );
-    let config = ScrollConfig::default()
-        .axes(argui_ui::ScrollAxes::Horizontal)
-        .scrollbar(style.clone());
-    let mut tree = UiTree::new(Element::container([]).scroll_config(config.clone()));
-    let node = tree.node_id_at(0).unwrap();
-    let mut scroll = region(node, config, 0.0);
-    scroll.max_offset = Point::new(500.0, 0.0);
-    scroll.scrollbar = Some(ScrollbarRegion {
-        horizontal: Some(ScrollbarGeometry {
-            track: scroll.bounds,
-            thumb: Rect::new(Point::default(), Size::new(40.0, 200.0)),
-        }),
-        vertical: None,
-        style,
-    });
-    let regions = [scroll];
-    tree.scrollbar_pressed(Point::new(20.0, 100.0), &regions)
-        .unwrap();
-    tree.scrollbar_dragged(Point::new(180.0, 100.0), &regions)
-        .unwrap();
-    assert_eq!(tree.scroll_offset(node), Point::new(500.0, 0.0));
-}
+#[path = "scroll/input.rs"]
+mod input;

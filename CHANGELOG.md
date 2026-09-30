@@ -66,6 +66,7 @@ that do not use them.
 
 ### Fixed
 
+- Disabled native scrolling still delivers raw wheel events to custom zoom handlers. Host wheel payloads expose independent axes and line or pixel units.
 - X11 and native popup surfaces now prefer supported Mailbox presentation; active Linux animations have independent frame deadlines even when Mailbox is unavailable, keeping other windows responsive when a surface is covered or restored.
 
 - Floating surfaces with automatic width fit their content before viewport constraints are applied; percentage widths retain the viewport as their sizing basis when the surface is measured again.
